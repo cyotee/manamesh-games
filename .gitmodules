@@ -1,0 +1,3 @@
+[submodule "manamesh"]
+	path = manamesh
+	url = https://github.com/cyotee/manamesh.git
