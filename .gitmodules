@@ -4,3 +4,6 @@
 [submodule "packages/boardgame.io"]
 	path = packages/boardgame.io
 	url = https://github.com/boardgameio/boardgame.io.git
+[submodule "packages/boardgameIO-p2p"]
+	path = packages/boardgameIO-p2p
+	url = https://github.com/cyotee/boardgameIO-p2p.git
