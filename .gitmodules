@@ -1,3 +1,6 @@
 [submodule "manamesh"]
 	path = manamesh
 	url = https://github.com/cyotee/manamesh.git
+[submodule "packages/boardgame.io"]
+	path = packages/boardgame.io
+	url = https://github.com/boardgameio/boardgame.io.git
