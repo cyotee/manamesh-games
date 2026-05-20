@@ -1,0 +1,32 @@
+[profile.default]
+src = "contracts"
+test = "tests/foundry"
+out = "out"
+script = "script"
+cache_path = "cache"
+libs = ["lib"]
+
+# Compiler settings — aligned with Crane (lib/crane/AGENTS.md §Configuration).
+solc_version = "0.8.30"
+optimizer = true
+optimizer_runs = 1
+evm_version = "prague"
+
+# Testing
+ffi = false
+verbosity = 2
+fuzz = { runs = 256 }
+
+[profile.ci]
+fuzz = { runs = 1000 }
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = true
+
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+base = "${BASE_RPC_URL}"

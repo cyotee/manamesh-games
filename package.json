@@ -1,0 +1,11 @@
+{
+  "name": "manamesh-games",
+  "packageManager": "yarn@4.11.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "boardgame.io": "file:./packages/boardgame.io",
+    "boardgameIO-p2p": "file:./packages/boardgameIO-p2p"
+  }
+}

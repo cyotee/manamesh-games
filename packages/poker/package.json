@@ -1,0 +1,38 @@
+{
+  "name": "@manamesh/poker",
+  "version": "0.1.0",
+  "description": "Texas Hold'em poker module for ManaMesh — Solidity settlement contracts, EIP-712 signing helpers, boardgame.io game module, and React board.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components/PokerBoard": "./src/components/PokerBoard.tsx",
+    "./signing": "./src/signing.ts",
+    "./handId": "./src/handId.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "forge:build": "forge build",
+    "forge:test": "forge test"
+  },
+  "peerDependencies": {
+    "@manamesh/frontend": "*",
+    "boardgame.io": "^0.50.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dependencies": {
+    "elliptic": "^6.5.5",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/elliptic": "^6.4.0",
+    "@types/react": "^18.2.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
