@@ -2,7 +2,8 @@
   "name": "manamesh-games",
   "packageManager": "yarn@4.11.0",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "manamesh/packages/*"
   ],
   "dependencies": {
     "boardgame.io": "file:./packages/boardgame.io",
