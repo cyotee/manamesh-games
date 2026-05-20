@@ -1,0 +1,23 @@
+{
+  "../../manamesh": {
+    "rev": "5105ac9e0037e97b55785a486f4e8a492666253c"
+  },
+  "../boardgame.io": {
+    "rev": "4f3c90df0d891f2e17f2bfafbed1bd4f4b804256"
+  },
+  "../boardgameIO-p2p": {
+    "rev": "7fa0af062661a913f3497b7f77ca0fbc83c0824b"
+  },
+  "lib/forge-std": {
+    "tag": {
+      "name": "v1.16.1",
+      "rev": "620536fa5277db4e3fd46772d5cbc1ea0696fb43"
+    }
+  },
+  "lib/openzeppelin-contracts": {
+    "tag": {
+      "name": "v5.0.2",
+      "rev": "dbb6104ce834628e473d2173bbc9d47f81a9eec3"
+    }
+  }
+}

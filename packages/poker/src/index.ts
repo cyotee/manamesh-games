@@ -1,4 +1,100 @@
-// Re-exports will be filled in as files migrate into this package
-// during the Phase 0 tasks of the implementation plan
-// (docs/superpowers/plans/2026-05-19-poker-hand-settler.md, in the manamesh submodule).
-export {};
+/**
+ * Poker Game Module
+ *
+ * Texas Hold'em poker implementation with both standard and crypto variants.
+ */
+
+// Types
+export type {
+  PokerCard,
+  BasePokerState,
+  PokerState,
+  PokerPlayerState,
+  CryptoPokerState,
+  CryptoPokerPlayerState,
+  PokerPhase,
+  CryptoPokerPhase,
+  BettingRoundState,
+  SidePot,
+  PokerConfig,
+  TimeoutConfig,
+  EvaluatedHand,
+  HandComparisonResult,
+  ShowdownResult,
+  MoveValidation,
+  PeekNotification,
+} from './types';
+
+export {
+  HandRank,
+  HAND_RANK_NAMES,
+  RANK_VALUES,
+  SUIT_VALUES,
+  POKER_ZONES,
+  DEFAULT_POKER_CONFIG,
+  DEFAULT_TIMEOUT_CONFIG,
+  getCardId,
+  parseCardId,
+  getAllCardIds,
+} from './types';
+
+// Hand ranking
+export {
+  evaluateHand,
+  compareHands,
+  findBestHand,
+  determineWinners,
+  getHandRankName,
+} from './hands';
+
+// Betting logic
+export {
+  initBettingRound,
+  getNextActivePlayer,
+  isBettingRoundComplete,
+  getActivePlayerIds,
+  getActingPlayerIds,
+  countActivePlayers,
+  processFold,
+  processCheck,
+  processCall,
+  processBet,
+  processRaise,
+  processAllIn,
+  calculateSidePots,
+  resetBetsForNewRound,
+  collectBets,
+  getSmallBlindPlayer,
+  getBigBlindPlayer,
+  getUTGPlayer,
+  getFirstToActPostflop,
+  postBlinds,
+  rotateDealer,
+  canPlayerAct,
+  getValidActions,
+} from './betting';
+
+// Standard Poker
+export {
+  PokerGame,
+  PokerModule,
+  createInitialState,
+  validateMove,
+  createStandardDeck,
+  shuffleDeck,
+  pokerCardSchema,
+} from './game';
+
+// Crypto Poker
+export {
+  CryptoPokerGame,
+  CryptoPokerModule,
+  createCryptoInitialState,
+  validateCryptoMove,
+  getCurrentSetupPlayer,
+  advanceSetupPlayer,
+  resetSetupPlayer,
+} from './crypto';
+
+// Default export is standard poker
+export { PokerModule as default } from './game';
