@@ -4992,6 +4992,7 @@ __metadata:
     "@libp2p/ping": "npm:^3.0.10"
     "@libp2p/webrtc": "npm:^6.0.11"
     "@libp2p/websockets": "npm:^10.1.3"
+    "@manamesh/poker": "workspace:*"
     "@multiformats/multiaddr": "npm:^13.0.1"
     "@rainbow-me/rainbowkit": "npm:^2.1.0"
     "@tanstack/query-core": "npm:^5.50.0"
@@ -5028,7 +5029,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@manamesh/poker@workspace:packages/poker":
+"@manamesh/poker@workspace:*, @manamesh/poker@workspace:packages/poker":
   version: 0.0.0-use.local
   resolution: "@manamesh/poker@workspace:packages/poker"
   dependencies:
