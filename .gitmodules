@@ -7,3 +7,12 @@
 [submodule "packages/boardgameIO-p2p"]
 	path = packages/boardgameIO-p2p
 	url = https://github.com/cyotee/boardgameIO-p2p.git
+[submodule "packages/poker/lib/forge-std"]
+	path = packages/poker/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "packages/poker/lib/openzeppelin-contracts"]
+	path = packages/poker/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "packages/poker/lib/crane"]
+	path = packages/poker/lib/crane
+	url = https://github.com/cyotee/crane
