@@ -96,5 +96,8 @@ export {
   resetSetupPlayer,
 } from './crypto';
 
+// React board component
+export { PokerBoard } from './components/PokerBoard';
+
 // Default export is standard poker
 export { PokerModule as default } from './game';
