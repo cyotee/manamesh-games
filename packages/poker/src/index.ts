@@ -96,6 +96,20 @@ export {
   resetSetupPlayer,
 } from './crypto';
 
+// On-chain settlement helpers (pair with the @manamesh/poker Solidity contracts)
+export { deriveHandId } from './handId';
+export type { HandInit } from './handId';
+export {
+  settlerDomain,
+  signHandInit,
+  recoverHandInitSigner,
+  signHandOutcome,
+  recoverHandOutcomeSigner,
+  signRoundStateTransition,
+  recoverRoundStateTransitionSigner,
+} from './signing';
+export type { HandOutcome, RoundStateTransition } from './signing';
+
 // React board component
 export { PokerBoard } from './components/PokerBoard';
 
