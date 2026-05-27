@@ -52,8 +52,8 @@ import {
 import type {
   CryptoPluginState,
   CryptoPluginApi,
-} from "@manamesh/frontend/src/crypto/plugin/crypto-plugin";
-import { CryptoPlugin } from "@manamesh/frontend/src/crypto/plugin/crypto-plugin";
+} from "@manamesh/crypto/plugin/crypto-plugin";
+import { CryptoPlugin } from "@manamesh/crypto/plugin/crypto-plugin";
 import {
   generateKeyPair,
   decrypt,
@@ -62,8 +62,8 @@ import {
   quickShuffle,
   buildCardPointLookup,
   type EncryptedCard,
-} from "@manamesh/frontend/src/crypto/mental-poker";
-import { secpIsValidPointHex } from "@manamesh/frontend/src/crypto/secp256k1";
+} from "@manamesh/crypto/mental-poker";
+import { secpIsValidPointHex } from "@manamesh/crypto/secp256k1";
 import {
   getCurrentSetupPlayer,
   advanceSetupPlayer,

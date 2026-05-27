@@ -4958,6 +4958,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@manamesh/crypto@npm:*, @manamesh/crypto@workspace:*, @manamesh/crypto@workspace:packages/crypto":
+  version: 0.0.0-use.local
+  resolution: "@manamesh/crypto@workspace:packages/crypto"
+  dependencies:
+    elliptic: "npm:^6.5.5"
+    snarkjs: "npm:^0.7.6"
+    typescript: "npm:^5.6.2"
+    vitest: "npm:^2.1.1"
+  peerDependencies:
+    boardgame.io: ^0.50.2
+  languageName: unknown
+  linkType: soft
+
 "@manamesh/fbackend@workspace:manamesh/packages/backend":
   version: 0.0.0-use.local
   resolution: "@manamesh/fbackend@workspace:manamesh/packages/backend"
@@ -4992,6 +5005,7 @@ __metadata:
     "@libp2p/ping": "npm:^3.0.10"
     "@libp2p/webrtc": "npm:^6.0.11"
     "@libp2p/websockets": "npm:^10.1.3"
+    "@manamesh/crypto": "npm:*"
     "@manamesh/poker": "workspace:*"
     "@multiformats/multiaddr": "npm:^13.0.1"
     "@rainbow-me/rainbowkit": "npm:^2.1.0"
@@ -5033,6 +5047,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@manamesh/poker@workspace:packages/poker"
   dependencies:
+    "@manamesh/crypto": "workspace:*"
     "@manamesh/frontend": "workspace:*"
     "@types/elliptic": "npm:^6.4.0"
     "@types/react": "npm:^18.2.0"

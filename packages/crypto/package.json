@@ -1,0 +1,44 @@
+{
+  "name": "@manamesh/crypto",
+  "version": "0.1.0",
+  "description": "Cryptographic primitives for ManaMesh — mental poker (SRA), Merkle commitments, EC ElGamal, Feldman DKG, DLEQ, ECDSA, Paillier HE, Shamir SSS, snarkjs ZK helpers, and the boardgame.io crypto plugin.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mental-poker": "./src/mental-poker/index.ts",
+    "./mental-poker/*": "./src/mental-poker/*.ts",
+    "./plugin": "./src/plugin/index.ts",
+    "./plugin/crypto-plugin": "./src/plugin/crypto-plugin.ts",
+    "./shamirs": "./src/shamirs/index.ts",
+    "./zk": "./src/zk/index.ts",
+    "./sha256": "./src/sha256.ts",
+    "./merkle": "./src/merkle.ts",
+    "./stable-json": "./src/stable-json.ts",
+    "./secp256k1": "./src/secp256k1.ts",
+    "./ec-elgamal-exp": "./src/ec-elgamal-exp.ts",
+    "./feldman-dkg": "./src/feldman-dkg.ts",
+    "./dleq": "./src/dleq.ts",
+    "./ecdsa": "./src/ecdsa.ts",
+    "./paillier": "./src/paillier.ts",
+    "./snarkjs-range": "./src/snarkjs-range.ts",
+    "./range-proof-vkey": "./src/range-proof-vkey.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "dependencies": {
+    "elliptic": "^6.5.5",
+    "snarkjs": "^0.7.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

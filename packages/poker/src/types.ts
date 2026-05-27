@@ -7,8 +7,8 @@
 
 import type { ZoneDefinition } from "@manamesh/frontend/src/game/modules/types";
 import type { StandardCard, CoreCard } from "@manamesh/frontend/src/game/modules/types";
-import type { CryptoPluginState } from "@manamesh/frontend/src/crypto/plugin/crypto-plugin";
-import type { EncryptedCard } from "@manamesh/frontend/src/crypto/mental-poker";
+import type { CryptoPluginState } from "@manamesh/crypto/plugin/crypto-plugin";
+import type { EncryptedCard } from "@manamesh/crypto/mental-poker";
 
 // ============================================================================
 // Card Types
