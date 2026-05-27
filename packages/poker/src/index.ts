@@ -109,6 +109,8 @@ export {
   recoverRoundStateTransitionSigner,
 } from './signing';
 export type { HandOutcome, RoundStateTransition } from './signing';
+export { buildSettlement, encodeCard } from './handOutcome';
+export type { BuiltSettlement, SettleableHandState, BuildHandOutcomeOptions } from './handOutcome';
 
 // React board component
 export { PokerBoard } from './components/PokerBoard';
