@@ -45,14 +45,18 @@ function isHex(s: string): boolean {
 }
 
 /**
- * Compute a commitment hash from a seed value.
- * Mirrors how test callers invoke sha256Hex(seedString) — at runtime, strings
- * duck-type into Uint8Array.set() producing a consistent (all-zero) byte buffer,
- * so the resulting hash is the same whether called with the seed at commit time
- * or at reveal-verification time.
+ * Compute a commitment hash from a seed hex string.
+ *
+ * Hashes the UTF-8 bytes of the seed string (via TextEncoder) so that the
+ * commit is actually bound to the seed value.  Both commit-time callers and
+ * revealShuffleSeed's verification MUST use this function so they agree on
+ * what the commitment represents.
+ *
+ * Exported so that tests can produce the correct commitment without
+ * duplicating the byte-encoding logic.
  */
-function commitHashOfSeed(seed: string): string {
-  return sha256Hex(seed as unknown as Uint8Array);
+export function hashSeedCommit(seedHex: string): string {
+  return sha256Hex(new TextEncoder().encode(seedHex));
 }
 
 /**
@@ -350,9 +354,10 @@ export function revealShuffleSeed(
   const commit = rng.commits[playerId];
   if (!commit) return INVALID_MOVE;
 
-  // Verify: hash(seed) must match stored commitment.
-  // commitHashOfSeed mirrors how callers produce the commit hash.
-  const computed = commitHashOfSeed(seedHex.toLowerCase());
+  // Verify: hash(seed bytes) must match stored commitment.
+  // hashSeedCommit hashes the UTF-8 bytes of the seed, so the commit is
+  // actually bound to the seed value rather than to its string length.
+  const computed = hashSeedCommit(seedHex.toLowerCase());
   if (computed !== commit.toLowerCase()) return INVALID_MOVE;
 
   const existing = rng.reveals[playerId] ?? null;

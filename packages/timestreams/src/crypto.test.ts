@@ -7,9 +7,9 @@ import {
   commitShuffleSeed,
   revealShuffleSeed,
   shuffleEncryptedDeck,
+  hashSeedCommit,
 } from "./crypto";
 import { generateKeyPair } from "@manamesh/boardgameio-crypto/mental-poker";
-import { sha256Hex } from "@manamesh/boardgameio-crypto";
 
 function ctx(player = "0", phase = "keyExchange"): Ctx {
   return { currentPlayer: player, numPlayers: 2, playOrder: ["0", "1"], phase, turn: 0, numMoves: 0 } as unknown as Ctx;
@@ -69,7 +69,7 @@ describe("crypto setup — encrypt & shuffle round-trip", () => {
     expect(G.phase).toBe("shuffle");
 
     const seeds: Record<string, string> = { "0": "aa".repeat(32), "1": "bb".repeat(32) };
-    for (const id of ids) commitShuffleSeed(G, ctx(id, "shuffle"), id, sha256Hex(seeds[id] as unknown as Uint8Array));
+    for (const id of ids) commitShuffleSeed(G, ctx(id, "shuffle"), id, hashSeedCommit(seeds[id]));
     for (const id of ids) revealShuffleSeed(G, ctx(id, "shuffle"), id, seeds[id]);
     shuffleEncryptedDeck(G, ctx("0", "shuffle"), "0");
     shuffleEncryptedDeck(G, ctx("1", "shuffle"), "1");
@@ -77,5 +77,43 @@ describe("crypto setup — encrypt & shuffle round-trip", () => {
     expect(G.phase).toBe("play");
     // every player's deck is fully layered (encrypted by both players)
     expect(G.encryptedDecks["0"].every((c: any) => c.layers === 2)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BINDING REGRESSION: commit must be bound to a specific seed (RED before fix)
+// ---------------------------------------------------------------------------
+
+describe("crypto — shuffle seed commit binding (regression)", () => {
+  function reachShufflePhase() {
+    const ids = ["0", "1"];
+    const G: any = createCryptoInitialState({ numPlayers: 2, playerIDs: ids } as any);
+    const keys: Record<string, any> = { "0": generateKeyPair(), "1": generateKeyPair() };
+    submitPublicKey(G, ctx("0"), "0", keys["0"].publicKey);
+    submitPublicKey(G, ctx("1"), "1", keys["1"].publicKey);
+    encryptDeck(G, ctx("0", "encrypt"), "0", keys["0"].privateKey);
+    encryptDeck(G, ctx("1", "encrypt"), "1", keys["1"].privateKey);
+    return G;
+  }
+
+  it("BINDING: a different same-length seed is rejected at reveal", () => {
+    const G = reachShufflePhase();
+
+    const seedA = "aa".repeat(32); // 64-char hex — player 0's true seed
+    const seedB = "bb".repeat(32); // different 64-char hex — the attacker's substitute seed
+    const seedC = "cc".repeat(32); // player 1's seed
+
+    // Commit using the CORRECT byte-hashing helper (single source of truth).
+    commitShuffleSeed(G, ctx("0", "shuffle"), "0", hashSeedCommit(seedA));
+    commitShuffleSeed(G, ctx("1", "shuffle"), "1", hashSeedCommit(seedC));
+
+    // Attack: player 0 reveals seedB instead of seedA.
+    // hashSeedCommit(seedB) != hashSeedCommit(seedA), so the fixed code rejects this.
+    const attackResult = revealShuffleSeed(G, ctx("0", "shuffle"), "0", seedB);
+    expect(attackResult).toBe("INVALID_MOVE");
+
+    // The correct seed is accepted.
+    const correctResult = revealShuffleSeed(G, ctx("0", "shuffle"), "0", seedA);
+    expect(correctResult).not.toBe("INVALID_MOVE");
   });
 });
