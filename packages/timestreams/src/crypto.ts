@@ -124,7 +124,7 @@ export function createCryptoInitialState(
  */
 export function submitPublicKey(
   G: TimestreamsState,
-  ctx: Ctx,
+  _ctx: Ctx,
   playerId: string,
   publicKey: string,
 ): TimestreamsState | typeof INVALID_MOVE {

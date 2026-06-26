@@ -29,4 +29,19 @@ describe("crypto setup — initial state & key exchange", () => {
     expect(G.phase).toBe("encrypt");
     expect(G.players["0"].publicKey).toBe(k0.publicKey);
   });
+
+  it("returns INVALID_MOVE on double-submit", () => {
+    const k0 = generateKeyPair();
+    submitPublicKey(G, ctx("0"), "0", k0.publicKey);
+    expect(submitPublicKey(G, ctx("0"), "0", k0.publicKey)).toBe("INVALID_MOVE");
+  });
+
+  it("returns INVALID_MOVE when phase is not keyExchange", () => {
+    G.phase = "encrypt";
+    expect(submitPublicKey(G, ctx("0"), "0", generateKeyPair().publicKey)).toBe("INVALID_MOVE");
+  });
+
+  it("returns INVALID_MOVE for an unknown player", () => {
+    expect(submitPublicKey(G, ctx("9"), "9", generateKeyPair().publicKey)).toBe("INVALID_MOVE");
+  });
 });
