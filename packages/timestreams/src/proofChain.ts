@@ -186,6 +186,15 @@ function verifyChainArray(chain: CryptographicProof[]): ProofChainVerification {
     });
   }
 
+  // Verify the first proof's own hash integrity
+  if (!verifyProofHash(chain[0])) {
+    errors.push({
+      index: 0,
+      transitionId: chain[0].transitionId,
+      error: "Invalid proof hash at index 0",
+    });
+  }
+
   for (let i = 1; i < chain.length; i++) {
     const current = chain[i];
     const previous = chain[i - 1];

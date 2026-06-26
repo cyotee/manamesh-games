@@ -12,4 +12,15 @@ describe("proof chain", () => {
     expect(p2.previousProofHash).toBe(p1.hash);
     expect(verifyProofChain(s).valid).toBe(true);
   });
+
+  it("detects a tampered hash on the first (and only) proof", () => {
+    const s: any = { proofChain: [] };
+    const p1 = createProof("draw", { card: "a" }, null);
+    appendProof(s, p1);
+    // Tamper the first proof's hash field directly.
+    // With a single-proof chain the loop (i >= 1) never runs, so without an
+    // explicit check at index 0 this tampering goes undetected.
+    s.proofChain[0].hash = "deadbeef";
+    expect(verifyProofChain(s).valid).toBe(false);
+  });
 });
