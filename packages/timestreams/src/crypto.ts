@@ -1,0 +1,150 @@
+/**
+ * Crypto Timestreams Game Module
+ *
+ * Mental poker setup flow for Timestreams: initial state and key exchange.
+ * Adapted from packages/onepiece/src/crypto.ts with per-player encrypted decks
+ * keyed as G.encryptedDecks[playerId] (vs onepiece's shared encryptedZones).
+ */
+
+import type { Ctx } from "boardgame.io";
+
+// boardgame.io/core is the workspace source package which lacks a built dist/
+// in this monorepo. Define INVALID_MOVE locally (it is just this string constant).
+const INVALID_MOVE = "INVALID_MOVE" as const;
+import type { GameConfig } from "@manamesh/frontend/src/game/modules/types";
+import type {
+  TimestreamsState,
+  TimestreamsPlayerState,
+  TimestreamsConfig,
+} from "./types";
+import { DEFAULT_CONFIG } from "./types";
+import { createPlaceholderDeck } from "./deck";
+import { createTimeline } from "./timeline";
+import { initializeCardVisibility } from "./visibility";
+import {
+  resetSetupPlayer,
+} from "@manamesh/boardgameio-crypto";
+
+// =============================================================================
+// Initial State
+// =============================================================================
+
+/**
+ * Create initial crypto state for Timestreams.
+ *
+ * Adapted from onepiece's createCryptoInitialState (lines 114+).
+ * Key differences:
+ * - Per-player decks in G.encryptedDecks[playerId] (not shared encryptedZones)
+ * - Uses createPlaceholderDeck for each player's deck
+ * - cardPoints deferred to encrypt step (empty here)
+ * - timeline via createTimeline() (6 era slots)
+ */
+export function createCryptoInitialState(
+  config: GameConfig,
+  moduleConfig?: Partial<TimestreamsConfig>,
+): TimestreamsState {
+  const playerOrder = [...config.playerIDs];
+  const deckSize = moduleConfig?.deckSize ?? DEFAULT_CONFIG.deckSize;
+
+  // Build per-player state
+  const players: Record<string, TimestreamsPlayerState> = {};
+  for (const playerId of playerOrder) {
+    players[playerId] = {
+      homeEra: null,
+      ready: false,
+      hand: [],
+      discard: [],
+      scorePile: [],
+      hasPassedThisDay: false,
+      publicKey: null,
+      hasEncrypted: false,
+      hasShuffled: false,
+    };
+  }
+
+  // Build per-player encrypted decks as placeholder { ciphertext: cardId, layers: 0 }
+  const encryptedDecks: TimestreamsState["encryptedDecks"] = {};
+  const allCardIds: string[] = [];
+
+  for (const playerId of playerOrder) {
+    const placeholderCards = createPlaceholderDeck(playerId, deckSize);
+    encryptedDecks[playerId] = placeholderCards.map((card) => ({
+      ciphertext: card.id,
+      layers: 0,
+    }));
+    for (const card of placeholderCards) {
+      allCardIds.push(card.id);
+    }
+  }
+
+  // Merge config with defaults
+  const resolvedConfig: TimestreamsConfig = {
+    ...DEFAULT_CONFIG,
+    ...moduleConfig,
+    deckSize,
+  };
+
+  // Build initial state (cardVisibility seeded after)
+  const G: TimestreamsState = {
+    players,
+    playerOrder,
+    config: resolvedConfig,
+    phase: "keyExchange",
+    timeline: createTimeline(),
+    currentDay: 1,
+    dayFirstPlayer: playerOrder[0],
+    encryptedDecks,
+    cardPoints: {},
+    shuffleRng: null,
+    eraAssignmentRng: null,
+    pendingDecryptRequests: [],
+    setupPlayerIndex: 0,
+    cardVisibility: {},
+    proofChain: [],
+    scores: {},
+    winner: null,
+  };
+
+  // Seed card visibility for every card across all players' decks
+  initializeCardVisibility(G, allCardIds);
+
+  return G;
+}
+
+// =============================================================================
+// Key Exchange Move
+// =============================================================================
+
+/**
+ * Submit a public key during key exchange phase.
+ *
+ * Adapted from onepiece's submitPublicKey (lines 230+).
+ * When all players have submitted, advances phase to "encrypt"
+ * and resets the sequential setup-player pointer.
+ */
+export function submitPublicKey(
+  G: TimestreamsState,
+  ctx: Ctx,
+  playerId: string,
+  publicKey: string,
+): TimestreamsState | typeof INVALID_MOVE {
+  if (G.phase !== "keyExchange") return INVALID_MOVE;
+
+  const player = G.players[playerId];
+  if (!player) return INVALID_MOVE;
+  if (player.publicKey) return INVALID_MOVE; // Already submitted
+
+  player.publicKey = publicKey;
+
+  // Check if all players have submitted their public keys
+  const allSubmitted = G.playerOrder.every(
+    (pid) => G.players[pid].publicKey !== null,
+  );
+
+  if (allSubmitted) {
+    G.phase = "encrypt";
+    resetSetupPlayer(G);
+  }
+
+  return G;
+}
