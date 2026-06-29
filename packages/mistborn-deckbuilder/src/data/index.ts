@@ -18,6 +18,19 @@ export const CHARACTERS = charactersData as Record<string, CharacterData>;
 // Mission data stub (expand later)
 export const MISSIONS: Record<string, any> = {};
 
+// Static pack cards from manifests for sync initial state (for game setup)
+import marketManifest from '../../assets/packs/mistborn/market/manifest.json' assert { type: 'json' };
+import metalManifest from '../../assets/packs/mistborn/metal-training/manifest.json' assert { type: 'json' };
+import charManifest from '../../assets/packs/mistborn/character/manifest.json' assert { type: 'json' };
+import fundingManifest from '../../assets/packs/mistborn/funding/manifest.json' assert { type: 'json' };
+
+export const PACK_CARDS_FROM_MANIFESTS = [
+  ...(marketManifest as any).cards || [],
+  ...(metalManifest as any).cards || [],
+  ...(charManifest as any).cards || [],
+  ...(fundingManifest as any).cards || [],
+];
+
 /**
  * Resolve image path for a card based on cropped assets in assets/cards/
  * Convention from user-cropped files.

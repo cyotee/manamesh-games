@@ -16,7 +16,7 @@ import type {
 } from './types';
 import { getBurnLimit } from './types';
 import { MISTBORN_ZONES } from './zones';
-import { getAllCards, getCharacter } from './data';
+import { getAllCards, getCharacter, PACK_CARDS_FROM_MANIFESTS } from './data';
 import {
   MISTBORN_SETS,
   DECK_SET_MAPPING,
@@ -49,6 +49,7 @@ export function createInitialState(
 
   const playerIDs = config.playerIDs || Array.from({ length: config.numPlayers }, (_, i) => `p${i}`);
   const packCards = config.packCards || [];
+  packCardsCache = packCards; // for validateMove metadata access
 
   // Prefer pack cards using the explicit DECK_SET_MAPPING when provided
   let starterPool: MistbornCard[] = [];
@@ -166,13 +167,65 @@ export function validateMove(
     return { valid: false, error: 'Not your turn' };
   }
 
-  // Structural examples
+  const player = state.players[playerID];
+  if (!player) return { valid: false, error: 'Player not found' };
+
+  if (move === 'burnMetal' || move === 'playCard') {
+    // Check burn limit (Phase 2 enforcement)
+    const currentBurns = player.metals.filter(m => m.burned).length;
+    if (currentBurns >= player.burnLimit) {
+      return { valid: false, error: `Burn limit reached (${player.burnLimit})` };
+    }
+  }
+
+  if (move === 'playCard') {
+    const cardId = args[0];
+    const card = packCardsCache.find((c: any) => c.id === cardId) || {};
+    const requiredMetal = card.metadata?.metal || card.metal;
+    if (requiredMetal && !player.metals.some(m => m.metal === requiredMetal && !m.burned)) {
+      // Check if can use token or card as metal
+      // For now, simple
+      return { valid: true }; // rules-free allows
+    }
+  }
+
   if (move === 'buyCard') {
-    // In real impl: check market has the card, compute coins from played, etc.
-    // For now allow (rules-free)
+    const cardId = args[0];
+    const marketCard = state.market.find((c: any) => c === cardId) || 
+                       (packCardsCache && packCardsCache.find((c: any) => c.id === cardId));
+    if (!marketCard) {
+      return { valid: false, error: 'Card not in market' };
+    }
+    const meta = packCardsCache.find((p: any) => p.id === cardId)?.metadata || {};
+    const cost = meta.cost || 0;
+    const coins = computeCoins(state, playerID);
+    if (coins < cost) {
+      return { valid: false, error: `Not enough coins (have ${coins}, need ${cost})` };
+    }
+  }
+
+  if (move === 'eliminateCard') {
+    // Soothe-like: only own cards
+    // Rules-free for now
   }
 
   return { valid: true };
+}
+
+// Temporary cache for pack cards in validation (will be wired better)
+let packCardsCache: any[] = [];
+
+// Helper to compute available coins from played cards (using metadata)
+function computeCoins(G: MistbornState, pid: string): number {
+  const play = G.zones.play?.[pid] || [];
+  let coins = 0;
+  play.forEach((c: any) => {
+    const meta = packCardsCache.find((p: any) => p.id === c.id)?.metadata || c.metadata;
+    if (meta?.tags?.includes('coin') || meta?.effectText?.includes('coin')) coins += (meta?.cost || 1); // simplistic
+    // In real, would resolve effects
+  });
+  // Also funding, savants, allies, boxings (stub)
+  return coins + (G as any).boxingsSpent || 0; // placeholder
 }
 
 // =============================================================================
@@ -231,14 +284,11 @@ const moves = {
 
   buyCard: (G: MistbornState, ctx: Ctx, cardId: string) => {
     const pid = ctx.currentPlayer!;
-    // Rules-free: move from market to player's discard (or hand in demo)
     const idx = G.market.indexOf(cardId);
     if (idx >= 0) {
-      const card = G.market.splice(idx, 1)[0]; // remove id, but for full would lookup
-      // For simplicity, add to discard zone simulation
+      G.market.splice(idx, 1);
       G.zones.discard[pid] = G.zones.discard[pid] || [];
-      G.zones.discard[pid].push({ id: cardId, name: cardId } as any); // placeholder
-      // Refill
+      G.zones.discard[pid].push({ id: cardId, name: cardId } as any);
       if (G.marketDeckCount > 0) {
         G.market.push(`market-refill-${Date.now()}`);
         G.marketDeckCount--;
@@ -254,12 +304,10 @@ const moves = {
     const hand = G.zones.hand[pid] || [];
     const discard = G.zones.discard[pid] || [];
 
-    // Move non-ally play + remaining hand to discard (Allies stay)
     G.zones.discard[pid] = [...discard, ...play, ...hand];
     G.zones.play[pid] = [];
     G.zones.hand[pid] = [];
 
-    // Draw 5
     const deck = G.zones.deck[pid] || [];
     const toDraw = Math.min(5, deck.length);
     const drawn = deck.splice(0, toDraw);
@@ -268,6 +316,27 @@ const moves = {
     G.moveHistory.push({ playerId: pid, move: 'cleanupAndDraw', args: [], timestamp: Date.now() });
     return G;
   },
+
+  advanceTraining: (G: MistbornState, ctx: Ctx) => {
+    const pid = ctx.currentPlayer!;
+    const player = G.players[pid];
+    player.trainingPosition = (player.trainingPosition || 0) + 1;
+    player.burnLimit = Math.min(4, 1 + Math.floor((player.trainingPosition || 0) / 3));
+    G.moveHistory.push({ playerId: pid, move: 'advanceTraining', args: [], timestamp: Date.now() });
+    return G;
+  },
+
+  eliminateCard: (G: MistbornState, ctx: Ctx, cardId: string, from: string) => {
+    const pid = ctx.currentPlayer!;
+    const zoneKey = from === 'play' ? 'play' : (from === 'discard' ? 'discard' : 'hand');
+    if (G.zones[zoneKey] && G.zones[zoneKey][pid]) {
+      G.zones[zoneKey][pid] = G.zones[zoneKey][pid].filter((c: any) => c.id !== cardId);
+    }
+    G.moveHistory.push({ playerId: pid, move: 'eliminateCard', args: [cardId, from], timestamp: Date.now() });
+    return G;
+  },
+
+
 
   advanceTraining: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
@@ -290,6 +359,42 @@ const moves = {
     G.moveHistory.push({ playerId: pid, move: 'eliminateCard', args: [cardId, from], timestamp: Date.now() });
     return G;
   },
+
+  useAsMetal: (G: MistbornState, ctx: Ctx, cardId: string) => {
+    const pid = ctx.currentPlayer!;
+    // Find in play, mark as sideways/used as metal
+    if (G.zones.play && G.zones.play[pid]) {
+      const card = G.zones.play[pid].find((c: any) => c.id === cardId);
+      if (card) {
+        card._sideways = true;
+        // Simulate burning a metal from the card's pairing
+      }
+    }
+    G.moveHistory.push({ playerId: pid, move: 'useAsMetal', args: [cardId], timestamp: Date.now() });
+    return G;
+  },
+
+  passTarget: (G: MistbornState, ctx: Ctx) => {
+    const pid = ctx.currentPlayer!;
+    const pids = Object.keys(G.players);
+    const idx = pids.indexOf(pid);
+    const next = pids[(idx + 1) % pids.length];
+    (G as any).targetHolder = next;
+    G.moveHistory.push({ playerId: pid, move: 'passTarget', args: [], timestamp: Date.now() });
+    return G;
+  },
+
+  passTarget: (G: MistbornState, ctx: Ctx) => {
+    const pid = ctx.currentPlayer!;
+    // Simple: cycle to next player
+    const pids = Object.keys(G.players);
+    const idx = pids.indexOf(pid);
+    const next = pids[(idx + 1) % pids.length];
+    // In state, target is in G, but for simplicity, assume handled in UI or add field
+    (G as any).targetHolder = next;
+    G.moveHistory.push({ playerId: pid, move: 'passTarget', args: [], timestamp: Date.now() });
+    return G;
+  },
 };
 
 // =============================================================================
@@ -299,7 +404,7 @@ const moves = {
 export const MistbornGame: Game<MistbornState> = {
   name: 'mistborn-deckbuilder',
   setup: (ctx, setupData) => {
-    const packCards = setupData?.packCards || [];
+    const packCards = setupData?.packCards || PACK_CARDS_FROM_MANIFESTS;
     return createInitialState({ 
       numPlayers: ctx.numPlayers, 
       playerIDs: ctx.playOrder,
@@ -307,6 +412,19 @@ export const MistbornGame: Game<MistbornState> = {
     } as any);
   },
   moves,
+  turn: {
+    // Rules engine start: auto advance training at start of turn
+    onBegin: (G: MistbornState, ctx: Ctx) => {
+      const pid = ctx.currentPlayer!;
+      const player = G.players[pid];
+      if (player) {
+        player.trainingPosition = (player.trainingPosition || 0) + 1;
+        player.burnLimit = Math.min(4, 1 + Math.floor(player.trainingPosition / 3));
+        // Reset per-turn state (burns, etc.) - metals are already per-turn in moves
+      }
+      return G;
+    },
+  },
   phases: {
     setup: { start: true, next: 'keyExchange' },
     keyExchange: { /* crypto steps */ },
@@ -314,7 +432,8 @@ export const MistbornGame: Game<MistbornState> = {
     shuffle: {},
     play: {
       moves,
-      // freeform — player decides when to end
+      // Freeform actions until player ends turn (rules-free allows manual end)
+      // In enforcement: add endIf for phase or explicit moves
     },
   },
   endIf: (G) => G.winner,

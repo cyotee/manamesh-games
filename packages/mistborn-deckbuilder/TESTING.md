@@ -126,3 +126,25 @@ Once the rules-free version is validated:
 For questions or to contribute, refer to PRD.md and RULES.md in this package.
 
 This version is tagged as `mistborn-rules-free-v0.1.0` for reference.
+
+---
+
+## Rules Engine Status (Post Tag)
+
+**Baseline for rules-free (manual play) testing is captured at tag `mistborn-rules-free-v0.1.0`.**
+
+After this tag:
+- Rules engine work begins: move validation using card metadata (costs, metals, tags, burn limits), proper move implementations, turn phases, and prompts.
+- The TESTING.md remains the reference for running the interactive demo (standalone or integrated) for manual validation of visuals, asset loading (bundled/IPFS/local), and card/zone interactions.
+- Future tags/releases will mark milestones in enforcement (e.g. `mistborn-rules-v0.2.0`).
+
+To reset to the pure rules-free snapshot for reference:
+```
+git checkout mistborn-rules-free-v0.1.0 -- packages/mistborn-deckbuilder
+```
+Or compare with:
+```
+git diff mistborn-rules-free-v0.1.0 -- packages/mistborn-deckbuilder
+```
+
+See PRD.md for Phase 1 vs Phase 2 boundaries.

@@ -50,6 +50,10 @@ export function MistbornBoard({
   if (error) return <div>Error loading pack: {error.message}</div>;
   if (!pack) return <div>No pack loaded. Check asset source.</div>;
 
+  // Precompute some images for character (to avoid hook issues in map)
+  const charCards = getEnrichedCardsForSet(pack.cards || [], 'character' as any);
+  const characterForDemo = charCards[0]; // e.g. Vin
+
   // Simple source switcher for testing IPFS vs local (only in demo mode)
   const handleSetIPFSSource = () => {
     const cid = prompt('Enter IPFS CID for the Mistborn pack root (e.g. bafy...)');
@@ -111,6 +115,14 @@ export function MistbornBoard({
 
   // In demo mode, show current effective source type
   const currentSourceType = effectiveSource?.type || 'local-directory';
+
+  // Precompute character images to avoid hook issues in render
+  const charImages: Record<string, string | null> = {};
+  const chars = getEnrichedCardsForSet(pack.cards || [], 'character' as any);
+  chars.forEach((ch: any) => {
+    // Note: can't call hook here easily, use path for now
+    charImages[ch.name] = getLocalAssetUrl('packs/mistborn/' + ch.front);
+  });
 
   // Helper to get card data from pack by id (for real G mode)
   const getCardFromPack = (id: string) => {
@@ -230,6 +242,17 @@ export function MistbornBoard({
     });
   };
 
+  const passTarget = () => {
+    if (!isDemo) return;
+    setDemoState(prev => {
+      if (!prev) return prev;
+      const pids = Object.keys(prev.players);
+      const currentIdx = pids.indexOf(prev.targetHolder);
+      const next = pids[(currentIdx + 1) % pids.length];
+      return { ...prev, targetHolder: next };
+    });
+  };
+
   const resetDemo = () => {
     if (!isDemo || !pack) return;
     const marketBase = getEnrichedCardsForSet(pack.cards || [], 'market' as any);
@@ -301,6 +324,24 @@ export function MistbornBoard({
         </div>
       </div>
 
+      {/* Target (rules-free sim) */}
+      {isDemo && (
+        <div style={{ marginBottom: 12 }}>
+          <strong>Target Holder:</strong> {demoState!.targetHolder} <button onClick={passTarget} style={{ fontSize: 11 }}>Pass Target</button>
+        </div>
+      )}
+
+      {/* Boxings and Atium supplies (for buying and special) */}
+      <div style={{ marginBottom: 12, fontSize: 11 }}>
+        <strong>Boxings:</strong> 14 | <strong>Atium:</strong> 16 (from track/missions)
+        <button onClick={() => { if (isDemo) { /* sim buy boxing */ } }} style={{ fontSize: 10, marginLeft: 8 }}>Buy Boxing (2 coins)</button>
+      </div>
+
+      {/* Boxings/Atium (sim) */}
+      <div style={{ marginBottom: 12, fontSize: 11 }}>
+        <strong>Boxings:</strong> available in supplies (buy for 2 coins, spend for 1) | <strong>Atium:</strong> from track/missions
+      </div>
+
       {/* Per-player areas */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(playerIds.length, 2)}, 1fr)`, gap: 16 }}>
         {playerIds.map((pid: string, idx: number) => {
@@ -309,6 +350,7 @@ export function MistbornBoard({
           const isCurrent = pid === currentPid;
           const hand = getPlayerHand(pid);
           const play = getPlayerPlay(pid);
+          const discard = getPlayerDiscard(pid);
 
           return (
             <div key={pid} style={{ background: 'white', padding: 12, borderRadius: 8, border: isCurrent ? '2px solid #333' : '1px solid #ddd' }}>
@@ -330,9 +372,10 @@ export function MistbornBoard({
                 Health: {player.health || 36} {pid === targetHolder && '(Target Holder)'}
               </div>
 
-              {/* Character (simplified for demo) */}
+              {/* Character from pack */}
               <div style={{ marginTop: 8, fontSize: 11 }}>
-                <strong>Character:</strong> {player.character || 'Vin'} (from pack)
+                <strong>Character:</strong> {player.character || 'Vin'}
+                {player.character && charImages[player.character] && <img src={charImages[player.character]} alt={player.character} style={{width: 50, marginLeft: 8, verticalAlign: 'middle'}} />}
               </div>
 
               {/* Hand */}
@@ -376,6 +419,9 @@ export function MistbornBoard({
                               );
                               return { ...prev, players: { ...prev.players, [pid]: p } };
                             });
+                          } else if (moves?.useAsMetal) {
+                            // For integrated, call a move to use as metal (sideways)
+                            moves.useAsMetal(card.id);
                           }
                         }}
                       />
@@ -388,9 +434,9 @@ export function MistbornBoard({
 
               {/* Discard */}
               <div style={{ marginTop: 8 }}>
-                <h4>Discard ({getPlayerDiscard(pid).length || 0})</h4>
+                <h4>Discard ({discard.length || 0})</h4>
                 <div style={{ fontSize: 10, color: '#888' }}>
-                  {getPlayerDiscard(pid).length ? getPlayerDiscard(pid).map((c: any) => c.name).join(', ') : 'Empty'}
+                  {discard.length ? discard.map((c: any) => c.name).join(', ') : 'Empty'}
                 </div>
               </div>
 
@@ -400,11 +446,12 @@ export function MistbornBoard({
               </div>
 
               {/* Quick actions */}
-              {isDemo && (
+              {moves && (
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button onClick={() => cleanupAndDraw(pid)} style={{ fontSize: 11 }}>Cleanup + Draw</button>
                   <button onClick={() => advance(pid)} style={{ fontSize: 11 }}>Advance Training</button>
                   <button onClick={() => simulateCombat(pid, 5)} style={{ fontSize: 11 }}>Simulate 5 Combat</button>
+                  <button onClick={() => isDemo ? passTarget() : moves?.passTarget?.()} style={{ fontSize: 11 }}>Pass Target</button>
                 </div>
               )}
             </div>
