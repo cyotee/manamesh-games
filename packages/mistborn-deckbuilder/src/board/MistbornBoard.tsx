@@ -117,11 +117,12 @@ export function MistbornBoard({
   const currentSourceType = effectiveSource?.type || 'local-directory';
 
   // Precompute character images to avoid hook issues in render
-  const charImages: Record<string, string | null> = {};
+  const charImages: Record<string, string | undefined> = {};
   const chars = getEnrichedCardsForSet(pack.cards || [], 'character' as any);
   chars.forEach((ch: any) => {
     // Note: can't call hook here easily, use path for now
-    charImages[ch.name] = getLocalAssetUrl('packs/mistborn/' + ch.front);
+    const p = ch.front ? getLocalAssetUrl('packs/mistborn/' + ch.front) : undefined;
+    charImages[ch.name] = p;
   });
 
   // Helper to get card data from pack by id (for real G mode). Accepts id string or card-like.
@@ -135,7 +136,7 @@ export function MistbornBoard({
 
   const switchPlayer = (pid: string) => {
     if (isDemo) {
-      setDemoState(prev => prev ? { ...prev, currentPlayer: pid } : prev);
+      setDemoState((prev: DemoState | null) => prev ? { ...prev, currentPlayer: pid } : prev);
     }
   };
   const marketCards = isDemo 
@@ -148,7 +149,7 @@ export function MistbornBoard({
       moves?.playCard?.(card.id, sideways);
       return;
     }
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const p = { ...prev.players[pid] };
       p.hand = p.hand.filter((c: any) => c.id !== card.id);
@@ -165,7 +166,7 @@ export function MistbornBoard({
       moves?.buyCard?.(card.id);
       return;
     }
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const newMarket = prev.market.filter((c: any) => c.id !== card.id);
       const more = getEnrichedCardsForSet(pack.cards || [], 'market' as any);
@@ -189,7 +190,7 @@ export function MistbornBoard({
       moves?.eliminateCard?.(cardId, from);
       return;
     }
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const p = { ...prev.players[pid] };
       if (from === 'hand') p.hand = p.hand.filter((c: any) => c.id !== cardId);
@@ -204,7 +205,7 @@ export function MistbornBoard({
       moves?.advanceTraining?.();
       return;
     }
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const p = { ...prev.players[pid] };
       p.trainingPosition = (p.trainingPosition || 0) + 1;
@@ -218,7 +219,7 @@ export function MistbornBoard({
       moves?.cleanupAndDraw?.();
       return;
     }
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const p = { ...prev.players[pid] };
       p.discard = [...p.discard, ...p.play, ...p.hand];
@@ -232,7 +233,7 @@ export function MistbornBoard({
 
   const simulateCombat = (pid: string, amount: number) => {
     if (!isDemo) return;
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const otherPid = Object.keys(prev.players).find(p => p !== pid)!;
       const p = { ...prev.players[pid] };
@@ -247,7 +248,7 @@ export function MistbornBoard({
 
   const passTarget = () => {
     if (!isDemo) return;
-    setDemoState(prev => {
+    setDemoState((prev: DemoState | null) => {
       if (!prev) return prev;
       const pids = Object.keys(prev.players);
       const currentIdx = pids.indexOf(prev.targetHolder);
@@ -271,7 +272,7 @@ export function MistbornBoard({
       missions: missionsBase,
       currentPlayer: 'p1',
       targetHolder: 'p2',
-    });
+    } as DemoState);
   };
 
   // Unified getters for demo (local state) + integrated real G/ctx (from zones + players)
@@ -377,7 +378,7 @@ export function MistbornBoard({
             <div key={idx} style={{ border: '1px solid #ccc', padding: 6, width: 140, fontSize: 11 }} onClick={() => {
               if (isDemo) {
                 const pid = demoState!.currentPlayer;
-                setDemoState(prev => {
+                setDemoState((prev: DemoState | null) => {
                   if (!prev) return prev;
                   const p = { ...prev.players[pid] };
                   p.trainingPosition = (p.trainingPosition || 0) + 1; // simulate mission advance
@@ -441,7 +442,7 @@ export function MistbornBoard({
               {/* Character from pack */}
               <div style={{ marginTop: 8, fontSize: 11 }}>
                 <strong>Character:</strong> {player.character || 'Vin'}
-                {player.character && charImages[player.character] && <img src={charImages[player.character]} alt={player.character} style={{width: 50, marginLeft: 8, verticalAlign: 'middle'}} />}
+                {player.character && charImages[player.character] && <img src={charImages[player.character] as string} alt={player.character} style={{width: 50, marginLeft: 8, verticalAlign: 'middle'}} />}
               </div>
 
               {/* Hand */}
@@ -477,7 +478,7 @@ export function MistbornBoard({
                         sideways={!!card._sideways}
                         onClick={() => {
                           if (isDemo) {
-                            setDemoState(prev => {
+                            setDemoState((prev: DemoState | null) => {
                               if (!prev) return prev;
                               const p = { ...prev.players[pid] };
                               p.play = p.play.map((c: any, j: number) =>
@@ -574,13 +575,14 @@ function MarketCard({ packId, card: cardData, onBuy }: { packId: string; card: a
   );
 }
 
-function MiniCard({ packId, card: cardData, sideways, onClick }: { packId: string; card: any; sideways?: boolean; onClick?: () => void }) {
+function MiniCard({ packId, card: cardData, sideways, onClick, onContextMenu }: { packId: string; card: any; sideways?: boolean; onClick?: () => void; onContextMenu?: (e: any) => void }) {
   const { url, isLoading } = useCardImage(packId, cardData.id, 'front');
   const meta = cardData.metadata || {};
 
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       style={{
         width: 70,
         border: '1px solid #555',

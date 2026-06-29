@@ -177,3 +177,7 @@ export function getEnrichedCardsForSet(
   const raw = getCardsForSet(cards, set);
   return enrichCardsWithMetadata(raw);
 }
+
+// Re-export common asset path helpers so board components and TrainingTrack
+// can import everything they need from '../assets' (matches historical usage).
+export { getLocalAssetUrl, PLAYER_TRAINING_TRACK_PATH } from './data/index';
