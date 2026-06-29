@@ -120,8 +120,8 @@ All cards include enriched metadata (cost, metal, tags, effectText) from the man
 Once the rules-free version is validated:
 - Deploy to Vercel for shared testing.
 - Publish pack to IPFS for production.
-- Proceed to rules engine (enforcement, phases, full moves, win conditions).
-- Add co-op (Lord Ruler) visuals.
+- Rules engine in progress: INVALID_MOVE enforcement on key moves using pack metadata (costs, metals, burn limits, sideways-as-metal), improved computeCoins, onBegin upkeep, endMainPhase, coins display in board, initial unit tests.
+- Next: fuller phases, combat/targeting, resource spending, prompts.
 
 For questions or to contribute, refer to PRD.md and RULES.md in this package.
 
