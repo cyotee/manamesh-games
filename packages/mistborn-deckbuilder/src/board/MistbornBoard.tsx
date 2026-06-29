@@ -163,7 +163,13 @@ export function MistbornBoard({
   };
 
   const buyFromMarket = (card: any) => {
+    const cost = card.metadata?.cost ?? 0;
     if (!isDemo) {
+      const currentCoins = computeCoins((G || { zones: {} }) as any, currentPid);
+      if (cost > currentCoins) {
+        // Engine will also reject; early return for UX
+        return;
+      }
       moves?.buyCard?.(card.id);
       return;
     }

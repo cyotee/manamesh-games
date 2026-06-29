@@ -148,6 +148,7 @@ export function createInitialState(
     proofChain: [],
     moveHistory: [],
     winner: null,
+    coinsSpent: {},
   };
 }
 
@@ -270,7 +271,9 @@ export function computeCoins(G: MistbornState, pid: string): number {
   const boxings = (G as any).boxingsAvailable || 0;
   coins += Math.min(2, Math.floor(boxings / 2)); // e.g. spend boxings for coins
 
-  return coins;
+  // Rules engine: subtract coins spent on buys this turn (recorded in buyCard move)
+  const spent = (G as any).coinsSpent?.[pid] || 0;
+  return Math.max(0, coins - spent);
 }
 
 // =============================================================================
@@ -344,6 +347,13 @@ const moves = {
     const idx = G.market.findIndex((c: any) => (typeof c === 'string' ? c === cardId : c.id === cardId));
     if (idx >= 0) {
       G.market.splice(idx, 1);
+
+      // Record the cost spent this turn so subsequent computeCoins / validates see reduced coins
+      const meta = (packCardsCache.find((p: any) => p.id === cardId)?.metadata) || {};
+      const cost = Number(meta.cost ?? 0);
+      if (! (G as any).coinsSpent) (G as any).coinsSpent = {};
+      (G as any).coinsSpent[pid] = ((G as any).coinsSpent[pid] || 0) + cost;
+
       // Resolve full enriched entry from pack cache when possible (for future metadata use)
       const entry = packCardsCache.find((p: any) => p.id === cardId) || { id: cardId, name: cardId };
       const fullCard = {
@@ -384,6 +394,10 @@ const moves = {
     const toDraw = Math.min(5, deck.length);
     const drawn = deck.splice(0, toDraw);
     G.zones.hand[pid] = drawn;
+
+    // Reset spent for next turn's production phase
+    if (!(G as any).coinsSpent) (G as any).coinsSpent = {};
+    (G as any).coinsSpent[pid] = 0;
 
     G.moveHistory.push({ playerId: pid, move: 'cleanupAndDraw', args: [], timestamp: Date.now() });
     return G;
@@ -481,7 +495,7 @@ const moves = {
 // Game Definition
 // =============================================================================
 
-export const MistbornGame: Game<MistbornState> = {
+const MistbornGame: Game<MistbornState> = {
   name: 'mistborn-deckbuilder',
   setup: (ctx: Ctx, setupData?: any) => {
     const packCards = setupData?.packCards || PACK_CARDS_FROM_MANIFESTS;
@@ -511,6 +525,9 @@ export const MistbornGame: Game<MistbornState> = {
       if (!(G as any).targetHolder) {
         (G as any).targetHolder = pid;
       }
+      // Reset per-turn spent coins for the new current player (rules engine coin accounting)
+      if (!(G as any).coinsSpent) (G as any).coinsSpent = {};
+      (G as any).coinsSpent[pid] = 0;
       return G;
     },
   },

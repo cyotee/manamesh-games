@@ -194,6 +194,9 @@ export interface MistbornState {
   isCoop: boolean;
   lordRuler?: LordRulerState;
 
+  // Rules engine: per-player coins spent on buys this turn (reset on turn start / cleanup)
+  coinsSpent?: Record<string, number>;
+
   // Crypto / audit
   crypto: CryptoPluginState;
   cardVisibility: Record<string, any>;
