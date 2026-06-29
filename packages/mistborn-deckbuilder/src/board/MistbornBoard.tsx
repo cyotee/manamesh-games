@@ -147,6 +147,20 @@ export function MistbornBoard({
   // Demo interaction helpers (rules-free)
   const playCard = (pid: string, card: any, sideways = false) => {
     if (!isDemo) {
+      // Pre-check metal requirement for normal play (engine will reject anyway)
+      if (!sideways) {
+        const p = (G?.players && G.players[pid]) || {};
+        const meta = card.metadata || {};
+        const req = meta.metal || meta.requiredMetal;
+        if (req) {
+          const metals = p.metals || [];
+          const has = metals.some((m: any) => {
+            const name = Array.isArray(req) ? req.includes(m.metal) : m.metal === req;
+            return name && !m.burned;
+          });
+          if (!has) return;
+        }
+      }
       moves?.playCard?.(card.id, sideways);
       return;
     }
@@ -449,6 +463,11 @@ export function MistbornBoard({
 
               {/* Coins (computed from play area via pack metadata in rules engine) */}
               <div style={{ fontSize: 11, marginTop: 2, color: '#2c3' }}>Coins: {availableCoins}</div>
+
+              {/* Metals state (burned this turn) */}
+              <div style={{ fontSize: 10, marginTop: 2 }}>
+                Metals: {(player.metals || []).map((m: any) => `${m.metal[0].toUpperCase()}${m.burned ? '✕' : '○'}`).join(' ')}
+              </div>
 
               {/* Character from pack */}
               <div style={{ marginTop: 8, fontSize: 11 }}>

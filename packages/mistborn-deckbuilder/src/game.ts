@@ -306,6 +306,18 @@ const moves = {
       // sideways can be represented by a flag on the card instance in play
       (card as any)._sideways = sideways;
       G.zones.play[pid] = [...play, card];
+
+      // Rules engine: if playing normally (not sideways), consume one unburned metal of the required type.
+      if (!sideways) {
+        const entry = packCardsCache.find((p: any) => p.id === cardId) || {};
+        const meta = entry.metadata || entry;
+        const requiredMetal = meta.metal || meta.requiredMetal;
+        if (requiredMetal && G.players[pid]?.metals) {
+          const metalName = Array.isArray(requiredMetal) ? requiredMetal[0] : requiredMetal;
+          const m = G.players[pid].metals.find((mm: any) => mm.metal === metalName && !mm.burned);
+          if (m) m.burned = true;
+        }
+      }
     }
     G.moveHistory.push({ playerId: pid, move: 'playCard', args: [cardId, sideways], timestamp: Date.now() });
     return G;
