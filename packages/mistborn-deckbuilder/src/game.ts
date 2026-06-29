@@ -236,27 +236,36 @@ export function setPackCardsForValidation(cards: any[]) {
   packCardsCache = Array.isArray(cards) ? cards : [];
 }
 
-// Helper to compute available coins from played cards (using metadata + simple heuristics)
-// In rules-free we are generous; rules engine will tighten via tags/cost/effects.
-function computeCoins(G: MistbornState, pid: string): number {
+// Helper to compute available coins from played cards using pack metadata.
+// Rules engine version: looks for explicit "coin" tags and "gain ... coin" effects.
+// Funding cards (tag or type) contribute 1 each.
+export function computeCoins(G: MistbornState, pid: string): number {
   const play = G.zones.play?.[pid] || [];
   let coins = 0;
+
   play.forEach((c: any) => {
-    const meta = (packCardsCache.find((p: any) => p.id === (c.id || c))?.metadata) || (c as any).metadata || {};
+    const id = c?.id || c;
+    const meta = (packCardsCache.find((p: any) => p.id === id)?.metadata) || (c as any).metadata || {};
     const tags: string[] = meta.tags || [];
     const effect: string = (meta.effectText || '').toLowerCase();
-    if (tags.includes('coin') || effect.includes('coin') || effect.includes('+') /* generous */) {
-      coins += (meta.cost && meta.cost > 0 ? meta.cost : 2);
+    const cardType = meta.cardType || '';
+
+    if (tags.includes('coin') || effect.includes('coin') || /gain\s+\d*\s*coin/.test(effect)) {
+      // Prefer explicit value if present; fall back to 1 or card cost heuristic
+      const val = meta.coinValue ?? (meta.cost && meta.cost > 0 ? meta.cost : 1);
+      coins += val;
     }
-    // Funding cards often provide coins; boxings later
-    if ((c.name || '').toLowerCase().includes('fund') || tags.includes('funding')) {
+
+    if (tags.includes('funding') || cardType === 'funding') {
       coins += 1;
     }
   });
-  // Supplies
+
+  // Boxings can be converted (very simple model for now)
   const boxings = (G as any).boxingsAvailable || 0;
-  // For now add a small base so buying is possible in demo
-  return coins + Math.min(3, Math.floor(boxings / 2));
+  coins += Math.min(2, Math.floor(boxings / 2)); // e.g. spend boxings for coins
+
+  return coins;
 }
 
 // =============================================================================

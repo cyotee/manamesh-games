@@ -3,6 +3,7 @@ import { useAssetPack } from '@manamesh/frontend/src/hooks/useAssetPack';
 import { useCardImage } from '@manamesh/frontend/src/hooks/useCardImage';
 import { DEFAULT_MISTBORN_PACK_SOURCE, getEnrichedCardsForSet, MISTBORN_SETS, getLocalAssetUrl } from '../assets';
 import { TrainingTrack } from './TrainingTrack';
+import { computeCoins } from '../game';
 
 interface MistbornBoardProps {
   // For full integration pass G/ctx/moves; for standalone test/demo mode, omit
@@ -418,6 +419,7 @@ export function MistbornBoard({
           const hand = getPlayerHand(pid);
           const play = getPlayerPlay(pid);
           const discard = getPlayerDiscard(pid);
+          const availableCoins = isDemo ? 4 : computeCoins((G || { zones: {}, boxingsAvailable: 0 }) as any, pid);
 
           return (
             <div key={pid} style={{ background: 'white', padding: 12, borderRadius: 8, border: isCurrent ? '2px solid #333' : '1px solid #ddd' }}>
@@ -438,6 +440,9 @@ export function MistbornBoard({
               <div style={{ marginTop: 8, fontSize: 12 }}>
                 Health: {player.health || 36} {pid === targetHolder && '(Target Holder)'}
               </div>
+
+              {/* Coins (computed from play area via pack metadata in rules engine) */}
+              <div style={{ fontSize: 11, marginTop: 2, color: '#2c3' }}>Coins: {availableCoins}</div>
 
               {/* Character from pack */}
               <div style={{ marginTop: 8, fontSize: 11 }}>
