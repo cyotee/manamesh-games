@@ -170,43 +170,54 @@ export function validateMove(
   const player = state.players[playerID];
   if (!player) return { valid: false, error: 'Player not found' };
 
-  if (move === 'burnMetal' || move === 'playCard') {
-    // Check burn limit (Phase 2 enforcement)
-    const currentBurns = player.metals.filter(m => m.burned).length;
-    if (currentBurns >= player.burnLimit) {
+  // Structural turn + zone checks always
+  if (move === 'burnMetal' || move === 'playCard' || move === 'useAsMetal') {
+    const currentBurns = (player.metals || []).filter((m: any) => m.burned).length;
+    if (currentBurns >= (player.burnLimit || 1)) {
+      // For Phase 1/early rules engine, we return invalid for overburn (can relax for pure free if desired)
       return { valid: false, error: `Burn limit reached (${player.burnLimit})` };
     }
   }
 
   if (move === 'playCard') {
     const cardId = args[0];
-    const card = packCardsCache.find((c: any) => c.id === cardId) || {};
-    const requiredMetal = card.metadata?.metal || card.metal;
-    if (requiredMetal && !player.metals.some(m => m.metal === requiredMetal && !m.burned)) {
-      // Check if can use token or card as metal
-      // For now, simple
-      return { valid: true }; // rules-free allows
+    const entry = packCardsCache.find((c: any) => c.id === cardId) || {};
+    const meta = entry.metadata || entry;
+    const requiredMetal = meta.metal || meta.requiredMetal;
+    if (requiredMetal) {
+      const hasMetal = (player.metals || []).some((m: any) => {
+        const mName = Array.isArray(requiredMetal) ? requiredMetal.includes(m.metal) : m.metal === requiredMetal;
+        return mName && !m.burned;
+      });
+      if (!hasMetal) {
+        // Rules engine: require metal. In pure rules-free demo, board can still call and rely on validate returning true-ish
+        // Keep strict here for forward progress toward enforcement.
+        // Allow for now to keep manual testing smooth: return {valid: true} or strict:
+        return { valid: true }; // keep permissive until full metal state wiring; tighten later
+      }
     }
   }
 
   if (move === 'buyCard') {
     const cardId = args[0];
-    const marketCard = state.market.find((c: any) => c === cardId) || 
-                       (packCardsCache && packCardsCache.find((c: any) => c.id === cardId));
-    if (!marketCard) {
+    const inMarket = (state.market || []).some((c: any) => (typeof c === 'string' ? c === cardId : c.id === cardId));
+    if (!inMarket) {
       return { valid: false, error: 'Card not in market' };
     }
-    const meta = packCardsCache.find((p: any) => p.id === cardId)?.metadata || {};
-    const cost = meta.cost || 0;
+    const meta = (packCardsCache.find((p: any) => p.id === cardId)?.metadata) || {};
+    const cost = Number(meta.cost ?? 0);
     const coins = computeCoins(state, playerID);
-    if (coins < cost) {
+    if (cost > 0 && coins < cost) {
       return { valid: false, error: `Not enough coins (have ${coins}, need ${cost})` };
     }
   }
 
   if (move === 'eliminateCard') {
-    // Soothe-like: only own cards
-    // Rules-free for now
+    // Only cards you control (structural)
+    const from = args[1];
+    if (from && !['hand', 'play', 'discard'].includes(from)) {
+      return { valid: false, error: 'Invalid eliminate source zone' };
+    }
   }
 
   return { valid: true };
@@ -215,17 +226,32 @@ export function validateMove(
 // Temporary cache for pack cards in validation (will be wired better)
 let packCardsCache: any[] = [];
 
-// Helper to compute available coins from played cards (using metadata)
+// Expose a setter for consumers (e.g. board or test harness can refresh metadata)
+export function setPackCardsForValidation(cards: any[]) {
+  packCardsCache = Array.isArray(cards) ? cards : [];
+}
+
+// Helper to compute available coins from played cards (using metadata + simple heuristics)
+// In rules-free we are generous; rules engine will tighten via tags/cost/effects.
 function computeCoins(G: MistbornState, pid: string): number {
   const play = G.zones.play?.[pid] || [];
   let coins = 0;
   play.forEach((c: any) => {
-    const meta = packCardsCache.find((p: any) => p.id === c.id)?.metadata || c.metadata;
-    if (meta?.tags?.includes('coin') || meta?.effectText?.includes('coin')) coins += (meta?.cost || 1); // simplistic
-    // In real, would resolve effects
+    const meta = (packCardsCache.find((p: any) => p.id === (c.id || c))?.metadata) || (c as any).metadata || {};
+    const tags: string[] = meta.tags || [];
+    const effect: string = (meta.effectText || '').toLowerCase();
+    if (tags.includes('coin') || effect.includes('coin') || effect.includes('+') /* generous */) {
+      coins += (meta.cost && meta.cost > 0 ? meta.cost : 2);
+    }
+    // Funding cards often provide coins; boxings later
+    if ((c.name || '').toLowerCase().includes('fund') || tags.includes('funding')) {
+      coins += 1;
+    }
   });
-  // Also funding, savants, allies, boxings (stub)
-  return coins + (G as any).boxingsSpent || 0; // placeholder
+  // Supplies
+  const boxings = (G as any).boxingsAvailable || 0;
+  // For now add a small base so buying is possible in demo
+  return coins + Math.min(3, Math.floor(boxings / 2));
 }
 
 // =============================================================================
@@ -284,11 +310,22 @@ const moves = {
 
   buyCard: (G: MistbornState, ctx: Ctx, cardId: string) => {
     const pid = ctx.currentPlayer!;
-    const idx = G.market.indexOf(cardId);
+    const idx = G.market.findIndex((c: any) => (typeof c === 'string' ? c === cardId : c.id === cardId));
     if (idx >= 0) {
       G.market.splice(idx, 1);
+      // Resolve full enriched entry from pack cache when possible (for future metadata use)
+      const entry = packCardsCache.find((p: any) => p.id === cardId) || { id: cardId, name: cardId };
+      const fullCard = {
+        id: entry.id || cardId,
+        name: entry.name || cardId,
+        cost: entry.metadata?.cost ?? entry.cost ?? 0,
+        metal: entry.metadata?.metal,
+        tags: entry.metadata?.tags || [],
+        effectText: entry.metadata?.effectText,
+        imagePath: entry.front || entry.imagePath,
+      };
       G.zones.discard[pid] = G.zones.discard[pid] || [];
-      G.zones.discard[pid].push({ id: cardId, name: cardId } as any);
+      G.zones.discard[pid].push(fullCard as any);
       if (G.marketDeckCount > 0) {
         G.market.push(`market-refill-${Date.now()}`);
         G.marketDeckCount--;
@@ -317,41 +354,20 @@ const moves = {
     return G;
   },
 
+  // Single definition (rules-free for Phase 1; will add metadata checks in validate + Phase 2)
   advanceTraining: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
     const player = G.players[pid];
-    player.trainingPosition = (player.trainingPosition || 0) + 1;
-    player.burnLimit = Math.min(4, 1 + Math.floor((player.trainingPosition || 0) / 3));
-    G.moveHistory.push({ playerId: pid, move: 'advanceTraining', args: [], timestamp: Date.now() });
-    return G;
-  },
-
-  eliminateCard: (G: MistbornState, ctx: Ctx, cardId: string, from: string) => {
-    const pid = ctx.currentPlayer!;
-    const zoneKey = from === 'play' ? 'play' : (from === 'discard' ? 'discard' : 'hand');
-    if (G.zones[zoneKey] && G.zones[zoneKey][pid]) {
-      G.zones[zoneKey][pid] = G.zones[zoneKey][pid].filter((c: any) => c.id !== cardId);
+    if (player) {
+      player.trainingPosition = (player.trainingPosition || 0) + 1;
+      player.burnLimit = Math.min(4, 1 + Math.floor((player.trainingPosition || 0) / 3));
     }
-    G.moveHistory.push({ playerId: pid, move: 'eliminateCard', args: [cardId, from], timestamp: Date.now() });
-    return G;
-  },
-
-
-
-  advanceTraining: (G: MistbornState, ctx: Ctx) => {
-    const pid = ctx.currentPlayer!;
-    const player = G.players[pid];
-    player.trainingPosition = (player.trainingPosition || 0) + 1;
-    // In rules-free, we allow manual; later enforcement will auto-advance on turn start
-    // Update burnLimit based on position (example milestones)
-    player.burnLimit = Math.min(4, 1 + Math.floor((player.trainingPosition || 0) / 3));
     G.moveHistory.push({ playerId: pid, move: 'advanceTraining', args: [], timestamp: Date.now() });
     return G;
   },
 
   eliminateCard: (G: MistbornState, ctx: Ctx, cardId: string, from: string) => {
     const pid = ctx.currentPlayer!;
-    // Rules-free: remove from specified zone (hand/play/discard simulation)
     const zoneKey = from === 'play' ? 'play' : (from === 'discard' ? 'discard' : 'hand');
     if (G.zones[zoneKey] && G.zones[zoneKey][pid]) {
       G.zones[zoneKey][pid] = G.zones[zoneKey][pid].filter((c: any) => c.id !== cardId);
@@ -366,8 +382,8 @@ const moves = {
     if (G.zones.play && G.zones.play[pid]) {
       const card = G.zones.play[pid].find((c: any) => c.id === cardId);
       if (card) {
-        card._sideways = true;
-        // Simulate burning a metal from the card's pairing
+        (card as any)._sideways = true;
+        // Simulate burning a metal from the card's pairing (metadata driven later)
       }
     }
     G.moveHistory.push({ playerId: pid, move: 'useAsMetal', args: [cardId], timestamp: Date.now() });
@@ -384,15 +400,12 @@ const moves = {
     return G;
   },
 
-  passTarget: (G: MistbornState, ctx: Ctx) => {
+  // End current player's main actions (rules engine will gate by phase)
+  endTurn: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
-    // Simple: cycle to next player
-    const pids = Object.keys(G.players);
-    const idx = pids.indexOf(pid);
-    const next = pids[(idx + 1) % pids.length];
-    // In state, target is in G, but for simplicity, assume handled in UI or add field
-    (G as any).targetHolder = next;
-    G.moveHistory.push({ playerId: pid, move: 'passTarget', args: [], timestamp: Date.now() });
+    // In full rules: perform cleanup/draw automatically or require explicit
+    G.moveHistory.push({ playerId: pid, move: 'endTurn', args: [], timestamp: Date.now() });
+    // boardgame.io will advance via turn order; explicit phase end handled in future
     return G;
   },
 };
@@ -413,27 +426,34 @@ export const MistbornGame: Game<MistbornState> = {
   },
   moves,
   turn: {
-    // Rules engine start: auto advance training at start of turn
+    // Rules engine: auto advance training at start of turn (per RULES)
     onBegin: (G: MistbornState, ctx: Ctx) => {
       const pid = ctx.currentPlayer!;
       const player = G.players[pid];
       if (player) {
         player.trainingPosition = (player.trainingPosition || 0) + 1;
         player.burnLimit = Math.min(4, 1 + Math.floor(player.trainingPosition / 3));
-        // Reset per-turn state (burns, etc.) - metals are already per-turn in moves
+        // Reset per-turn metal burns (rules engine will do on turn begin)
+        if (Array.isArray(player.metals)) {
+          player.metals.forEach((m: any) => { m.burned = false; m.flared = false; });
+        }
+      }
+      // Ensure targetHolder seeded
+      if (!(G as any).targetHolder) {
+        (G as any).targetHolder = pid;
       }
       return G;
     },
   },
   phases: {
     setup: { start: true, next: 'keyExchange' },
-    keyExchange: { /* crypto steps */ },
+    keyExchange: { /* crypto for mental poker - full in later milestone */ },
     encrypt: {},
     shuffle: {},
     play: {
       moves,
-      // Freeform actions until player ends turn (rules-free allows manual end)
-      // In enforcement: add endIf for phase or explicit moves
+      // Main freeform play for rules-free + early engine.
+      // Later: onBegin of subphases, endIf conditions, explicit endMainPhase -> combat/cleanup.
     },
   },
   endIf: (G) => G.winner,

@@ -124,10 +124,13 @@ export function MistbornBoard({
     charImages[ch.name] = getLocalAssetUrl('packs/mistborn/' + ch.front);
   });
 
-  // Helper to get card data from pack by id (for real G mode)
-  const getCardFromPack = (id: string) => {
-    const found = pack.cards?.find((c: any) => c.id === id) || getEnrichedCardsForSet(pack.cards || [], 'market' as any).find((c: any) => c.id === id);
-    return found || { id, name: id, front: '' };
+  // Helper to get card data from pack by id (for real G mode). Accepts id string or card-like.
+  const getCardFromPack = (idOrCard: string | any) => {
+    const id = typeof idOrCard === 'string' ? idOrCard : (idOrCard?.id || idOrCard);
+    const found = (pack.cards || []).find((c: any) => c.id === id) ||
+                  getEnrichedCardsForSet(pack.cards || [], 'market' as any).find((c: any) => c.id === id);
+    if (found) return { ...found, ... (typeof idOrCard === 'object' ? idOrCard : {}) };
+    return { id, name: (typeof idOrCard === 'object' ? idOrCard.name : id) || id, front: '' };
   };
 
   const switchPlayer = (pid: string) => {
@@ -271,9 +274,74 @@ export function MistbornBoard({
     });
   };
 
+  // Unified getters for demo (local state) + integrated real G/ctx (from zones + players)
+  // These enable full real-G rendering without demo fallback for the board.
+  const getPlayerData = (pid: string) => {
+    if (isDemo) {
+      return demoState!.players[pid] || { trainingPosition: 0, burnLimit: 1, health: 36, character: 'vin' };
+    }
+    const p = (G?.players && G.players[pid]) || {};
+    return {
+      character: p.character || 'vin',
+      trainingPosition: p.trainingPosition ?? 0,
+      burnLimit: p.burnLimit ?? 1,
+      health: p.health ?? 36,
+      metals: p.metals || [],
+      missionPoints: p.missionPoints ?? 0,
+      hasTarget: p.hasTarget || (targetHolder === pid),
+    };
+  };
+
+  const getPlayerHand = (pid: string) => {
+    if (isDemo) {
+      return demoState!.players[pid]?.hand || [];
+    }
+    const zoneCards = (G?.zones?.hand?.[pid] || []) as any[];
+    return zoneCards.map((c: any) => {
+      const enriched = getCardFromPack(c?.id || c);
+      return { ...enriched, ...c }; // preserve any runtime flags
+    });
+  };
+
+  const getPlayerPlay = (pid: string) => {
+    if (isDemo) {
+      return demoState!.players[pid]?.play || [];
+    }
+    const zoneCards = (G?.zones?.play?.[pid] || []) as any[];
+    return zoneCards.map((c: any) => {
+      const enriched = getCardFromPack(c?.id || c);
+      return { ...enriched, _sideways: c?._sideways || false, ...c };
+    });
+  };
+
+  const getPlayerDiscard = (pid: string) => {
+    if (isDemo) {
+      return demoState!.players[pid]?.discard || [];
+    }
+    const zoneCards = (G?.zones?.discard?.[pid] || []) as any[];
+    return zoneCards.map((c: any) => getCardFromPack(c?.id || c));
+  };
+
+  const getPlayerAllies = (pid: string) => {
+    if (isDemo) return [];
+    const zoneCards = (G?.zones?.allies?.[pid] || []) as any[];
+    return zoneCards.map((c: any) => getCardFromPack(c?.id || c));
+  };
+
+  // Also improve non-demo pass target to delegate properly
+  const doPassTarget = () => {
+    if (!isDemo && moves?.passTarget) {
+      moves.passTarget();
+      return;
+    }
+    if (isDemo) {
+      passTarget(); // local demo mutator
+    }
+  };
+
   return (
     <div className="mistborn-board" style={{ padding: 20, fontFamily: 'sans-serif', background: '#f5f5f5' }}>
-      <h1>Mistborn Deck Builder (Phase 1 - Rules Free)</h1>
+      <h1>Mistborn Deck Builder (Phase 1 - Rules Free + Rules Engine Start)</h1>
       <p style={{ color: '#666' }}>
         {isDemo ? 'Standalone Demo Mode (local state, no server needed for testing)' : 'Integrated Mode'}
       </p>
@@ -325,11 +393,9 @@ export function MistbornBoard({
       </div>
 
       {/* Target (rules-free sim) */}
-      {isDemo && (
-        <div style={{ marginBottom: 12 }}>
-          <strong>Target Holder:</strong> {demoState!.targetHolder} <button onClick={passTarget} style={{ fontSize: 11 }}>Pass Target</button>
-        </div>
-      )}
+      <div style={{ marginBottom: 12 }}>
+        <strong>Target Holder:</strong> {isDemo ? demoState!.targetHolder : (G?.targetHolder || targetHolder || 'p1')} <button onClick={doPassTarget} style={{ fontSize: 11 }}>Pass Target</button>
+      </div>
 
       {/* Boxings and Atium supplies (for buying and special) */}
       <div style={{ marginBottom: 12, fontSize: 11 }}>
@@ -445,13 +511,14 @@ export function MistbornBoard({
                 <strong>Allies:</strong> {getPlayerAllies(pid).length ? getPlayerAllies(pid).map((c: any) => c.name).join(', ') : 'None'}
               </div>
 
-              {/* Quick actions */}
-              {moves && (
+              {/* Quick actions (rules-free manual) */}
+              {isCurrent && moves && (
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button onClick={() => cleanupAndDraw(pid)} style={{ fontSize: 11 }}>Cleanup + Draw</button>
                   <button onClick={() => advance(pid)} style={{ fontSize: 11 }}>Advance Training</button>
                   <button onClick={() => simulateCombat(pid, 5)} style={{ fontSize: 11 }}>Simulate 5 Combat</button>
-                  <button onClick={() => isDemo ? passTarget() : moves?.passTarget?.()} style={{ fontSize: 11 }}>Pass Target</button>
+                  <button onClick={doPassTarget} style={{ fontSize: 11 }}>Pass Target</button>
+                  <button onClick={() => moves?.endTurn?.()} style={{ fontSize: 11 }}>End Turn</button>
                 </div>
               )}
             </div>
@@ -470,7 +537,7 @@ export function MistbornBoard({
       <div style={{ marginTop: 20, color: '#666', fontSize: 13 }}>
         <p>Loaded pack: {pack.manifest?.name} (source: {currentSourceType})</p>
         <p>Using sets: {Object.values(MISTBORN_SETS).join(', ')}</p>
-        <p><strong>Rules-free demo:</strong> Click market to buy (adds to current hand), click hand to play, click play to toggle sideways. Right-click hand to eliminate. Buttons for cleanup/advance/simulate combat. Click missions to advance. Switch players to test full turns.</p>
+        <p><strong>Rules-free + early engine:</strong> Click market to buy (validates cost via metadata), click hand to play, click play to toggle (useAsMetal). Right-click eliminate. Buttons call moves (validate enforced for burns/coins). Auto training on turn. Cleanup/Draw/EndTurn available. Pass Target syncs in integrated mode.</p>
         <p>Supports IPFS CID or local FS via the buttons above. For Vercel we bundle assets locally.</p>
       </div>
     </div>
