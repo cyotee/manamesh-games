@@ -226,7 +226,7 @@ export function validateMove(
   }
 
   // Structural moves (order enforced at top of validate)
-  if (['cleanupAndDraw', 'passTarget', 'endTurn', 'refillMarket', 'draw'].includes(move)) {
+  if (['cleanupAndDraw', 'passTarget', 'endTurn', 'refillMarket', 'draw', 'endMainPhase'].includes(move)) {
     return { valid: true };
   }
 
@@ -454,9 +454,25 @@ const moves = {
   // End current player's main actions (rules engine will gate by phase)
   endTurn: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
-    // In full rules: perform cleanup/draw automatically or require explicit
+    const validation = validateMove(G, 'endTurn', pid);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     G.moveHistory.push({ playerId: pid, move: 'endTurn', args: [], timestamp: Date.now() });
     // boardgame.io will advance via turn order; explicit phase end handled in future
+    return G;
+  },
+
+  // Explicit end of main actions (can be used to enter combat/cleanup in full engine)
+  endMainPhase: (G: MistbornState, ctx: Ctx) => {
+    const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'endMainPhase', pid);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
+    // In rules-free this is mostly a marker; full engine can change phase here
+    (G as any).phase = 'combat';
+    G.moveHistory.push({ playerId: pid, move: 'endMainPhase', args: [], timestamp: Date.now() });
     return G;
   },
 };

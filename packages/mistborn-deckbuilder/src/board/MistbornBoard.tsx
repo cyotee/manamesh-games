@@ -424,7 +424,7 @@ export function MistbornBoard({
           return (
             <div key={pid} style={{ background: 'white', padding: 12, borderRadius: 8, border: isCurrent ? '2px solid #333' : '1px solid #ddd' }}>
               <h3 style={{ color, marginTop: 0 }}>
-                Player {pid} {isCurrent && '(Current)'} — Burn Limit: {player.burnLimit}
+                Player {pid} {isCurrent && '(Current)'} — Burn Limit: {player.burnLimit} (burned: {(player.metals || []).filter((m: any) => m.burned).length})
               </h3>
 
               {/* Training */}
@@ -525,6 +525,7 @@ export function MistbornBoard({
                   <button onClick={() => simulateCombat(pid, 5)} style={{ fontSize: 11 }}>Simulate 5 Combat</button>
                   <button onClick={doPassTarget} style={{ fontSize: 11 }}>Pass Target</button>
                   <button onClick={() => moves?.endTurn?.()} style={{ fontSize: 11 }}>End Turn</button>
+                  <button onClick={() => moves?.endMainPhase?.()} style={{ fontSize: 11 }}>End Main Phase</button>
                 </div>
               )}
             </div>
