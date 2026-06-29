@@ -1,0 +1,30 @@
+{
+  "name": "@manamesh/mistborn-deckbuilder",
+  "version": "0.1.0",
+  "description": "Mistborn: The Deck Building Game module for ManaMesh — rules-free game board and card management version first (with full mental-poker crypto), followed by rules enforcement.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./zones": "./src/zones.ts",
+    "./game": "./src/game.ts",
+    "./crypto": "./src/crypto.ts",
+    "./data": "./src/data/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@manamesh/boardgameio-crypto": "workspace:*",
+    "@manamesh/frontend": "workspace:*",
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}

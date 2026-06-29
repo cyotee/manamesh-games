@@ -1,0 +1,24 @@
+{
+  "vin": {
+    "id": "vin",
+    "name": "Vin",
+    "signatureMetal": "pewter",
+    "imagePath": "character_cards/Chartacter_Card-Vin.png",
+    "abilities": {
+      "level1": "If you are burning Pewter, gain combat or heal.",
+      "level2": "Once per turn, when you buy an Action card, you may eliminate it and resolve its top effect immediately.",
+      "atium": "When burning Atium, gain powerful bonus."
+    }
+  },
+  "kelsier": {
+    "id": "kelsier",
+    "name": "Kelsier",
+    "signatureMetal": "steel",
+    "imagePath": "character_cards/Chartacter_Card-Kelsier.png",
+    "abilities": {
+      "level1": "If burning Steel...",
+      "level2": "Once per turn when you buy an Action, eliminate it and resolve top effect.",
+      "atium": "Atium effect"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Funding Cards",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "cards": [
+    {
+      "id": "Funding_Card_Front",
+      "name": "Funding",
+      "front": "cards/Funding_Card_Front.png",
+      "back": "cards/Funding_Card_Back.png",
+      "metadata": {
+        "cardType": "funding",
+        "cost": 0,
+        "effectText": "Gain 1 coin.",
+        "tags": [
+          "coin"
+        ]
+      }
+    }
+  ]
+}

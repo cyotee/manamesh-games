@@ -1,0 +1,439 @@
+{
+  "name": "Lord-ruler Cards",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "cards": [
+    {
+      "id": "Lord_Ruler_Challenge_Card-L01",
+      "name": "L01",
+      "front": "cards/Lord_Ruler_Challenge_Card-L01.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L01.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L02",
+      "name": "L02",
+      "front": "cards/Lord_Ruler_Challenge_Card-L02.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L02.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L03",
+      "name": "L03",
+      "front": "cards/Lord_Ruler_Challenge_Card-L03.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L03.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L04",
+      "name": "L04",
+      "front": "cards/Lord_Ruler_Challenge_Card-L04.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L04.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L05",
+      "name": "L05",
+      "front": "cards/Lord_Ruler_Challenge_Card-L05.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L05.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L06",
+      "name": "L06",
+      "front": "cards/Lord_Ruler_Challenge_Card-L06.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L06.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L07",
+      "name": "L07",
+      "front": "cards/Lord_Ruler_Challenge_Card-L07.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L07.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L08",
+      "name": "L08",
+      "front": "cards/Lord_Ruler_Challenge_Card-L08.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L08.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L09",
+      "name": "L09",
+      "front": "cards/Lord_Ruler_Challenge_Card-L09.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L09.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L10",
+      "name": "L10",
+      "front": "cards/Lord_Ruler_Challenge_Card-L10.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L10.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L11",
+      "name": "L11",
+      "front": "cards/Lord_Ruler_Challenge_Card-L11.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L11.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L12",
+      "name": "L12",
+      "front": "cards/Lord_Ruler_Challenge_Card-L12.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L12.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L13",
+      "name": "L13",
+      "front": "cards/Lord_Ruler_Challenge_Card-L13.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L13.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L14",
+      "name": "L14",
+      "front": "cards/Lord_Ruler_Challenge_Card-L14.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L14.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L15",
+      "name": "L15",
+      "front": "cards/Lord_Ruler_Challenge_Card-L15.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L15.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L16",
+      "name": "L16",
+      "front": "cards/Lord_Ruler_Challenge_Card-L16.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L16.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L17",
+      "name": "L17",
+      "front": "cards/Lord_Ruler_Challenge_Card-L17.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L17.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L18",
+      "name": "L18",
+      "front": "cards/Lord_Ruler_Challenge_Card-L18.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L18.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L19",
+      "name": "L19",
+      "front": "cards/Lord_Ruler_Challenge_Card-L19.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L19.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L20",
+      "name": "L20",
+      "front": "cards/Lord_Ruler_Challenge_Card-L20.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L20.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L21",
+      "name": "L21",
+      "front": "cards/Lord_Ruler_Challenge_Card-L21.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L21.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L22",
+      "name": "L22",
+      "front": "cards/Lord_Ruler_Challenge_Card-L22.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L22.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L23",
+      "name": "L23",
+      "front": "cards/Lord_Ruler_Challenge_Card-L23.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L23.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L24",
+      "name": "L24",
+      "front": "cards/Lord_Ruler_Challenge_Card-L24.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L24.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L25",
+      "name": "L25",
+      "front": "cards/Lord_Ruler_Challenge_Card-L25.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L25.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L26",
+      "name": "L26",
+      "front": "cards/Lord_Ruler_Challenge_Card-L26.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L26.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L27",
+      "name": "L27",
+      "front": "cards/Lord_Ruler_Challenge_Card-L27.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L27.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L28",
+      "name": "L28",
+      "front": "cards/Lord_Ruler_Challenge_Card-L28.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L28.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L29",
+      "name": "L29",
+      "front": "cards/Lord_Ruler_Challenge_Card-L29.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L29.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L30",
+      "name": "L30",
+      "front": "cards/Lord_Ruler_Challenge_Card-L30.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L30.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L31",
+      "name": "L31",
+      "front": "cards/Lord_Ruler_Challenge_Card-L31.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L31.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L32",
+      "name": "L32",
+      "front": "cards/Lord_Ruler_Challenge_Card-L32.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L32.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L33",
+      "name": "L33",
+      "front": "cards/Lord_Ruler_Challenge_Card-L33.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L33.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L34",
+      "name": "L34",
+      "front": "cards/Lord_Ruler_Challenge_Card-L34.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L34.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L35",
+      "name": "L35",
+      "front": "cards/Lord_Ruler_Challenge_Card-L35.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L35.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    },
+    {
+      "id": "Lord_Ruler_Challenge_Card-L36",
+      "name": "L36",
+      "front": "cards/Lord_Ruler_Challenge_Card-L36.png",
+      "metadata": {
+        "cardType": "edict",
+        "effectText": "Lord Ruler challenge: L36.",
+        "tags": [
+          "lord-ruler"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,716 @@
+{
+  "name": "Market Cards",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "cards": [
+    {
+      "id": "Market_Card-Ascendant",
+      "name": "Ascendant",
+      "front": "cards/Market_Card-Ascendant.png",
+      "metadata": {
+        "cost": 5,
+        "metal": "atium",
+        "effectText": "Powerful atium ability.",
+        "tags": [
+          "atium"
+        ],
+        "pairing": [
+          "atium"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Assassinate",
+      "name": "Assassinate",
+      "front": "cards/Market_Card-Assassinate.png",
+      "metadata": {
+        "cost": 3,
+        "metal": "zinc",
+        "effectText": "Eliminate a card from play.",
+        "tags": [
+          "soothe",
+          "eliminate"
+        ],
+        "pairing": [
+          "zinc",
+          "brass"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Balance",
+      "name": "Balance",
+      "front": "cards/Market_Card-Balance.png",
+      "metadata": {
+        "cost": 2,
+        "metal": "bronze",
+        "effectText": "Seek top effect of a market card.",
+        "tags": [
+          "seek"
+        ],
+        "pairing": [
+          "bronze",
+          "copper"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Brawl",
+      "name": "Brawl",
+      "front": "cards/Market_Card-Brawl.png",
+      "metadata": {
+        "cost": 2,
+        "metal": "pewter",
+        "effectText": "Gain combat.",
+        "tags": [
+          "combat"
+        ],
+        "pairing": [
+          "pewter",
+          "tin"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Charm",
+      "name": "Charm",
+      "front": "cards/Market_Card-Charm.png",
+      "metadata": {
+        "cost": 3,
+        "metal": "pewter",
+        "effectText": "Gain coin or block.",
+        "tags": [
+          "coin",
+          "cloud"
+        ],
+        "pairing": [
+          "pewter",
+          "tin"
+        ],
+        "cardType": "ally",
+        "defense": 3
+      }
+    },
+    {
+      "id": "Market_Card-Coinshot",
+      "name": "Coinshot",
+      "front": "cards/Market_Card-Coinshot.png",
+      "metadata": {
+        "metal": "steel",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cost": 2,
+        "effectText": "Coinshot effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Confrontation",
+      "name": "Confrontation",
+      "front": "cards/Market_Card-Confrontation.png",
+      "metadata": {
+        "metal": "atium",
+        "pairing": [
+          "atium"
+        ],
+        "cost": 5,
+        "effectText": "Confrontation effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Coppercloud",
+      "name": "Coppercloud",
+      "front": "cards/Market_Card-Coppercloud.png",
+      "metadata": {
+        "metal": "copper",
+        "pairing": [
+          "bronze",
+          "copper"
+        ],
+        "cost": 2,
+        "effectText": "Reduce incoming damage to you or allies.",
+        "tags": [
+          "cloud"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Crash",
+      "name": "Crash",
+      "front": "cards/Market_Card-Crash.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Crash effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Crewleader",
+      "name": "Crewleader",
+      "front": "cards/Market_Card-Crewleader.png",
+      "metadata": {
+        "cost": 3,
+        "effectText": "Crewleader effect.",
+        "cardType": "ally",
+        "defense": 2
+      }
+    },
+    {
+      "id": "Market_Card-Crushing_Blow",
+      "name": "Crushing Blow",
+      "front": "cards/Market_Card-Crushing_Blow.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Crushing Blow effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Eavesdrop",
+      "name": "Eavesdrop",
+      "front": "cards/Market_Card-Eavesdrop.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Eavesdrop effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Enrage",
+      "name": "Enrage",
+      "front": "cards/Market_Card-Enrage.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Enrage effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Hazekillers",
+      "name": "Hazekillers",
+      "front": "cards/Market_Card-Hazekillers.png",
+      "metadata": {
+        "cost": 4,
+        "effectText": "Hazekillers effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Hide",
+      "name": "Hide",
+      "front": "cards/Market_Card-Hide.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Hide effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-House_Lord",
+      "name": "House Lord",
+      "front": "cards/Market_Card-House_Lord.png",
+      "metadata": {
+        "cost": 4,
+        "effectText": "House Lord effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-House_War",
+      "name": "House War",
+      "front": "cards/Market_Card-House_War.png",
+      "metadata": {
+        "cost": 4,
+        "effectText": "House War effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Hunt",
+      "name": "Hunt",
+      "front": "cards/Market_Card-Hunt.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Hunt effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Hyperaware",
+      "name": "Hyperaware",
+      "front": "cards/Market_Card-Hyperaware.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Mission points or Sense effect.",
+        "tags": [
+          "mission",
+          "sense"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Informant",
+      "name": "Informant",
+      "front": "cards/Market_Card-Informant.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Informant effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Inquisitor",
+      "name": "Inquisitor",
+      "front": "cards/Market_Card-Inquisitor.png",
+      "metadata": {
+        "cost": 4,
+        "effectText": "Inquisitor effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Inspire",
+      "name": "Inspire",
+      "front": "cards/Market_Card-Inspire.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Inspire effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Intimidate",
+      "name": "Intimidate",
+      "front": "cards/Market_Card-Intimidate.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Intimidate effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Investigate",
+      "name": "Investigate",
+      "front": "cards/Market_Card-Investigate.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Investigate effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Ironpull",
+      "name": "Ironpull",
+      "front": "cards/Market_Card-Ironpull.png",
+      "metadata": {
+        "metal": "iron",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cost": 2,
+        "effectText": "Move a card from discard to top of deck.",
+        "tags": [
+          "pull"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Kandra",
+      "name": "Kandra",
+      "front": "cards/Market_Card-Kandra.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Kandra effect.",
+        "cardType": "ally",
+        "defense": 3
+      }
+    },
+    {
+      "id": "Market_Card-Keeper",
+      "name": "Keeper",
+      "front": "cards/Market_Card-Keeper.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Keeper effect.",
+        "cardType": "ally",
+        "defense": 3
+      }
+    },
+    {
+      "id": "Market_Card-Lookout",
+      "name": "Lookout",
+      "front": "cards/Market_Card-Lookout.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Lookout effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Lurcher",
+      "name": "Lurcher",
+      "front": "cards/Market_Card-Lurcher.png",
+      "metadata": {
+        "metal": "iron",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cost": 2,
+        "effectText": "Lurcher effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Maelstrom",
+      "name": "Maelstrom",
+      "front": "cards/Market_Card-Maelstrom.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Maelstrom effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Mercenary",
+      "name": "Mercenary",
+      "front": "cards/Market_Card-Mercenary.png",
+      "metadata": {
+        "cost": 3,
+        "effectText": "Mercenary effect.",
+        "cardType": "ally",
+        "defense": 3
+      }
+    },
+    {
+      "id": "Market_Card-Noble",
+      "name": "Noble",
+      "front": "cards/Market_Card-Noble.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Noble effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Pacify",
+      "name": "Pacify",
+      "front": "cards/Market_Card-Pacify.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Pacify effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Pewterarm",
+      "name": "Pewterarm",
+      "front": "cards/Market_Card-Pewterarm.png",
+      "metadata": {
+        "metal": "pewter",
+        "pairing": [
+          "pewter",
+          "tin"
+        ],
+        "cost": 3,
+        "effectText": "Gain combat or health if burning Pewter.",
+        "tags": [
+          "combat",
+          "heal"
+        ],
+        "cardType": "ally",
+        "defense": 3
+      }
+    },
+    {
+      "id": "Market_Card-Pickpocket",
+      "name": "Pickpocket",
+      "front": "cards/Market_Card-Pickpocket.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Pickpocket effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Pierce",
+      "name": "Pierce",
+      "front": "cards/Market_Card-Pierce.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Pierce effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Precise_Shot",
+      "name": "Precise Shot",
+      "front": "cards/Market_Card-Precise_Shot.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Precise Shot effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Presereve",
+      "name": "Presereve",
+      "front": "cards/Market_Card-Presereve.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Presereve effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Rebel",
+      "name": "Rebel",
+      "front": "cards/Market_Card-Rebel.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Rebel effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Recover",
+      "name": "Recover",
+      "front": "cards/Market_Card-Recover.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Recover effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Reposition",
+      "name": "Reposition",
+      "front": "cards/Market_Card-Reposition.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Reposition effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Rescue",
+      "name": "Rescue",
+      "front": "cards/Market_Card-Rescue.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Rescue effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Rioter",
+      "name": "Rioter",
+      "front": "cards/Market_Card-Rioter.png",
+      "metadata": {
+        "metal": "zinc",
+        "pairing": [
+          "zinc",
+          "brass"
+        ],
+        "cost": 2,
+        "effectText": "Activate an ally without burning its metal.",
+        "tags": [
+          "riot"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Ruin",
+      "name": "Ruin",
+      "front": "cards/Market_Card-Ruin.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Ruin effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Seeker",
+      "name": "Seeker",
+      "front": "cards/Market_Card-Seeker.png",
+      "metadata": {
+        "metal": "bronze",
+        "pairing": [
+          "bronze",
+          "copper"
+        ],
+        "cost": 2,
+        "effectText": "Use the top effect of any market Action card.",
+        "tags": [
+          "seek"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Smoker",
+      "name": "Smoker",
+      "front": "cards/Market_Card-Smoker.png",
+      "metadata": {
+        "metal": "copper",
+        "pairing": [
+          "bronze",
+          "copper"
+        ],
+        "cost": 2,
+        "effectText": "Reduce incoming damage to you or allies.",
+        "tags": [
+          "cloud"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Sneak",
+      "name": "Sneak",
+      "front": "cards/Market_Card-Sneak.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Sneak effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Soar",
+      "name": "Soar",
+      "front": "cards/Market_Card-Soar.png",
+      "metadata": {
+        "metal": "steel",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cost": 2,
+        "effectText": "Eliminate a market card. Additional Steel for bonus.",
+        "tags": [
+          "push"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Soldier",
+      "name": "Soldier",
+      "front": "cards/Market_Card-Soldier.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Soldier effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Spy",
+      "name": "Spy",
+      "front": "cards/Market_Card-Spy.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Spy effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Steelpush",
+      "name": "Steelpush",
+      "front": "cards/Market_Card-Steelpush.png",
+      "metadata": {
+        "metal": "steel",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cost": 2,
+        "effectText": "Eliminate a market card. Additional Steel for bonus.",
+        "tags": [
+          "push"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Strategize",
+      "name": "Strategize",
+      "front": "cards/Market_Card-Strategize.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Strategize effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Strike",
+      "name": "Strike",
+      "front": "cards/Market_Card-Strike.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Strike effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Survive",
+      "name": "Survive",
+      "front": "cards/Market_Card-Survive.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Survive effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Tineye",
+      "name": "Tineye",
+      "front": "cards/Market_Card-Tineye.png",
+      "metadata": {
+        "metal": "tin",
+        "pairing": [
+          "pewter",
+          "tin"
+        ],
+        "cost": 2,
+        "effectText": "Mission points or Sense effect.",
+        "tags": [
+          "mission",
+          "sense"
+        ],
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Train_in_Secret",
+      "name": "Train in Secret",
+      "front": "cards/Market_Card-Train_in_Secret.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Train in Secret effect.",
+        "cardType": "action"
+      }
+    },
+    {
+      "id": "Market_Card-Unveil",
+      "name": "Unveil",
+      "front": "cards/Market_Card-Unveil.png",
+      "metadata": {
+        "cost": 2,
+        "effectText": "Unveil effect.",
+        "cardType": "action"
+      }
+    }
+  ]
+}

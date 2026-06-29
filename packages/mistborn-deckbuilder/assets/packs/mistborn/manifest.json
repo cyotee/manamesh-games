@@ -1,0 +1,13 @@
+{
+  "name": "Mistborn - Core Assets",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "sets": [
+    { "name": "Market", "path": "market" },
+    { "name": "Missions", "path": "missions" },
+    { "name": "Lord Ruler", "path": "lord-ruler" },
+    { "name": "Metal Training", "path": "metal-training" },
+    { "name": "Characters", "path": "character" },
+    { "name": "Funding", "path": "funding" }
+  ]
+}

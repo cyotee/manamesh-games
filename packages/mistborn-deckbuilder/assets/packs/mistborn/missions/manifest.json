@@ -1,0 +1,103 @@
+{
+  "name": "Missions Cards",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "cards": [
+    {
+      "id": "Mission_Card-Canton_of_Orthodoxy",
+      "name": "Canton of Orthodoxy",
+      "front": "cards/Mission_Card-Canton_of_Orthodoxy.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Crew_Hideout",
+      "name": "Crew Hideout",
+      "front": "cards/Mission_Card-Crew_Hideout.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Keep_Venture",
+      "name": "Keep Venture",
+      "front": "cards/Mission_Card-Keep_Venture.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Krendik_Shaw",
+      "name": "Krendik Shaw",
+      "front": "cards/Mission_Card-Krendik_Shaw.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Luthadel_Garrison",
+      "name": "Luthadel Garrison",
+      "front": "cards/Mission_Card-Luthadel_Garrison.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Luthadel_Rooftops",
+      "name": "Luthadel Rooftops",
+      "front": "cards/Mission_Card-Luthadel_Rooftops.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Pits_of_Hathsin",
+      "name": "Pits of Hathsin",
+      "front": "cards/Mission_Card-Pits_of_Hathsin.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    },
+    {
+      "id": "Mission_Card-Skaa_Caverns",
+      "name": "Skaa Caverns",
+      "front": "cards/Mission_Card-Skaa_Caverns.png",
+      "metadata": {
+        "cardType": "mission",
+        "effectText": "Mission rewards: move up on track, first player bonuses.",
+        "tags": [
+          "mission"
+        ]
+      }
+    }
+  ]
+}

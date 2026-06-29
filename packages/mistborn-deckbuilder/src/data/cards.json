@@ -1,0 +1,59 @@
+[
+  {
+    "id": "market-001",
+    "name": "Iron Training",
+    "cost": 0,
+    "metal": "iron",
+    "pairing": ["iron", "steel"],
+    "cardType": "character-starter",
+    "effectText": "Burn: Pull a card from your discard pile to the top of your deck.",
+    "tags": ["pull"],
+    "imagePath": "metal_training_cards/Metal_Training_Card-Iron.png"
+  },
+  {
+    "id": "market-010",
+    "name": "Pewterarm",
+    "cost": 3,
+    "metal": "pewter",
+    "pairing": ["pewter", "tin"],
+    "cardType": "ally",
+    "defense": 3,
+    "effectText": "IF YOU ARE BURNING PEWTER: Gain 1 health. Defender.",
+    "tags": ["defender", "heal"],
+    "imagePath": "market_cards/Market_Card-Pewterarm.png"
+  },
+  {
+    "id": "market-025",
+    "name": "Soar",
+    "cost": 2,
+    "metal": "steel",
+    "additionalMetals": [["steel"]],
+    "pairing": ["iron", "steel"],
+    "cardType": "action",
+    "effectText": "Burn Steel: Eliminate a card from the market (replace it). Additional Steel: gain extra combat or coin.",
+    "tags": ["push"],
+    "imagePath": "market_cards/Market_Card-Soar.png"
+  },
+  {
+    "id": "funding-basic",
+    "name": "Funding",
+    "cost": 0,
+    "cardType": "funding",
+    "effectText": "Gain 1 coin.",
+    "tags": ["coin"],
+    "imagePath": "funding_card/Funding_Card_Front.png",
+    "backImagePath": "funding_card/Funding_Card_Back.png"
+  },
+  {
+    "id": "confrontation",
+    "name": "Confrontation",
+    "cost": 5,
+    "metal": "atium",
+    "additionalMetals": [["atium"], ["atium"], ["atium"]],
+    "pairing": ["atium", "atium"],
+    "cardType": "confrontation",
+    "effectText": "Burn 4 Atium: You win the game.",
+    "tags": ["win-condition"],
+    "imagePath": "market_cards/Market_Card-Confrontation.png"
+  }
+]

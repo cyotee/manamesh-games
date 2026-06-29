@@ -1,0 +1,151 @@
+{
+  "name": "Metal-training Cards",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "cards": [
+    {
+      "id": "Metal_Training_Card-Brass",
+      "name": "Brass",
+      "front": "cards/Metal_Training_Card-Brass.png",
+      "metadata": {
+        "metal": "brass",
+        "pairing": [
+          "zinc",
+          "brass"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Brass for its effect.",
+        "tags": [
+          "brass"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Bronze",
+      "name": "Bronze",
+      "front": "cards/Metal_Training_Card-Bronze.png",
+      "metadata": {
+        "metal": "bronze",
+        "pairing": [
+          "bronze",
+          "copper"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Bronze for its effect.",
+        "tags": [
+          "bronze"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Copper",
+      "name": "Copper",
+      "front": "cards/Metal_Training_Card-Copper.png",
+      "metadata": {
+        "metal": "copper",
+        "pairing": [
+          "bronze",
+          "copper"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Copper for its effect.",
+        "tags": [
+          "copper"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Iron",
+      "name": "Iron",
+      "front": "cards/Metal_Training_Card-Iron.png",
+      "metadata": {
+        "metal": "iron",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Iron for its effect.",
+        "tags": [
+          "iron"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Pewter",
+      "name": "Pewter",
+      "front": "cards/Metal_Training_Card-Pewter.png",
+      "metadata": {
+        "metal": "pewter",
+        "pairing": [
+          "pewter",
+          "tin"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Pewter for its effect.",
+        "tags": [
+          "pewter"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Steel",
+      "name": "Steel",
+      "front": "cards/Metal_Training_Card-Steel.png",
+      "metadata": {
+        "metal": "steel",
+        "pairing": [
+          "iron",
+          "steel"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Steel for its effect.",
+        "tags": [
+          "steel"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Tin",
+      "name": "Tin",
+      "front": "cards/Metal_Training_Card-Tin.png",
+      "metadata": {
+        "metal": "tin",
+        "pairing": [
+          "pewter",
+          "tin"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Tin for its effect.",
+        "tags": [
+          "tin"
+        ],
+        "cost": 0
+      }
+    },
+    {
+      "id": "Metal_Training_Card-Zinc",
+      "name": "Zinc",
+      "front": "cards/Metal_Training_Card-Zinc.png",
+      "metadata": {
+        "metal": "zinc",
+        "pairing": [
+          "zinc",
+          "brass"
+        ],
+        "cardType": "character-starter",
+        "effectText": "Burn Zinc for its effect.",
+        "tags": [
+          "zinc"
+        ],
+        "cost": 0
+      }
+    }
+  ]
+}

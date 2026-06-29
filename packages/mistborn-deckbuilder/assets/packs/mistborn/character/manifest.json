@@ -1,0 +1,67 @@
+{
+  "name": "Character Cards",
+  "version": "1.0.0",
+  "game": "mistborn",
+  "cards": [
+    {
+      "id": "Chartacter_Card-Kelsier",
+      "name": "Kelsier",
+      "front": "cards/Chartacter_Card-Kelsier.png",
+      "back": "cards/Character_Card_Back.png",
+      "metadata": {
+        "signatureMetal": "steel",
+        "abilities": {
+          "level1": "If burning Steel...",
+          "level2": "Once per turn when buying an Action, eliminate it and resolve top effect."
+        },
+        "cardType": "character-starter",
+        "cost": 0
+      }
+    },
+    {
+      "id": "Chartacter_Card-Marsh",
+      "name": "Marsh",
+      "front": "cards/Chartacter_Card-Marsh.png",
+      "back": "cards/Character_Card_Back.png",
+      "metadata": {
+        "signatureMetal": "zinc",
+        "abilities": {
+          "level1": "Riot effects.",
+          "level2": "Once per turn when buying an Action, eliminate it and resolve top effect."
+        },
+        "cardType": "character-starter",
+        "cost": 0
+      }
+    },
+    {
+      "id": "Chartacter_Card-Shan",
+      "name": "Shan",
+      "front": "cards/Chartacter_Card-Shan.png",
+      "back": "cards/Character_Card_Back.png",
+      "metadata": {
+        "signatureMetal": "bronze",
+        "abilities": {
+          "level1": "Seeker.",
+          "level2": "Once per turn when buying an Action, eliminate it and resolve top effect."
+        },
+        "cardType": "character-starter",
+        "cost": 0
+      }
+    },
+    {
+      "id": "Chartacter_Card-Vin",
+      "name": "Vin",
+      "front": "cards/Chartacter_Card-Vin.png",
+      "back": "cards/Character_Card_Back.png",
+      "metadata": {
+        "signatureMetal": "pewter",
+        "abilities": {
+          "level1": "If burning Pewter, gain combat or heal.",
+          "level2": "Once per turn when buying an Action, eliminate it and resolve top effect."
+        },
+        "cardType": "character-starter",
+        "cost": 0
+      }
+    }
+  ]
+}
