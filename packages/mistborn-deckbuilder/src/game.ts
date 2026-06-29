@@ -225,6 +225,11 @@ export function validateMove(
     }
   }
 
+  // Structural moves (order enforced at top of validate)
+  if (['cleanupAndDraw', 'passTarget', 'endTurn', 'refillMarket', 'draw'].includes(move)) {
+    return { valid: true };
+  }
+
   return { valid: true };
 }
 
@@ -363,6 +368,10 @@ const moves = {
 
   cleanupAndDraw: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'cleanupAndDraw', pid);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const play = G.zones.play[pid] || [];
     const hand = G.zones.hand[pid] || [];
     const discard = G.zones.discard[pid] || [];
@@ -430,6 +439,10 @@ const moves = {
 
   passTarget: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'passTarget', pid);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const pids = Object.keys(G.players);
     const idx = pids.indexOf(pid);
     const next = pids[(idx + 1) % pids.length];
