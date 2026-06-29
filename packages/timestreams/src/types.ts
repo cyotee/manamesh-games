@@ -43,12 +43,90 @@ export type EraId = (typeof ERA_ORDER)[number];
 export interface TimestreamsCard extends CoreCard {
   /** The player who owns this card instance in their deck */
   ownerId: string;
-  /** Distinguishes invention (permanent) from action (one-shot) cards */
-  cardType: "invention" | "action";
-  /** Optional special trait for card interactions */
-  trait?: "art" | "government";
-  /** Human-readable description of the card's scoring impact */
-  scoreEffect: string;
+
+  /** Primary category */
+  cardType: 'invention' | 'action';
+
+  /**
+   * Subtypes (primarily for inventions).
+   * "government" → only one allowed per era.
+   * "art" → special interactions with other art cards.
+   */
+  subtypes?: string[];
+
+  /** Additional text that does not fit neatly into the Play/Score/React fields. */
+  addlCardText?: string;
+
+  /** Optional flavor text to show when appropriate (e.g. in detailed views or hover previews). */
+  flavorText?: string;
+
+  /** Has a Play effect that resolves immediately when the card is played/placed. */
+  hasPlayEffect: boolean;
+  playEffectText?: string;
+
+  /** Has a Score ability resolved during the scoring phase. */
+  hasScoreEffect: boolean;
+  scoreEffectText?: string;
+
+  /**
+   * Has a React ability.
+   * - Inventions: triggered reactively by specific game events.
+   * - Actions: may be played on anyone's turn in response to their action.
+   */
+  hasReact: boolean;
+
+  /**
+   * The full React ability text.
+   * It contains the react trigger conditions, and the effect
+   * if the player chooses to apply the ability.
+   *
+   * Example: "React: If this Invention would be moved or destroyed,
+   * you may discard this card instead."
+   */
+  reactEffectText?: string;
+
+  /**
+   * Optional numeric score value.
+   * Present on some Inventions. Useful for validation (Actions should not have score value).
+   */
+  scoreValue?: number;
+
+  /** Keyword tags for quick filtering and future effect dispatch. */
+  tags?: string[];
+}
+
+/**
+ * Helper for the common "react:<event>" pattern.
+ * For more complex tag combinations (including card ID references),
+ * prefer writing small, focused evaluation functions that inspect tags.
+ */
+export function hasReactTrigger(card: TimestreamsCard, event: string): boolean {
+  const target = `react:${event}`;
+  return card.tags?.some(tag => tag === target || tag === event) ?? false;
+}
+
+/**
+ * Composes the full human-readable card text.
+ * Order: addlCardText, playEffectText, scoreEffectText, reactEffectText.
+ * Flavor text is kept separate (use card.flavorText when appropriate to display).
+ */
+export function composeCardText(card: TimestreamsCard): string {
+  const parts: string[] = [];
+
+  if (card.addlCardText) {
+    parts.push(card.addlCardText);
+  }
+  if (card.playEffectText) {
+    parts.push(card.playEffectText);
+  }
+  if (card.scoreEffectText) {
+    parts.push(card.scoreEffectText);
+  }
+  if (card.reactEffectText) {
+    parts.push(card.reactEffectText);
+  }
+
+  return parts.join('\n\n');
 }
 
 // =============================================================================
@@ -272,3 +350,159 @@ export const DEFAULT_CONFIG: TimestreamsConfig = {
   deckEncryption: "mental-poker",
   proofChainEnabled: true,
 };
+
+// =============================================================================
+// Asset Pack Metadata Shapes (target for OCR + pack builder)
+// =============================================================================
+
+/**
+ * Metadata shape for cards in era-specific deck sets (e.g. stone_age, future_tech).
+ * This goes into CardManifestEntry.metadata in the asset pack.
+ * Populated from OCR of scanned card images + Deck List.txt.
+ */
+export interface TimestreamsDeckCardMetadata {
+  /** Primary category */
+  cardType: 'invention' | 'action';
+
+  /**
+   * Subtypes for inventions (e.g. "art", "government").
+   * Governments have the rule: only one per era.
+   */
+  subtypes?: string[];
+
+  /** Additional card text that does not fit neatly into the Play/Score/React categories. */
+  addlCardText?: string;
+
+  /** Optional flavor text to show when appropriate (e.g. in detailed views). */
+  flavorText?: string;
+
+  /** Whether this card has a Play effect that triggers on placement/play. */
+  hasPlayEffect: boolean;
+
+  /** Play effect text (if hasPlayEffect). */
+  playEffectText?: string;
+
+  /** Whether this card has a Score ability (resolved in scoring phase). */
+  hasScoreEffect: boolean;
+
+  /** Score ability text. Actions should not have this. */
+  scoreEffectText?: string;
+
+  /**
+   * Whether this card has a React ability.
+   * - For Inventions: triggered reactively by specific game events.
+   * - For Actions: can be played on anyone's turn in response to their action.
+   */
+  hasReact: boolean;
+
+  /**
+   * The full React ability text from the card.
+   * It contains the react trigger conditions, and the effect
+   * if the player chooses to apply the ability.
+   *
+   * Example: "React: If another card would move this Invention,
+   * discard this card instead."
+   */
+  reactEffectText?: string;
+
+  /**
+   * Numeric score value (only present for cards that participate in scoring).
+   * For Action cards this field should be omitted entirely.
+   * Used as a secondary heuristic for the "should be Invention" correction.
+   */
+  scoreValue?: number;
+
+  /**
+   * Tags for declarative, machine-readable card behavior.
+   *
+   * The goal is to declare as much behavior as possible in the manifest
+   * so that game logic can be driven by evaluating tags rather than
+   * hard-coding per-card rules.
+   *
+   * Recommended conventions:
+   * - Verbs/actions: "move", "destroy", "draw"
+   * - Triggers: "react:move", "react:destroy"
+   * - Parameters via separate tags or key=value style when needed:
+   *     ["react:move", "target:opponent", "requires:stone-age-cloth"]
+   *
+   * Game code should centralize tag interpretation logic so that
+   * adding new cards rarely requires changes to the rules engine.
+   */
+  tags?: string[];
+}
+
+/**
+ * Metadata for era header/column cards (the 6 timeline backdrops).
+ */
+export interface TimestreamsEraCardMetadata {
+  assetType: 'era';
+  era: EraId;
+  label: string; // e.g. "Stone Age", "Future Tech"
+}
+
+/**
+ * Metadata for player aid reference cards.
+ */
+export interface TimestreamsAidCardMetadata {
+  assetType: 'playerAid';
+  aidType: 'scoring' | 'turn';
+  title: string;
+  /** The full instructions / rules summary on the aid card. */
+  text: string;
+}
+
+/**
+ * Union for all Timestreams-specific metadata in asset packs.
+ */
+export type TimestreamsCardMetadata =
+  | TimestreamsDeckCardMetadata
+  | TimestreamsEraCardMetadata
+  | TimestreamsAidCardMetadata;
+
+// =============================================================================
+// Detection Helpers (for hand filtering and future prompting)
+// =============================================================================
+
+/** Is this card a normal Invention that can be played on your turn into the current era? */
+export function isPlayableInvention(card: TimestreamsCard): boolean {
+  return card.cardType === 'invention' && !card.hasReact;
+}
+
+/** Is this an Action that can be played instead of an Invention on your turn? */
+export function isPlayableAction(card: TimestreamsCard): boolean {
+  return card.cardType === 'action' && !card.hasReact;
+}
+
+/** Does this card have a React ability that might be playable right now? */
+export function hasReactAbility(card: TimestreamsCard): boolean {
+  return card.hasReact;
+}
+
+/** Is this a Government invention? (only one allowed per era) */
+export function isGovernment(card: TimestreamsCard): boolean {
+  return card.subtypes?.includes('government') ?? false;
+}
+
+/** Does this card have a Score ability that will be relevant in the scoring phase? */
+export function hasScoreAbility(card: TimestreamsCard): boolean {
+  // Primary signal is the explicit boolean. scoreValue is only used as fallback
+  // during transition or when hasScoreEffect is not explicitly set.
+  if (card.hasScoreEffect !== undefined) {
+    return card.hasScoreEffect;
+  }
+  return (card.scoreValue ?? 0) > 0;
+}
+
+/**
+ * Validation heuristic from the physical cards:
+ * If a card claims to be an "action" but has a score value / score text,
+ * it is almost certainly an Invention (see Androids example).
+ *
+ * For real data, prefer checking hasScoreEffect === true.
+ */
+export function shouldBeInvention(card: Partial<TimestreamsCard>): boolean {
+  return (
+    card.cardType === 'action' &&
+    (card.hasScoreEffect === true || (card.scoreValue ?? 0) > 0)
+  );
+}

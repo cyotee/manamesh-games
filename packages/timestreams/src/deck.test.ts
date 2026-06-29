@@ -6,8 +6,12 @@ describe("placeholder deck factory", () => {
     const deck = createPlaceholderDeck("0", 36);
     expect(deck).toHaveLength(36);
     expect(deck[0]).toMatchObject({
-      id: "0-card-0", ownerId: "0", name: "Score 1 Point",
-      cardType: "invention", scoreEffect: "Score 1 Point",
+      id: "0-card-0",
+      ownerId: "0",
+      name: "Score 1 Point",
+      cardType: "invention",
+      hasScoreEffect: true,
+      scoreEffectText: "Score 1 Point",
     });
     expect(new Set(deck.map((c) => c.id)).size).toBe(36);
   });
@@ -20,7 +24,15 @@ describe("placeholder deck factory", () => {
   });
 
   it("schema validates and round-trips", () => {
-    const card = timestreamsCardSchema.create({ id: "x", name: "Score 1 Point", ownerId: "0" });
+    const card = timestreamsCardSchema.create({
+      id: "x",
+      name: "Score 1 Point",
+      ownerId: "0",
+      hasPlayEffect: false,
+      hasScoreEffect: true,
+      hasReact: false,
+      scoreEffectText: "Score 1 Point",
+    });
     expect(timestreamsCardSchema.validate(card)).toBe(true);
     expect(timestreamsCardSchema.validate({ id: "y" })).toBe(false);
     expect(timestreamsCardSchema.getAssetKey(card)).toBe("x");

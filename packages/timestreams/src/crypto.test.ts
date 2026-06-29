@@ -117,3 +117,30 @@ describe("crypto — shuffle seed commit binding (regression)", () => {
     expect(correctResult).not.toBe("INVALID_MOVE");
   });
 });
+
+describe("crypto — deckSize derivation from pack/realDecks", () => {
+  it("uses provided realDecks length for deckSize instead of default 36", () => {
+    const ids = ["0", "1"];
+    // Simulate real decks coming from a pack that has e.g. 38 cards (Future Tech)
+    const fake38CardDeck = Array.from({ length: 38 }, (_, i) => ({ id: `card-${i}` })) as any;
+    const realDecks = { "0": fake38CardDeck, "1": fake38CardDeck };
+
+    const G: any = createCryptoInitialState(
+      { numPlayers: 2, playerIDs: ids } as any,
+      undefined,
+      realDecks
+    );
+
+    expect(G.config.deckSize).toBe(38);
+    expect(G.encryptedDecks["0"]).toHaveLength(38);
+  });
+
+  it("falls back to moduleConfig or DEFAULT when no realDecks", () => {
+    const ids = ["0", "1"];
+    const G: any = createCryptoInitialState(
+      { numPlayers: 2, playerIDs: ids } as any,
+      { deckSize: 42 }
+    );
+    expect(G.config.deckSize).toBe(42);
+  });
+});

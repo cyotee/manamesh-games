@@ -7,6 +7,7 @@ import { deterministicShuffle, sha256Hex } from "@manamesh/boardgameio-crypto";
  * Rejects if era already taken or player already ready.
  */
 export function claimHomeEra(G: TimestreamsState, playerId: string, era: EraId): boolean {
+  if (G.config.homeEraAssignment === "random") return false;
   const p = G.players[playerId];
   if (!p || p.ready) return false;
   const alreadyClaimed = Object.values(G.players).some(

@@ -20,7 +20,9 @@ import type {
   DecryptRequest,
 } from "./types";
 import { DEFAULT_CONFIG } from "./types";
+import type { TimestreamsCard } from "./types";
 import { createPlaceholderDeck } from "./deck";
+import { resolveDeck } from "./deckResolver";
 import { createTimeline } from "./timeline";
 import { initializeCardVisibility } from "./visibility";
 import {
@@ -35,6 +37,7 @@ import {
   advanceSetupPlayer,
   resetSetupPlayer,
 } from "@manamesh/boardgameio-crypto";
+import { assignRandomHomeEras } from "./homeEra";
 
 // =============================================================================
 // Helpers
@@ -114,16 +117,29 @@ function maybeFinalizeShuffleSeed(G: TimestreamsState): void {
  * Adapted from onepiece's createCryptoInitialState (lines 114+).
  * Key differences:
  * - Per-player decks in G.encryptedDecks[playerId] (not shared encryptedZones)
- * - Uses createPlaceholderDeck for each player's deck
+ * - Supports real decks from asset pack (via deckResolver) or falls back to placeholders
  * - cardPoints deferred to encrypt step (empty here)
  * - timeline via createTimeline() (6 era slots)
  */
 export function createCryptoInitialState(
   config: GameConfig,
   moduleConfig?: Partial<TimestreamsConfig>,
+  realDecks?: Record<string, TimestreamsCard[]>,
 ): TimestreamsState {
   const playerOrder = [...config.playerIDs];
-  const deckSize = moduleConfig?.deckSize ?? DEFAULT_CONFIG.deckSize;
+
+  // Derive deckSize from real decks (from pack) if provided.
+  // This allows different decks (eras, custom packs) to have their own sizes
+  // instead of being locked to the old hardcoded default of 36.
+  let deckSize = moduleConfig?.deckSize ?? DEFAULT_CONFIG.deckSize;
+  if (realDecks) {
+    const realLengths = Object.values(realDecks)
+      .map((d) => (Array.isArray(d) ? d.length : 0))
+      .filter((l) => l > 0);
+    if (realLengths.length > 0) {
+      deckSize = realLengths[0];
+    }
+  }
 
   // Build per-player state
   const players: Record<string, TimestreamsPlayerState> = {};
@@ -141,17 +157,23 @@ export function createCryptoInitialState(
     };
   }
 
-  // Build per-player encrypted decks as placeholder { ciphertext: cardId, layers: 0 }
+  // Build per-player encrypted decks.
+  // Prefer real decks from asset pack (if provided and non-empty).
+  // Otherwise fall back to placeholders.
   const encryptedDecks: TimestreamsState["encryptedDecks"] = {};
   const allCardIds: string[] = [];
 
   for (const playerId of playerOrder) {
-    const placeholderCards = createPlaceholderDeck(playerId, deckSize);
-    encryptedDecks[playerId] = placeholderCards.map((card) => ({
+    const real = realDecks?.[playerId];
+    const deckCards = (real && real.length > 0)
+      ? real
+      : createPlaceholderDeck(playerId, deckSize);
+
+    encryptedDecks[playerId] = deckCards.map((card) => ({
       ciphertext: card.id,
       layers: 0,
     }));
-    for (const card of placeholderCards) {
+    for (const card of deckCards) {
       allCardIds.push(card.id);
     }
   }
@@ -417,6 +439,117 @@ export function shuffleEncryptedDeck(
 
     if (events?.endPhase) {
       events.endPhase();
+    }
+  }
+
+  return G;
+}
+
+// =============================================================================
+// Era Assignment RNG (for homeEraAssignment === 'random' in setup phase)
+// Full commit-reveal wiring, mirroring shuffle but in setup phase.
+// =============================================================================
+
+function ensureEraAssignmentRng(G: TimestreamsState): ShuffleRngState {
+  if (G.eraAssignmentRng) return G.eraAssignmentRng;
+
+  const commits: Record<string, string | null> = {};
+  const reveals: Record<string, string | null> = {};
+  for (const pid of G.playerOrder) {
+    commits[pid] = null;
+    reveals[pid] = null;
+  }
+
+  G.eraAssignmentRng = {
+    phase: "commit",
+    commits,
+    reveals,
+    finalSeedHex: null,
+    abortVotes: {},
+  };
+  return G.eraAssignmentRng;
+}
+
+function maybeFinalizeEraSeed(G: TimestreamsState): void {
+  const rng = ensureEraAssignmentRng(G);
+  if (rng.finalSeedHex) return;
+
+  const allRevealed = G.playerOrder.every((pid) => {
+    const seed = rng.reveals[pid];
+    return typeof seed === "string" && seed.length > 0;
+  });
+  if (!allRevealed) return;
+
+  const seedStr = G.playerOrder
+    .map((pid) => rng.reveals[pid] ?? "")
+    .join(":");
+  rng.finalSeedHex = sha256Hex(new TextEncoder().encode(seedStr));
+}
+
+export function commitEraSeed(
+  G: TimestreamsState,
+  _ctx: Ctx,
+  playerId: string,
+  commitHashHex: string,
+  callerId?: string,
+): TimestreamsState | typeof INVALID_MOVE {
+  if (G.phase !== "setup") return INVALID_MOVE;
+  if (callerId && callerId !== playerId) return INVALID_MOVE;
+  if (!G.players[playerId]) return INVALID_MOVE;
+  if (G.config.homeEraAssignment !== "random") return INVALID_MOVE;
+
+  const rng = ensureEraAssignmentRng(G);
+
+  if (!isHex(commitHashHex) || commitHashHex.length !== 64) return INVALID_MOVE;
+
+  const existing = rng.commits[playerId] ?? null;
+  if (existing && existing !== commitHashHex) return INVALID_MOVE;
+  rng.commits[playerId] = commitHashHex;
+
+  const allCommitted = G.playerOrder.every((pid) => {
+    const c = rng.commits[pid];
+    return typeof c === "string" && c.length > 0;
+  });
+  if (allCommitted && rng.phase === "commit") {
+    rng.phase = "reveal";
+  }
+
+  return G;
+}
+
+export function revealEraSeed(
+  G: TimestreamsState,
+  _ctx: Ctx,
+  playerId: string,
+  seedHex: string,
+  callerId?: string,
+): TimestreamsState | typeof INVALID_MOVE {
+  if (G.phase !== "setup") return INVALID_MOVE;
+  if (callerId && callerId !== playerId) return INVALID_MOVE;
+  if (!G.players[playerId]) return INVALID_MOVE;
+  if (G.config.homeEraAssignment !== "random") return INVALID_MOVE;
+
+  const rng = ensureEraAssignmentRng(G);
+
+  if (rng.phase !== "reveal" && rng.phase !== "ready") return INVALID_MOVE;
+  if (!isHex(seedHex) || seedHex.length < 16) return INVALID_MOVE;
+
+  const commit = rng.commits[playerId];
+  if (!commit) return INVALID_MOVE;
+
+  if (hashSeedCommit(seedHex) !== commit) return INVALID_MOVE;
+
+  rng.reveals[playerId] = seedHex;
+
+  maybeFinalizeEraSeed(G);
+
+  if (rng.finalSeedHex) {
+    rng.phase = "ready";
+    assignRandomHomeEras(G, rng.finalSeedHex);
+    // Auto-ready once eras assigned (for random mode)
+    for (const pid of G.playerOrder) {
+      const p = G.players[pid];
+      if (p) p.ready = true;
     }
   }
 
