@@ -456,7 +456,7 @@ export function MistbornBoard({
                         packId={pack.id}
                         card={card}
                         onClick={() => playCard(pid, card)}
-                        onContextMenu={(e) => { e.preventDefault(); eliminateCard(pid, 'hand', card.id); }}
+                        onContextMenu={(e: any) => { e.preventDefault(); eliminateCard(pid, 'hand', card.id); }}
                       />
                     ))
                   ) : (

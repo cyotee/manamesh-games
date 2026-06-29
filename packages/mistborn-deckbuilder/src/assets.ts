@@ -178,6 +178,10 @@ export function getEnrichedCardsForSet(
   return enrichCardsWithMetadata(raw);
 }
 
-// Re-export common asset path helpers so board components and TrainingTrack
-// can import everything they need from '../assets' (matches historical usage).
-export { getLocalAssetUrl, PLAYER_TRAINING_TRACK_PATH } from './data/index';
+// Asset path helpers (duplicated here for UI consumers like the board so that
+// importing from '../assets' works without pulling the full card manifest data).
+export function getLocalAssetUrl(relativePath: string): string {
+  return `/assets/${relativePath}`;
+}
+
+export const PLAYER_TRAINING_TRACK_PATH = 'board/Player Training Track.png';
