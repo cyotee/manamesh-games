@@ -190,10 +190,8 @@ export function validateMove(
         return mName && !m.burned;
       });
       if (!hasMetal) {
-        // Rules engine: require metal. In pure rules-free demo, board can still call and rely on validate returning true-ish
-        // Keep strict here for forward progress toward enforcement.
-        // Allow for now to keep manual testing smooth: return {valid: true} or strict:
-        return { valid: true }; // keep permissive until full metal state wiring; tighten later
+        // Rules engine: metal required to play this card (or use as metal sideways via other move)
+        return { valid: false, error: `Missing required metal: ${requiredMetal}` };
       }
     }
   }
@@ -272,6 +270,10 @@ const moves = {
 
   playCard: (G: MistbornState, ctx: Ctx, cardId: string, sideways = false) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'playCard', pid, cardId);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const hand = G.zones.hand[pid] || [];
     const play = G.zones.play[pid] || [];
     const idx = hand.findIndex((c: any) => c.id === cardId);
@@ -287,6 +289,10 @@ const moves = {
 
   burnMetal: (G: MistbornState, ctx: Ctx, metal: string, attachTo?: string) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'burnMetal', pid, metal, attachTo);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const player = G.players[pid];
     const ms = player.metals.find((m: any) => m.metal === metal);
     if (ms) {
@@ -310,6 +316,10 @@ const moves = {
 
   buyCard: (G: MistbornState, ctx: Ctx, cardId: string) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'buyCard', pid, cardId);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const idx = G.market.findIndex((c: any) => (typeof c === 'string' ? c === cardId : c.id === cardId));
     if (idx >= 0) {
       G.market.splice(idx, 1);
@@ -357,6 +367,10 @@ const moves = {
   // Single definition (rules-free for Phase 1; will add metadata checks in validate + Phase 2)
   advanceTraining: (G: MistbornState, ctx: Ctx) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'advanceTraining', pid);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const player = G.players[pid];
     if (player) {
       player.trainingPosition = (player.trainingPosition || 0) + 1;
@@ -368,6 +382,10 @@ const moves = {
 
   eliminateCard: (G: MistbornState, ctx: Ctx, cardId: string, from: string) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'eliminateCard', pid, cardId, from);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     const zoneKey = from === 'play' ? 'play' : (from === 'discard' ? 'discard' : 'hand');
     if (G.zones[zoneKey] && G.zones[zoneKey][pid]) {
       G.zones[zoneKey][pid] = G.zones[zoneKey][pid].filter((c: any) => c.id !== cardId);
@@ -378,6 +396,10 @@ const moves = {
 
   useAsMetal: (G: MistbornState, ctx: Ctx, cardId: string) => {
     const pid = ctx.currentPlayer!;
+    const validation = validateMove(G, 'useAsMetal', pid, cardId);
+    if (!validation.valid) {
+      return INVALID_MOVE;
+    }
     // Find in play, mark as sideways/used as metal
     if (G.zones.play && G.zones.play[pid]) {
       const card = G.zones.play[pid].find((c: any) => c.id === cardId);
