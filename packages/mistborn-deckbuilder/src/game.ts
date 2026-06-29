@@ -181,16 +181,23 @@ export function validateMove(
 
   if (move === 'playCard') {
     const cardId = args[0];
+    const sideways = !!args[1];
     const entry = packCardsCache.find((c: any) => c.id === cardId) || {};
     const meta = entry.metadata || entry;
     const requiredMetal = meta.metal || meta.requiredMetal;
+
+    if (sideways) {
+      // Playing sideways = using the card as a metal via its pairing.
+      // No external metal burn required; the card itself provides it.
+      return { valid: true };
+    }
+
     if (requiredMetal) {
       const hasMetal = (player.metals || []).some((m: any) => {
         const mName = Array.isArray(requiredMetal) ? requiredMetal.includes(m.metal) : m.metal === requiredMetal;
         return mName && !m.burned;
       });
       if (!hasMetal) {
-        // Rules engine: metal required to play this card (or use as metal sideways via other move)
         return { valid: false, error: `Missing required metal: ${requiredMetal}` };
       }
     }
@@ -270,7 +277,7 @@ const moves = {
 
   playCard: (G: MistbornState, ctx: Ctx, cardId: string, sideways = false) => {
     const pid = ctx.currentPlayer!;
-    const validation = validateMove(G, 'playCard', pid, cardId);
+    const validation = validateMove(G, 'playCard', pid, cardId, sideways);
     if (!validation.valid) {
       return INVALID_MOVE;
     }
@@ -438,7 +445,7 @@ const moves = {
 
 export const MistbornGame: Game<MistbornState> = {
   name: 'mistborn-deckbuilder',
-  setup: (ctx, setupData) => {
+  setup: (ctx: Ctx, setupData?: any) => {
     const packCards = setupData?.packCards || PACK_CARDS_FROM_MANIFESTS;
     return createInitialState({ 
       numPlayers: ctx.numPlayers, 
@@ -446,6 +453,8 @@ export const MistbornGame: Game<MistbornState> = {
       packCards,
     } as any);
   },
+  // Note: onBegin etc. typed in the turn config below
+
   moves,
   turn: {
     // Rules engine: auto advance training at start of turn (per RULES)
@@ -499,8 +508,9 @@ export const MistbornModule: GameModule = {
       id: data.id,
       name: data.name,
       imageCid: data.imageCid,
-      ...data,
+      ...(data as Partial<MistbornCard>),
     }),
+    getAssetKey: (card) => card.id,
   },
 
   zones: MISTBORN_ZONES,
@@ -531,13 +541,14 @@ export const MistbornModule: GameModule = {
     //   const starterCards = getCardsForDeckType(pack.pack?.cards ?? [], 'starters');
   },
 
-  initialState: (config: any) => createInitialState({
+  initialState: (config: GameConfig) => createInitialState({
     ...config,
     // If the caller passes packCards (e.g. from loaded pack in board/setup), use them.
-    packCards: config.packCards,
+    packCards: (config as any).packCards,
   }),
 
-  validateMove,
+  validateMove: (state: MistbornState, move: string, playerID: string, ...args: unknown[]) =>
+    validateMove(state, move, playerID, ...args),
 
   getBoardgameIOGame: () => MistbornGame,
 };
