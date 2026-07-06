@@ -85,36 +85,51 @@ describe('discard executor', () => {
     expect(G.timeline.modern.stack).toContain('victim#0');
   });
 
-  it('react:redirect on discard logs redirect (basic)', () => {
+  it('react:redirect on discard retargets to adjacent and performs discard on the new target (Thought Police style)', () => {
     const G = makeState({ players: ['0', '1'], currentDay: 5 });
-    putInEra(G, 'modern', makeCard({ id: 'victim#0', ownerId: '1' }));
-    const redirectCard = makeCard({ id: 'victim#0', ownerId: '1', tags: ['react:redirect', 'redirect:discard'] });
-    putInEra(G, 'modern', redirectCard);
+    // Stack order: adjA (above, index 0), tp=victim (index 1)
+    const adj = makeCard({ id: 'adjA#0', ownerId: '1' });
+    const tp = makeCard({
+      id: 'victim#0', ownerId: '1',
+      tags: ['react:redirect', 'redirect:discard', 'redirect:target-to:adjacent', 'redirect:optional', 'decider:owner'],
+    });
+    putInEra(G, 'modern', adj, tp);
     const napalm = makeCard({
       id: 'modern-napalm#0', ownerId: '0', cardType: 'action',
       tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
     });
     putInHand(G, '0', napalm);
     const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
-    expect(res.log.join(' ')).toMatch(/redirected to victim#0/);
-    // victim still in stack (demo treats as fizzle after log)
-    expect(G.timeline.modern.stack).toContain('victim#0');
+    expect(res.log.join(' ')).toMatch(/redirected to adjA#0/);
+    // TP (victim) remains; the adjacent was retargeted and discarded
+    expect(G.timeline.modern.stack).toEqual(['victim#0']);
+    expect(G.players['1'].discard.map(c => c.id)).toEqual(['adjA#0']);
   });
 
-  it('react:replace on discard logs replace (basic)', () => {
+  it('react:replace on discard substitutes move instead of discard (Combination Drug Therapy)', () => {
     const G = makeState({ players: ['0', '1'], currentDay: 5 });
-    putInEra(G, 'modern', makeCard({ id: 'victim#0', ownerId: '1' }));
-    const replaceCard = makeCard({ id: 'victim#0', ownerId: '1', tags: ['react:replace', 'replace:discard'] });
-    putInEra(G, 'modern', replaceCard);
+    // CDT has protect:discard + replace, plus move tags for the substitution
+    const other = makeCard({ id: 'other#0', ownerId: '1' });
+    const cdt = makeCard({
+      id: 'cdt#0', ownerId: '1',
+      tags: [
+        'react:discard', 'trigger:target:self',
+        'protect:self', 'protect:discard',
+        'replace:discard-with-move',
+        'move:target:self', 'move-destination:top-of-era',
+      ],
+    });
+    putInEra(G, 'modern', other, cdt);
     const napalm = makeCard({
       id: 'modern-napalm#0', ownerId: '0', cardType: 'action',
       tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
     });
     putInHand(G, '0', napalm);
-    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
+    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'cdt#0' });
     expect(res.log.join(' ')).toMatch(/replaced \(replace-with-move\)/);
-    // victim still in stack (demo)
-    expect(G.timeline.modern.stack).toContain('victim#0');
+    // CDT was not discarded; instead moved to top of era via replace
+    expect(G.timeline.modern.stack).toEqual(['cdt#0', 'other#0']);
+    expect(G.players['1'].discard).toEqual([]);
   });
 
   it('react:retaliate on discard logs retaliate and performs counter (basic)', () => {

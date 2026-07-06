@@ -1,6 +1,6 @@
 import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
-import { erasForScope, candidateTargets } from '../targets';
-import { discardFromPlay, isDiscardBlocked } from '../boardOps';
+import { erasForScope, candidateTargets, locateCard } from '../targets';
+import { discardFromPlay, isDiscardBlocked, moveToEra } from '../boardOps';
 import { fireEvent } from '../triggers';
 import { checkReactForDiscard, shouldCancelDiscard } from '../react';
 import { done, needs, type Executor } from '../types';
@@ -38,8 +38,6 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
   const log: string[] = [];
   for (const id of picks) {
     if (!options.includes(id)) continue;
-    const blocked = isDiscardBlocked(G, id, playerId);
-    if (blocked) { log.push(`${card.id}: discard of ${id} fizzles (${blocked})`); continue; }
 
     let effectiveId = id;
     const react = checkReactForDiscard(G, id, playerId, card.id);
@@ -51,14 +49,26 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
     if (react.redirectTo) {
       log.push(`${card.id}: discard of ${id} redirected to ${react.redirectTo}`);
       effectiveId = react.redirectTo;
-      // re-check protect on the new target (per PRD)
-      if (shouldCancelDiscard(G, effectiveId, playerId) || isDiscardBlocked(G, effectiveId, playerId)) {
+      // re-check on the new (retargeted) target (protects, blocks, and possibly further reacts)
+      const redirReact = checkReactForDiscard(G, effectiveId, playerId, card.id);
+      if (redirReact.cancelled || shouldCancelDiscard(G, effectiveId, playerId) || isDiscardBlocked(G, effectiveId, playerId)) {
         log.push(`${card.id}: redirected discard of ${effectiveId} fizzles`);
         continue;
       }
     }
+    // Blocked check: skip for retargeted or replaced (redirected may still fizzle above; replace transforms)
+    const isRetargetedOrReplaced = !!(react.redirectTo || react.replaceWith);
+    const blocked = !isRetargetedOrReplaced && isDiscardBlocked(G, effectiveId, playerId);
+    if (blocked) { log.push(`${card.id}: discard of ${effectiveId} fizzles (${blocked})`); continue; }
+
     if (react.replaceWith) {
       log.push(`${card.id}: discard of ${id} replaced (${react.replaceWith})`);
+      // Execute the replacement outcome on the original target (e.g. move self to top for CDT)
+      const loc = locateCard(G, id);
+      if (loc && react.replaceWith === 'replace-with-move') {
+        moveToEra(G, id, loc.era, 'top');
+        // fire a move-like event? for now the log suffices; could fireEvent if needed
+      }
       continue;
     }
     if (react.retaliate) {

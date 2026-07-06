@@ -1,4 +1,5 @@
 import { hasTag, tagValue } from './tags';
+import { locateCard, cardAtOffset } from './targets';
 
 // =============================================================================
 // M3 React Pipeline (in progress)
@@ -81,12 +82,18 @@ export function getRedirectTargetForDiscard(G: any, cardId: string, actorPlayerI
   const card = G.cards?.[cardId];
   if (!card) return null;
 
-  if (hasTag(card, 'react:redirect') && hasTag(card, 'redirect:discard')) {
-    const targetTo = tagValue(card, 'redirect:target-to');
+  // Match cards that declare redirect reacts (actual cards use react:targeted/react:discard + redirect:target-to:* ; some use react:redirect + redirect:discard)
+  const declaresRedirect = hasTag(card, 'react:redirect') || hasTag(card, 'react:discard') || hasTag(card, 'react:targeted');
+  const targetTo = tagValue(card, 'redirect:target-to');
+  if (declaresRedirect && targetTo) {
     if (targetTo === 'self') return cardId;
     if (targetTo === 'adjacent') {
-      // TODO: real adjacent lookup using locateCard
-      return cardId; // placeholder
+      // Proper adjacent lookup: prefer below then above (index +1, -1)
+      const below = cardAtOffset(G, cardId, 1);
+      if (below) return below;
+      const above = cardAtOffset(G, cardId, -1);
+      if (above) return above;
+      return null; // no adjacent to retarget to
     }
     // decider:owner etc. would require prompting the owner
     return cardId;
@@ -98,10 +105,10 @@ export function getReplaceOutcomeForDiscard(G: any, cardId: string): string | nu
   const card = G.cards?.[cardId];
   if (!card) return null;
 
-  if (hasTag(card, 'react:replace') && hasTag(card, 'replace:discard')) {
-    if (hasTag(card, 'replace:discard-with-move')) {
-      return 'move';
-    }
+  // Actual card (CDT) uses react:discard + replace:discard-with-move (no generic react:replace / replace:discard)
+  const declaresReplace = hasTag(card, 'react:replace') || hasTag(card, 'react:discard');
+  const hasReplaceDiscard = hasTag(card, 'replace:discard') || hasTag(card, 'replace:discard-with-move');
+  if (declaresReplace && hasReplaceDiscard) {
     return 'replace-with-move';
   }
   return null;
@@ -156,27 +163,7 @@ export function checkReactForDiscard(
 ): ReactDecision {
   const decision: ReactDecision = { cancelled: false };
 
-  if (shouldCancelDiscard(G, targetCardId, actorPlayerId)) {
-    decision.cancelled = true;
-    decision.log = 'react:cancel';
-    return decision;
-  }
-
-  // cancel:all-effects-of-source (Big Rock, Herbalism style)
-  if (sourceCardId) {
-    const target = G.cards?.[targetCardId];
-    const source = G.cards?.[sourceCardId];
-    if (target && source) {
-      // If target (or its protectors) has cancel:all-effects-of-source for this source
-      if (hasTag(target, 'react:cancel') && hasTag(target, 'cancel:all-effects-of-source')) {
-        // simplistic: assume it matches the source
-        decision.cancelled = true;
-        decision.log = 'cancel:all-effects-of-source';
-        return decision;
-      }
-    }
-  }
-
+  // Check redirect/replace first (per retarget pipeline; allows replace to transform even if protected tags present, e.g. CDT)
   const redirect = getRedirectTargetForDiscard(G, targetCardId, actorPlayerId);
   if (redirect) {
     decision.redirectTo = redirect;
@@ -190,6 +177,31 @@ export function checkReactForDiscard(
   const retaliate = getRetaliateOutcomeForDiscard(G, targetCardId, actorPlayerId);
   if (retaliate) {
     decision.retaliate = true;
+  }
+
+  // Cancel/protect only if no redirect/replace claimed the effect (static protect before cancel in comment, but react transforms take precedence for retarget/replace)
+  const hasRedirectOrReplace = !!(decision.redirectTo || decision.replaceWith);
+  if (!hasRedirectOrReplace) {
+    if (shouldCancelDiscard(G, targetCardId, actorPlayerId)) {
+      decision.cancelled = true;
+      decision.log = 'react:cancel';
+      return decision;
+    }
+  }
+
+  // cancel:all-effects-of-source (Big Rock, Herbalism style) — applies to original unless redirected
+  if (sourceCardId && !hasRedirectOrReplace) {
+    const target = G.cards?.[targetCardId];
+    const source = G.cards?.[sourceCardId];
+    if (target && source) {
+      // If target (or its protectors) has cancel:all-effects-of-source for this source
+      if (hasTag(target, 'react:cancel') && hasTag(target, 'cancel:all-effects-of-source')) {
+        // simplistic: assume it matches the source
+        decision.cancelled = true;
+        decision.log = 'cancel:all-effects-of-source';
+        return decision;
+      }
+    }
   }
 
   return decision;
