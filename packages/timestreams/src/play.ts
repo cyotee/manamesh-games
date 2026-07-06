@@ -6,6 +6,7 @@ import { dealForDay } from "./crypto";
 import { dayFirstPlayer } from "./homeEra";
 import { registerCard } from "./effects/state";
 import { clearRestOfToday } from "./effects/modifiers";
+import { fireEvent, registerStaticTriggers } from "./effects/triggers";
 
 // Local constant (boardgame.io/core may not resolve under vitest+PnP)
 export const INVALID_MOVE = "INVALID_MOVE" as const;
@@ -44,6 +45,8 @@ export function playInvention(
   registerCard(G, card);
   const era = eraForDay(G.currentDay);
   appendToEra(G.timeline, era, cardId);
+  registerStaticTriggers(G, card);
+  fireEvent(G, { type: "invention-played", cardId, eraId: era, actorPlayerId: playerId });
   transitionCardVisibility(G, cardId, "public", playerId, "playInvention", { era });
   player.hasPassedThisDay = false;
 
@@ -68,6 +71,7 @@ export function playAction(
   removeCardFromHand(player, cardId);
   registerCard(G, card);
   player.discard.push(card);
+  fireEvent(G, { type: "action-played", cardId, eraId: eraForDay(G.currentDay), actorPlayerId: playerId });
   transitionCardVisibility(G, cardId, "public", playerId, "playAction", {});
   player.hasPassedThisDay = false;
 

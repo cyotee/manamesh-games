@@ -9,6 +9,7 @@ import { swapExecutor } from './executors/swap';
 import { attachExecutor } from './executors/attach';
 import { preventExecutor } from './executors/prevent';
 import { recoverExecutor } from './executors/recover';
+import { delayedTriggerExecutor } from './executors/delayedTrigger';
 
 /** Executor registry: [applies?, executor]. Extended by later tasks. */
 const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
@@ -19,6 +20,7 @@ const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
   [({ card }) => hasTag(card, 'play:attach'), attachExecutor],
   [({ card }) => hasTag(card, 'play:prevent'), preventExecutor],
   [({ card }) => hasTag(card, 'play:recover'), recoverExecutor],
+  [({ card }) => hasTag(card, 'play:delayed-trigger'), delayedTriggerExecutor],
 ];
 
 export function resolvePlayEffect(

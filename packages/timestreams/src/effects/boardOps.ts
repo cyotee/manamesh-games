@@ -72,7 +72,7 @@ export function attachTo(G: TimestreamsState, actionCardId: string, hostCardId: 
   attachments[hostCardId].push(actionCardId);
 }
 
-export function discardFromPlay(G: TimestreamsState, cardId: string, _actorPlayerId: string): boolean {
+export function discardFromPlay(G: TimestreamsState, cardId: string, actorPlayerId: string): boolean {
   if (removeFromStack(G, cardId) === null) return false;
   const attachments = getAttachments(G);
   const attached = attachments[cardId] ?? [];
