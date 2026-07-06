@@ -12,4 +12,6 @@ export { composeCardText, hasReactTrigger } from "./types";
 export { resolvePlayEffect } from "./effects/resolvePlay";
 export { canPlayCard } from "./effects/gates";
 export { fireEvent, registerStaticTriggers } from "./effects/triggers";
+export { resolveScoring } from "./scoring";
+export { checkReactForDiscard, checkReactForMove, applyReactsForEvent, isProtected } from "./effects/react";
 export type { EffectResult, PlayerPrompt, ChoiceMap } from "./effects/types";
