@@ -1,0 +1,12 @@
+{
+	"folders": [
+        {
+            "name": "manamesh-games",
+            "path": "."
+        },
+        {
+            "path": "../manamesh"
+        }
+    ],
+	"settings": {}
+}

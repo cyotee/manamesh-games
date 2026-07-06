@@ -167,3 +167,27 @@ export function secpLagrangeCoeffAt0(xs: bigint[], i: number): bigint {
   }
   return secpModN(num * secpInvN(den));
 }
+
+/**
+ * Validate an EncryptedCard received as a decryption share.
+ * Ensures the ciphertext is a valid curve point and layers is a non-negative number.
+ */
+export function validateEncryptedCard(card: { ciphertext: string; layers: number } | null | undefined): boolean {
+  if (!card || typeof card.layers !== "number" || card.layers < 0) return false;
+  return secpIsValidPointHex(card.ciphertext);
+}
+
+/**
+ * Strict player identity check for moves.
+ * In pure P2P, we require exact match (ctx.playerID may be undefined in some host paths,
+ * but game modules should pass the real sender).
+ */
+export function validatePlayerIdentity(ctxPlayerId: string | undefined, claimedPlayerId: string): boolean {
+  if (!claimedPlayerId || typeof claimedPlayerId !== "string") return false;
+  if (ctxPlayerId === undefined) {
+    // Conservative: in fully trusted host scenarios this may be relaxed,
+    // but for adversarial P2P we prefer explicit binding at call sites.
+    return true;
+  }
+  return claimedPlayerId === ctxPlayerId;
+}

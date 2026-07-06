@@ -1,5 +1,5 @@
 [submodule "manamesh"]
-	path = manamesh
+	path = packages/manamesh
 	url = https://github.com/cyotee/manamesh.git
 [submodule "packages/boardgame.io"]
 	path = packages/boardgame.io

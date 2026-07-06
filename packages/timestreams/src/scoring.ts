@@ -2,7 +2,7 @@ import type { TimestreamsState } from "./types";
 import { scoringSlotCardIds } from "./timeline";
 import { homeEraTurnOrder } from "./homeEra";
 import { effectiveScoreValue } from "./effects/boardOps";
-import { getCard } from "./effects/state";
+import { getCard, getPendingTriggers } from "./effects/state";
 import { hasTag, tagNumber } from "./effects/tags";
 import { resolveCardScoreEffects } from "./effects/executors/score";
 import { fireEvent } from "./effects/triggers";
@@ -90,6 +90,26 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
     (G as any).scoringPhase = 'delayed';
     // fire for delayed score triggers (e.g. cards with delayed:trigger:after-destination-era-scored)
     fireEvent(G, { type: 'era-scored' as any, cardId: '', eraId: eraId as any, actorPlayerId: '' });
+
+    // Apply additional score from delayed triggers for this era (e.g. Pottery style delayed bonus)
+    const allTriggersAtDelayed = getPendingTriggers(G);
+    for (const trigger of allTriggersAtDelayed) {
+      if (trigger.spent) continue;
+      if ((trigger.event === 'era-scored' || trigger.event === 'delayed:era-scored') &&
+          (trigger.eraAnchor === null || trigger.eraAnchor === eraId)) {
+        const source = getCard(G, trigger.sourceCardId);
+        if (source) {
+          if (hasTag(source, 'score:bonus-points')) {
+            const amt = tagNumber(source, 'bonus-points:amount') || 0;
+            const owner = source.ownerId;
+            if (owner && scores[owner] !== undefined) {
+              scores[owner] += amt;
+            }
+          }
+          if (trigger.limit === 'once') trigger.spent = true;
+        }
+      }
+    }
 
     (G as any).scoringPhase = 'cleanup';
 

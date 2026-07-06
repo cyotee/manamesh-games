@@ -3,7 +3,8 @@
   "packageManager": "yarn@4.11.0",
   "workspaces": [
     "packages/*",
-    "manamesh/packages/*"
+    "!packages/manamesh",
+    "packages/manamesh/packages/*"
   ],
   "dependencies": {
     "boardgame.io": "file:./packages/boardgame.io",

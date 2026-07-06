@@ -2,12 +2,25 @@
 
 Texas Hold'em poker module for ManaMesh.
 
+**Current canonical design docs (as of 2026-06):**
+- `docs/DESIGN_DOCUMENTS_MAP.md` — single index of all poker design docs
+- `docs/PREPAREDNESS_REPORT.md`
+- `docs/PRD_Deployment.md`
+- `docs/TASK.md`
+- `docs/GAME_FLOW_AND_SECURITY.md` — mental poker game flow + security
+- See also: `../manamesh/PRD_CONTRACTS.md` (locked contracts spec)
+
+**Maintaining alignment:**
+- When updating contracts or game flow, update these docs + `PRD_CONTRACTS.md` in the same change.
+- Primary sources of truth: this package's docs + `PRD_CONTRACTS.md`.
+- Historical/old design references should be annotated with dates and links to current docs.
+
 This package houses:
 
 - **Solidity contracts** (`contracts/`) — `PokerHandSettler` Diamond per ERC20
   token, `BettingConfigOracle` Diamond, Level-1 best-5-of-7 verifier facet.
   Built on the Crane framework (ERC2535 Diamond + DFPkg). See the locked PRD
-  at `../../manamesh/PRD_CONTRACTS.md` for the full settlement protocol.
+  at `../manamesh/PRD_CONTRACTS.md` for the full settlement protocol.
 - **Foundry tests** (`tests/foundry/`).
 - **TypeScript game module** (`src/`) — boardgame.io game definition, betting
   logic, hand evaluation, and the cooperative-decryption flow for mental poker.
@@ -19,6 +32,7 @@ This package houses:
 ## Layout
 
 ```
+docs/           Design documents (PREPAREDNESS, PRD_Deployment, TASK, GAME_FLOW, historical/)
 contracts/      Solidity sources
 tests/foundry/  Foundry tests
 src/            TypeScript: game module + signing helpers + board

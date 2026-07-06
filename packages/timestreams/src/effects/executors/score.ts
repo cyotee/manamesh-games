@@ -2,7 +2,7 @@ import { hasTag, tagNumber, tagValue, isDeckMember } from '../tags';
 import { effectiveScoreValue } from '../boardOps';
 import { getCard } from '../state';
 import { erasForScope, candidateTargets, cardAtOffset, locateCard } from '../targets';
-import { isScoreEffectsSuppressed, shouldCancelScoreEffects } from '../react';
+import { shouldCancelScoreEffects, isProtected } from '../react';
 import { done, type Executor } from '../types';
 
 // Basic score effect resolver for a single card during scoring (M3 skeleton)
@@ -120,7 +120,7 @@ export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIn
   }
 
   // basic protect/suppress/cancel for score effects (M3)
-  if (shouldCancelScoreEffects(G, card.id) || isScoreEffectsSuppressed(G, card.id) || hasTag(card, 'protect:score-effects') || hasTag(card, 'suppress:score-effects-on-target')) {
+  if (shouldCancelScoreEffects(G, card.id) || isProtected(G, card.id, 'score-effects') || hasTag(card, 'protect:score-effects') || hasTag(card, 'suppress:score-effects-on-target')) {
     // zero tag-based extras (printed value still applies via effective)
     extra = 0;
   }

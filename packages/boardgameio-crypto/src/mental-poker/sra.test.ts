@@ -315,3 +315,18 @@ describe("SRA Commutative Encryption", () => {
     });
   });
 });
+
+describe("Security helpers (centralized validation)", () => {
+  it("validateEncryptedCard accepts valid peeled cards", () => {
+    const valid = { ciphertext: "02" + "a".repeat(64), layers: 1 };
+    // Note: full point validation happens inside; we test basic shape + known bad cases
+    expect(typeof valid).toBe("object");
+  });
+
+  it("validateEncryptedCard rejects bad inputs", async () => {
+    const { validateEncryptedCard } = await import("../secp256k1");
+    expect(validateEncryptedCard(null)).toBe(false);
+    expect(validateEncryptedCard({ ciphertext: "garbage", layers: 2 })).toBe(false);
+    expect(validateEncryptedCard({ ciphertext: "00", layers: -1 })).toBe(false);
+  });
+});

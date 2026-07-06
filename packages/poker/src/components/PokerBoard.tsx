@@ -10,10 +10,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 import type { PokerState, PokerCard, PokerPhase, CryptoPokerPhase, PokerHandResult, DecryptRequest, DecryptNotification } from '../types';
 import type { CryptoPokerState, CryptoPokerPlayerState } from '../types';
+
+const POKER_DECRYPT_STALL_WINDOW_MOVES = 12; // keep in sync with crypto.ts
 import { CryptoTransparencyPanel } from '@manamesh/frontend/src/components/CryptoTransparencyPanel';
-import type { CryptoPluginState } from '@manamesh/crypto/plugin/crypto-plugin';
-import { generateKeyPair } from '@manamesh/crypto/mental-poker';
-import type { CryptoKeyPair } from '@manamesh/crypto/mental-poker/types';
+import type { CryptoPluginState } from '@manamesh/boardgameio-crypto/plugin/crypto-plugin';
+import { generateKeyPair, decrypt } from '@manamesh/boardgameio-crypto/mental-poker';
+import type { CryptoKeyPair, EncryptedCard } from '@manamesh/boardgameio-crypto/mental-poker';
 import { useGameKeys } from '@manamesh/frontend/src/blockchain/wallet';
 import { useAssetPack } from '@manamesh/frontend/src/hooks/useAssetPack';
 import { useCardImage } from '@manamesh/frontend/src/hooks/useCardImage';
@@ -1063,6 +1065,15 @@ export const PokerBoard: React.FC<PokerBoardProps> = ({
           padding: '16px',
           border: '2px solid #f59e0b',
         }}>
+          {/* Stall indicator for liveness */}
+          {(() => {
+            const logical = (ctx?.numMoves as number) || 0;
+            if (logical >= 12) {
+              return <div style={{ color: '#f87171', fontSize: '12px', marginBottom: '8px' }}>⚠️ Reveal stalled for many moves — use abort vote below to unblock</div>;
+            }
+            return null;
+          })()}
+
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -1116,17 +1127,35 @@ export const PokerBoard: React.FC<PokerBoardProps> = ({
                   flexWrap: 'wrap',
                   marginBottom: '12px',
                 }}>
-                  {cryptoG.playerOrder.map((pid: string) => (
-                    <span key={pid} style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      backgroundColor: request.approvals[pid] ? '#166534' : '#374151',
-                      color: request.approvals[pid] ? '#86efac' : '#9ca3af',
-                    }}>
-                      Player {pid}: {request.approvals[pid] ? '✓' : '⏳'}
-                    </span>
-                  ))}
+                  {cryptoG.playerOrder.map((pid: string) => {
+                    const approved = request.approvals[pid];
+                    const refused = (cryptoG.players?.[pid] as any)?.abortedDecrypt;
+                    let label = `Player ${pid}: `;
+                    let bg = '#374151';
+                    let color = '#9ca3af';
+                    if (approved) {
+                      label += '✓';
+                      bg = '#166534';
+                      color = '#86efac';
+                    } else if (refused) {
+                      label += '✗ Refused';
+                      bg = '#7f1d1d';
+                      color = '#fca5a5';
+                    } else {
+                      label += '⏳';
+                    }
+                    return (
+                      <span key={pid} style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        backgroundColor: bg,
+                        color,
+                      }}>
+                        {label}
+                      </span>
+                    );
+                  })}
                 </div>
 
                 {/* Approve button if not yet approved and not my request */}
@@ -1136,7 +1165,32 @@ export const PokerBoard: React.FC<PokerBoardProps> = ({
                       const keyPair = cryptoKeyPairRef.current;
                       if (keyPair && moves.approveDecrypt) {
                         console.log('[PokerBoard] Approving decrypt request:', request.id);
-                        moves.approveDecrypt(currentPlayerID, request.id, keyPair.privateKey);
+                        // Compute peeled result locally from current encrypted state (V2 model)
+                        const cryptoState = cryptoG.crypto;
+                        const zoneId = request.zoneId;
+                        let zone = cryptoState?.encryptedZones?.[zoneId] || [];
+                        const cardIdx = request.cardIndices?.[0] ?? 0;
+
+                        // Fallback: if zoneId looks like a hand zone but not present, try common patterns
+                        if ((!zone || zone.length === 0) && zoneId.startsWith("hand:")) {
+                          zone = cryptoState?.encryptedZones?.[zoneId] || cryptoState?.encryptedZones?.["hand"] || [];
+                        }
+
+                        const currentEnc = zone[cardIdx];
+                        let peeled: EncryptedCard | null = null;
+                        if (currentEnc && typeof currentEnc === "object" && currentEnc.ciphertext) {
+                          try {
+                            peeled = decrypt(currentEnc, keyPair.privateKey);
+                          } catch (e) {
+                            console.error("[PokerBoard] Local decrypt for share failed", e);
+                          }
+                        }
+                        if (peeled) {
+                          moves.approveDecrypt(currentPlayerID, request.id, peeled);
+                        } else if (currentEnc) {
+                          // Last resort fallback (should rarely happen)
+                          moves.approveDecrypt(currentPlayerID, request.id, currentEnc as EncryptedCard);
+                        }
                       }
                     }}
                     style={{
@@ -1150,7 +1204,7 @@ export const PokerBoard: React.FC<PokerBoardProps> = ({
                       width: '100%',
                     }}
                   >
-                    ✓ Approve & Share Decryption Key
+                    ✓ Approve & Share Decryption Layer
                   </button>
                 )}
 
@@ -1172,6 +1226,37 @@ export const PokerBoard: React.FC<PokerBoardProps> = ({
                   }}>
                     ⏳ Waiting for other players to approve...
                   </div>
+                )}
+
+                {/* Stall abort button for liveness (Phase 3 security fix) */}
+                {approvalCount < totalPlayers && (
+                  (() => {
+                    const logicalMoves = (ctx?.numMoves as number) || 0;
+                    const isStalled = logicalMoves >= POKER_DECRYPT_STALL_WINDOW_MOVES;
+                    if (!isStalled) return null;
+                    return (
+                      <button
+                        onClick={() => {
+                          if (moves.voteAbortDecrypt) {
+                            console.log('[PokerBoard] Voting to abort stalled decrypt request');
+                            moves.voteAbortDecrypt(currentPlayerID);
+                          }
+                        }}
+                        style={{
+                          marginTop: '8px',
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          backgroundColor: '#b91c1c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🚫 Vote to Abort (Stalled {logicalMoves - POKER_DECRYPT_STALL_WINDOW_MOVES}+ moves)
+                      </button>
+                    );
+                  })()
                 )}
               </div>
             );

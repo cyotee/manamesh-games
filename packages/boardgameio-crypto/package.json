@@ -1,7 +1,7 @@
 {
-  "name": "@manamesh/crypto",
+  "name": "@manamesh/boardgameio-crypto",
   "version": "0.1.0",
-  "description": "Cryptographic primitives for ManaMesh — mental poker (SRA), Merkle commitments, EC ElGamal, Feldman DKG, DLEQ, ECDSA, Paillier HE, Shamir SSS, snarkjs ZK helpers, and the boardgame.io crypto plugin.",
+  "description": "Cryptographic primitives for boardgame.io games — mental poker (SRA), Merkle commitments, EC ElGamal, Feldman DKG, DLEQ, ECDSA, Paillier HE, Shamir SSS, snarkjs ZK helpers, the boardgame.io crypto plugin, and setup-flow helpers.",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -24,7 +24,8 @@
     "./ecdsa": "./src/ecdsa.ts",
     "./paillier": "./src/paillier.ts",
     "./snarkjs-range": "./src/snarkjs-range.ts",
-    "./range-proof-vkey": "./src/range-proof-vkey.ts"
+    "./range-proof-vkey": "./src/range-proof-vkey.ts",
+    "./integration/setup-utils": "./src/integration/setup-utils.ts"
   },
   "scripts": {
     "test": "vitest run",

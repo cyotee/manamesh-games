@@ -20,8 +20,8 @@ import {PokerHandSettlerRepo} from "./PokerHandSettlerRepo.sol";
 /**
  * @title PokerHandSettlerTarget - Escrow + settlement logic for one ERC20.
  * @notice Implements deposit/withdraw, hand assertion (buy-in locking), and
- *         normal settlement. Force-timeout settlement is added in Phase 5; the
- *         on-chain verifier gate is wired in Phase 4.
+ *         normal settlement. Force-timeout settlement and the on-chain verifier
+ *         are implemented (verifier is optional via repo flag).
  * @dev Holds no storage of its own; all state lives in {PokerHandSettlerRepo}.
  *      Deployed standalone only for unit tests — composed into a diamond via its
  *      Facet in production.
@@ -182,9 +182,9 @@ contract PokerHandSettlerTarget is IPokerHandSettler {
     /// @inheritdoc IPokerHandSettler
     /// @dev Same finalStacks-direct accounting as {settleHand}, but the verifier
     ///      is skipped (§11.11) and any declared winner without a valid signature
-    ///      forfeits their entire share to the operator (§11.10). v1 binds
-    ///      `lastRoundState` to the hand by handId; verifying its all-player
-    ///      signatures is deferred to a later hardening pass.
+    ///      forfeits their entire share to the operator (§11.10). `lastRoundState`
+    ///      is bound by handId. Full signature verification on lastRoundState is
+    ///      currently limited (see IPokerHandSettler).
     function forceTimeoutSettlement(
         HandInit calldata init,
         HandOutcome calldata outcome,

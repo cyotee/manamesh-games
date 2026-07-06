@@ -17,6 +17,7 @@ export * from "./stable-json";
 
 // Threshold-tally (browser-feasible) primitives
 export * from "./secp256k1";
+export { validateEncryptedCard, validatePlayerIdentity } from "./secp256k1";
 export * from "./ec-elgamal-exp";
 export * from "./feldman-dkg";
 export * from "./dleq";
@@ -28,3 +29,6 @@ export * from "./zk";
 // Range proof snarkjs wrappers
 export * from "./snarkjs-range";
 export { RANGE_PROOF_VKEY } from "./range-proof-vkey";
+
+// boardgame.io setup-flow helpers (absorbed from former @cyotee/boardgameio-crypto)
+export * from "./integration/setup-utils";

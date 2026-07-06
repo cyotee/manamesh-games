@@ -76,8 +76,10 @@ interface IPokerHandSettler {
         external;
 
     /**
-     * @notice Force-settles a timed-out hand (Phase 5).
-     * @dev Reverts with NotImplemented until Phase 5.
+     * @notice Force-settles a timed-out hand.
+     * @dev Supports partial winner signatures; unsigned winners forfeit to the operator.
+     *      lastRoundState is bound by handId (full signature verification on lastRoundState
+     *      may be added in a future hardening pass).
      */
     function forceTimeoutSettlement(
         HandInit calldata init,

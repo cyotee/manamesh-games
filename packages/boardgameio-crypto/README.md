@@ -1,4 +1,4 @@
-# @manamesh/crypto
+# @manamesh/boardgameio-crypto
 
 Shared cryptographic primitives for ManaMesh's provably-fair P2P card games.
 
@@ -14,20 +14,20 @@ other in-tree package, so it can be consumed freely without import cycles.
 
 | Import | Contents |
 |--------|----------|
-| `@manamesh/crypto` | Barrel: re-exports everything below |
-| `@manamesh/crypto/mental-poker` | SRA commutative encryption, commitment + shuffle proofs |
-| `@manamesh/crypto/plugin/crypto-plugin` | boardgame.io crypto plugin |
-| `@manamesh/crypto/merkle` | Merkle-tree commitments (Battleship) |
-| `@manamesh/crypto/ec-elgamal-exp`, `/feldman-dkg`, `/dleq` | Threshold Tally primitives |
-| `@manamesh/crypto/ecdsa`, `/secp256k1`, `/sha256`, `/stable-json` | Signing + hashing helpers |
-| `@manamesh/crypto/paillier` | Paillier HE (HE Battleship) |
-| `@manamesh/crypto/shamirs` | Shamir secret sharing (ECIES-encrypted) |
-| `@manamesh/crypto/zk`, `/snarkjs-range` | snarkjs ZK helpers |
+| `@manamesh/boardgameio-crypto` | Barrel: re-exports everything below |
+| `@manamesh/boardgameio-crypto/mental-poker` | SRA commutative encryption, commitment + shuffle proofs |
+| `@manamesh/boardgameio-crypto/plugin/crypto-plugin` | boardgame.io crypto plugin |
+| `@manamesh/boardgameio-crypto/merkle` | Merkle-tree commitments (Battleship) |
+| `@manamesh/boardgameio-crypto/ec-elgamal-exp`, `/feldman-dkg`, `/dleq` | Threshold Tally primitives |
+| `@manamesh/boardgameio-crypto/ecdsa`, `/secp256k1`, `/sha256`, `/stable-json` | Signing + hashing helpers |
+| `@manamesh/boardgameio-crypto/paillier` | Paillier HE (HE Battleship) |
+| `@manamesh/boardgameio-crypto/shamirs` | Shamir secret sharing (ECIES-encrypted) |
+| `@manamesh/boardgameio-crypto/zk`, `/snarkjs-range` | snarkjs ZK helpers |
 
 ## Test
 
 ```bash
-yarn workspace @manamesh/crypto test
+yarn workspace @manamesh/boardgameio-crypto test
 ```
 
 ## Note on type-checking
