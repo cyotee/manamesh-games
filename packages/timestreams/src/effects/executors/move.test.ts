@@ -60,4 +60,18 @@ describe('move executor', () => {
     expect(res.log.join(' ')).toMatch(/fizzles/);
     expect(G.timeline.medieval.stack).toContain('movable#0');
   });
+
+  it('react:cancel on move fizzles the move (basic)', () => {
+    const G = makeState({ players: ['0'], currentDay: 2 });
+    const movable = makeCard({ id: 'movable#0', ownerId: '0', tags: ['react:cancel', 'cancel:move'] });
+    putInEra(G, 'medieval', movable);
+    const music = makeCard({
+      id: 'stone-age-music#0', ownerId: '0',
+      tags: ['play:move', 'move:target:any-card', 'move-source:today', 'move-destination:tomorrow'],
+    });
+    putInEra(G, 'medieval', music);
+    const res = resolvePlayEffect(G, '0', 'stone-age-music#0', { 'stone-age-music#0:move-card': 'movable#0' });
+    expect(res.log.join(' ')).toMatch(/fizzles \(react:cancel\)/);
+    expect(G.timeline.medieval.stack).toContain('movable#0');
+  });
 });

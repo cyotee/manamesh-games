@@ -56,6 +56,18 @@ export function getRedirectTargetForDiscard(G: any, cardId: string): string | nu
   return null;
 }
 
+export function shouldCancelMove(G: any, cardId: string): boolean {
+  const card = G.cards?.[cardId];
+  if (!card) return false;
+
+  if (hasTag(card, 'protect:move') || hasTag(card, 'react:cancel') && hasTag(card, 'cancel:move')) {
+    return true;
+  }
+
+  // TODO: attached, source-specific, etc.
+  return false;
+}
+
 // Placeholder for future full react application during events.
 export function applyReactsForEvent(G: any, event: any): void {
   // TODO: implement cancel/redirect/replace/retaliate pipeline

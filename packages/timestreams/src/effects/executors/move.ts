@@ -3,6 +3,7 @@ import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets, locateCard } from '../targets';
 import { moveWithinEra, moveToEra, isMoveBlocked } from '../boardOps';
 import { isMoveDirectionPrevented } from '../modifiers';
+import { shouldCancelMove } from '../react';
 import { done, needs, type Executor, type ExecCtx } from '../types';
 
 interface Destination { era: EraId; position: 'top' | 'bottom'; }
@@ -73,6 +74,9 @@ export const moveExecutor: Executor = (ctx) => {
 
   const blocked = isMoveBlocked(G, moving, playerId);
   if (blocked) return done([`${card.id}: move of ${moving} fizzles (${blocked})`]);
+  if (shouldCancelMove(G, moving)) {
+    return done([`${card.id}: move of ${moving} fizzles (react:cancel)`]);
+  }
 
   // Relative move within era (amount + direction)
   const amount = tagNumber(card, 'move:amount');
