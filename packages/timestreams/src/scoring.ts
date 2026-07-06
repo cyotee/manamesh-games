@@ -1,6 +1,7 @@
 import type { TimestreamsState } from "./types";
 import { scoringSlotCardIds } from "./timeline";
 import { homeEraTurnOrder } from "./homeEra";
+import { effectiveScoreValue } from "./effects/boardOps";
 
 export function cardOwner(cardId: string): string {
   const parts = cardId.split("-card-");
@@ -17,7 +18,7 @@ export function resolveScoring(G: TimestreamsState): void {
     for (const cid of slotIds) {
       const owner = cardOwner(cid);
       if (owner && scores[owner] !== undefined) {
-        scores[owner] += 1;
+        scores[owner] += effectiveScoreValue(G, cid);
       }
     }
   }

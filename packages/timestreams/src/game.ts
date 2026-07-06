@@ -176,13 +176,13 @@ export const TimestreamsGame: Game<TimestreamsState> = {
     play: {
       moves: {
         playInvention: {
-          move: ({ G, ctx, playerID }, cardId: string) =>
-            playInvention(G, ctx, playerID, cardId),
+          move: ({ G, ctx, playerID }, cardId: string, choices?: any) =>
+            playInvention(G, ctx, playerID, cardId, choices || {}),
           client: false,
         },
         playAction: {
-          move: ({ G, ctx, playerID }, cardId: string) =>
-            playAction(G, ctx, playerID, cardId),
+          move: ({ G, ctx, playerID }, cardId: string, choices?: any) =>
+            playAction(G, ctx, playerID, cardId, choices || {}),
           client: false,
         },
         pass: {
