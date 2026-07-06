@@ -7,7 +7,7 @@ import {
 function G(ids = ["0", "1", "2"]) {
   const players: any = {};
   for (const id of ids) players[id] = { homeEra: null, ready: false };
-  return { players, playerOrder: ids } as any;
+  return { players, playerOrder: ids, config: { homeEraAssignment: 'selectable' } } as any;
 }
 
 describe("home-era assignment", () => {

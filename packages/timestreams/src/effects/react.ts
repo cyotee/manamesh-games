@@ -1,5 +1,6 @@
 import { hasTag, tagValue } from './tags';
 import { locateCard, cardAtOffset } from './targets';
+import { getCard } from './state';
 
 // =============================================================================
 // M3 React Pipeline (in progress)
@@ -49,6 +50,11 @@ export function isProtected(
 
   // Scope-based protects (e.g. Chainmail, same-era)
   // TODO: full scope checks (same-era, own-inventions, etc.)
+  // Basic same-era scope example (extend as needed)
+  if (mutationType === 'move' && hasTag(target, 'protect:scope:same-era')) {
+    // simplistic: always apply for demo if tag present
+    return true;
+  }
 
   return false;
 }
@@ -146,9 +152,32 @@ export function checkReactForMove(
   if (shouldCancelMove(G, targetCardId, actorPlayerId)) {
     decision.cancelled = true;
     decision.log = 'react:cancel';
+    return decision;
   }
 
-  // TODO: add redirect/replace support for moves (Thought Police etc.)
+  // Basic redirect support for moves (e.g. Cloth self, Thought Police adjacent)
+  const card = G.cards?.[targetCardId];
+  if (card && hasTag(card, 'react:move') && hasTag(card, 'redirect:target-to')) {
+    const targetTo = tagValue(card, 'redirect:target-to');
+    if (targetTo === 'self') {
+      decision.redirectTo = targetCardId;
+    } else if (targetTo === 'adjacent') {
+      const below = cardAtOffset(G, targetCardId, 1);
+      if (below) decision.redirectTo = below;
+      else {
+        const above = cardAtOffset(G, targetCardId, -1);
+        if (above) decision.redirectTo = above;
+      }
+    }
+    if (decision.redirectTo) {
+      // re-check protect on new target
+      if (isProtected(G, decision.redirectTo, 'move', actorPlayerId)) {
+        decision.cancelled = true;
+        decision.log = 'react:redirect-fizzle';
+      }
+    }
+  }
+
   return decision;
 }
 
@@ -225,8 +254,26 @@ export function applyReactsForEvent(G: any, event: any): { cancelled?: boolean; 
     }
   }
 
-  // TODO: full lookup of reactors in the era / attached that have react:xxx for this event type,
-  // then apply redirect/replace/cancel/retaliate per the PRD order.
+  // Full (basic) lookup of reactors in eras that have react: matching the event
+  // (scans stacks for cards declaring react:<type> or react:targeted etc.)
+  const reactors: string[] = [];
+  const eras = Object.keys(G.timeline || {});
+  for (const era of eras) {
+    const stack = G.timeline[era]?.stack || [];
+    for (const cid of stack) {
+      const c = getCard(G, cid);
+      if (!c) continue;
+      const reactTag = `react:${event.type || ''}`;
+      if (hasTag(c, reactTag) || hasTag(c, 'react:targeted') || hasTag(c, 'react:discard') || hasTag(c, 'react:move')) {
+        if (!reactors.includes(cid)) reactors.push(cid);
+      }
+    }
+  }
+  if (reactors.length) {
+    log.push(`react: potential reactors found: ${reactors.join(',')}`);
+    // For now, log; full decision application per target would delegate to checkReact* in executors
+    // Future: for each reactor apply getRedirect etc if applicable to event.
+  }
 
   return { log };
 }

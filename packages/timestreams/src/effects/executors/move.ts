@@ -79,6 +79,10 @@ export const moveExecutor: Executor = (ctx) => {
   if (react.cancelled) {
     return done([`${card.id}: move of ${moving} fizzles (react:cancel)`]);
   }
+  let effectiveMoving = moving;
+  if (react.redirectTo) {
+    effectiveMoving = react.redirectTo;
+  }
 
   // Relative move within era (amount + direction)
   const amount = tagNumber(card, 'move:amount');
@@ -95,8 +99,8 @@ export const moveExecutor: Executor = (ctx) => {
       }
       delta = posChoice === 'down' ? amount : -amount;
     }
-    moveWithinEra(G, moving, from.index + delta);
-    return done([`${card.id}: moved ${moving} ${delta < 0 ? 'up' : 'down'} ${Math.abs(delta)}`]);
+    moveWithinEra(G, effectiveMoving, from.index + delta);
+    return done([`${card.id}: moved ${effectiveMoving} ${delta < 0 ? 'up' : 'down'} ${Math.abs(delta)}`]);
   }
 
   const destTag = tagValue(card, 'move-destination');
@@ -104,8 +108,8 @@ export const moveExecutor: Executor = (ctx) => {
   if (!dest) return done([`${card.id}: move fizzles (no destination)`]);
 
   if (dest.era !== from.era && isMoveDirectionPrevented(G, from.era, dest.era)) {
-    return done([`${card.id}: move of ${moving} to ${dest.era} fizzles (prevented direction)`]);
+    return done([`${card.id}: move of ${effectiveMoving} to ${dest.era} fizzles (prevented direction)`]);
   }
-  moveToEra(G, moving, dest.era, dest.position);
-  return done([`${card.id}: moved ${moving} to ${dest.position} of ${dest.era}`]);
+  moveToEra(G, effectiveMoving, dest.era, dest.position);
+  return done([`${card.id}: moved ${effectiveMoving} to ${dest.position} of ${dest.era}`]);
 };

@@ -3,7 +3,7 @@ import { scoringSlotCardIds } from "./timeline";
 import { homeEraTurnOrder } from "./homeEra";
 import { effectiveScoreValue } from "./effects/boardOps";
 import { getCard, getPendingTriggers } from "./effects/state";
-import { hasTag, tagNumber } from "./effects/tags";
+import { hasTag, tagNumber, tagsWithPrefix } from "./effects/tags";
 import { resolveCardScoreEffects } from "./effects/executors/score";
 import { fireEvent } from "./effects/triggers";
 
@@ -32,14 +32,15 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
     for (const cid of era.stack) {
       const c = getCard(G, cid);
       if (!c) continue;
-      if (hasTag(c, 'score:add-scoring-slots')) {
+      // Use prefix check because tags are suffixed e.g. "score:add-scoring-slots:2"
+      if (tagsWithPrefix(c, 'score:add-scoring-slots').length > 0) {
         delta += tagNumber(c, 'score:add-scoring-slots') || 0;
       }
-      if (hasTag(c, 'score:remove-scoring-slots')) {
+      if (tagsWithPrefix(c, 'score:remove-scoring-slots').length > 0) {
         delta -= tagNumber(c, 'score:remove-scoring-slots') || 0;
       }
       // Some play-time slot effects may also be present
-      if (hasTag(c, 'play:add-scoring-slots')) {
+      if (tagsWithPrefix(c, 'play:add-scoring-slots').length > 0) {
         delta += tagNumber(c, 'play:add-scoring-slots') || 0;
       }
     }
@@ -48,7 +49,6 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
 
   for (const eraId of Object.keys(G.timeline) as any) {
     const era = G.timeline[eraId];
-    // TODO M3: compute dynamic slot count from effects / era cards (Slow/Fast Time etc.)
     const computedSlots = computeSlotsForEra(eraId);
     let remainingSlots = computedSlots;
 

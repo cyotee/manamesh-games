@@ -161,4 +161,27 @@ describe("placeholder scoring", () => {
     // the score value for this test is just the base (the delayed add would have happened if the source had been considered in the add, but the processing path is verified)
     // expect(G.scores["0"]).toBe(4); // would be if added
   });
+
+  it('computes dynamic scoring slots from score:add-scoring-slots cards (e.g. Slow Time)', () => {
+    const G = makeState({ players: ['0'], currentDay: 1 });
+    G.players['0'].homeEra = 'stone';
+    G.config.scoringSlots = 6;
+
+    // Slow Time style card adds +2 slots
+    const slow = makeCard({ id: 'slow#0', ownerId: '0', tags: ['score:add-scoring-slots:2'] });
+    putInEra(G, 'stone',
+      makeCard({ id: 'c1#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c2#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c3#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c4#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c5#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c6#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c7#0', ownerId: '0', scoreValue: 1 }),
+      slow,
+    );
+
+    resolveScoring(G);
+    // With base 6, +2 from card = 8 slots, so top 8 (all) should score: 7 points
+    expect(G.scores).toEqual({ '0': 7 });
+  });
 });
