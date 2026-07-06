@@ -42,6 +42,20 @@ export function shouldCancelDiscard(G: any, cardId: string): boolean {
   return false;
 }
 
+export function getRedirectTargetForDiscard(G: any, cardId: string): string | null {
+  const card = G.cards?.[cardId];
+  if (!card) return null;
+
+  if (hasTag(card, 'react:redirect') && hasTag(card, 'redirect:discard')) {
+    // simplistic: redirect to self or a fixed target for demo
+    // in real, would use target from tags or choice
+    return cardId; // redirect to self as a demo (fizzle later or handle)
+  }
+
+  // TODO: full redirect target resolution, decider, etc.
+  return null;
+}
+
 // Placeholder for future full react application during events.
 export function applyReactsForEvent(G: any, event: any): void {
   // TODO: implement cancel/redirect/replace/retaliate pipeline

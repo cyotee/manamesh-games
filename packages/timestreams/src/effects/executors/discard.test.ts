@@ -84,4 +84,20 @@ describe('discard executor', () => {
     // victim still in stack
     expect(G.timeline.modern.stack).toContain('victim#0');
   });
+
+  it('react:redirect on discard logs redirect (basic)', () => {
+    const G = makeState({ players: ['0', '1'], currentDay: 5 });
+    putInEra(G, 'modern', makeCard({ id: 'victim#0', ownerId: '1' }));
+    const redirectCard = makeCard({ id: 'victim#0', ownerId: '1', tags: ['react:redirect', 'redirect:discard'] });
+    putInEra(G, 'modern', redirectCard);
+    const napalm = makeCard({
+      id: 'modern-napalm#0', ownerId: '0', cardType: 'action',
+      tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
+    });
+    putInHand(G, '0', napalm);
+    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
+    expect(res.log.join(' ')).toMatch(/redirected to victim#0/);
+    // victim still in stack (demo treats as fizzle after log)
+    expect(G.timeline.modern.stack).toContain('victim#0');
+  });
 });
