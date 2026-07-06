@@ -5,6 +5,7 @@ import { effectiveScoreValue } from "./effects/boardOps";
 import { getCard } from "./effects/state";
 import { hasTag, tagNumber } from "./effects/tags";
 import { resolveCardScoreEffects } from "./effects/executors/score";
+import { fireEvent } from "./effects/triggers";
 
 export function cardOwner(cardId: string, G?: TimestreamsState): string {
   if (G) {
@@ -87,7 +88,8 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
 
     // per-era delayed and cleanup as per PRD (after this era's slots)
     (G as any).scoringPhase = 'delayed';
-    // TODO: fire delayed:trigger:after-destination-era-scored for this eraId
+    // fire for delayed score triggers (e.g. cards with delayed:trigger:after-destination-era-scored)
+    fireEvent(G, { type: 'era-scored' as any, cardId: '', eraId: eraId as any, actorPlayerId: '' });
 
     (G as any).scoringPhase = 'cleanup';
 
