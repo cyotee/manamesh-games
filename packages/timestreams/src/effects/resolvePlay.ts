@@ -7,6 +7,8 @@ import { discardExecutor } from './executors/discard';
 import { moveExecutor } from './executors/move';
 import { swapExecutor } from './executors/swap';
 import { attachExecutor } from './executors/attach';
+import { preventExecutor } from './executors/prevent';
+import { recoverExecutor } from './executors/recover';
 
 /** Executor registry: [applies?, executor]. Extended by later tasks. */
 const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
@@ -15,6 +17,8 @@ const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
   [({ card }) => hasTag(card, 'play:move'), moveExecutor],
   [({ card }) => hasTag(card, 'play:swap'), swapExecutor],
   [({ card }) => hasTag(card, 'play:attach'), attachExecutor],
+  [({ card }) => hasTag(card, 'play:prevent'), preventExecutor],
+  [({ card }) => hasTag(card, 'play:recover'), recoverExecutor],
 ];
 
 export function resolvePlayEffect(
