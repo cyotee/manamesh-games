@@ -3,10 +3,12 @@ import { requireCard } from './state';
 import { tagsWithPrefix, hasTag, tagValue } from './tags';
 import { merge, OK, type ChoiceMap, type EffectResult, type Executor, type ExecCtx } from './types';
 import { drawExecutor } from './executors/draw';
+import { discardExecutor } from './executors/discard';
 
 /** Executor registry: [applies?, executor]. Extended by later tasks. */
 const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
   [({ card }) => tagValue(card, 'play:draw') !== undefined || tagValue(card, 'opponents-draw') !== undefined, drawExecutor],
+  [({ card }) => tagValue(card, 'play:discard') !== undefined, discardExecutor],
 ];
 
 export function resolvePlayEffect(

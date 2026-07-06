@@ -20,7 +20,10 @@ function shiftEra(era: EraId, delta: number): EraId[] {
 
 export function erasForScope(G: TimestreamsState, scope: string, refCardId?: string): EraId[] {
   const today = eraForDay(Math.min(G.currentDay, ERA_ORDER.length));
-  const refEra = refCardId ? locateCard(G, refCardId)?.era : undefined;
+  let refEra = refCardId ? locateCard(G, refCardId)?.era : undefined;
+  if (!refEra && (scope === 'this-or-previous-era' || scope === 'same-era' || scope === 'attached-era' || scope === 'next-era')) {
+    refEra = today;
+  }
   switch (scope) {
     case 'today': return [today];
     case 'tomorrow': return shiftEra(today, 1);
