@@ -81,4 +81,19 @@ describe("placeholder scoring", () => {
     expect(G.scores).toEqual({ "0": 8 });
     expect(G.players["0"].scorePile?.length).toBe(2);
   });
+
+  it("applies score:perform-other (basic target resolution)", () => {
+    const G = makeState({ players: ["0"], currentDay: 1 });
+    G.players["0"].homeEra = "stone";
+    G.config.scoringSlots = 6;
+
+    putInEra(G, "stone",
+      makeCard({ id: "target#0", ownerId: "0", scoreValue: 5 }),
+      makeCard({ id: "performer#0", ownerId: "0", scoreValue: 0, tags: ["score:perform-other", "perform:target-filter:any", "target:scope:today"] }),
+    );
+
+    resolveScoring(G);
+    // target 5 + performer performs target's value (5) = 10
+    expect(G.scores).toEqual({ "0": 10 });
+  });
 });

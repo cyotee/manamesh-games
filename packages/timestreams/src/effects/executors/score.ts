@@ -64,6 +64,20 @@ export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIn
     extra -= amt;
   }
 
+  // perform-other (basic support for M3)
+  if (hasTag(card, 'score:perform-other')) {
+    const filter = tagValue(card, 'perform:target-filter') || 'any';
+    // simplistic resolution: find a target in scope and add its value
+    const scope = tagValue(card, 'target:scope') || 'today';
+    const eras = erasForScope(G, scope, card.id);
+    const kind = filter === 'any' ? 'any' : 'invention';
+    const cands = candidateTargets(G, { kind, eras, excludeCardId: card.id });
+    if (cands.length > 0) {
+      const tgt = cands[0];
+      extra += effectiveScoreValue(G, tgt);
+    }
+  }
+
   return extra;
 }
 
