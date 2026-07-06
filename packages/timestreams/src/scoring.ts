@@ -21,6 +21,7 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
 
   // Initialize scored for this pass (M3 Wonky)
   G.scoredThisScoring = [];
+  (G as any).scoringPhase = 'slots';
 
   function computeSlotsForEra(eraId: string): number {
     const base = G.config.scoringSlots ?? 6;
@@ -81,6 +82,11 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
 
   G.scores = scores;
 
+  (G as any).scoringPhase = 'delayed';
+  // TODO: fire delayed triggers here per PRD
+
+  (G as any).scoringPhase = 'cleanup';
+
   // Basic M3 cleanup: move scored slot cards to owners' score piles
   for (const cid of G.scoredThisScoring || []) {
     const owner = cardOwner(cid, G);
@@ -94,6 +100,8 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
       }
     }
   }
+
+  (G as any).scoringPhase = 'done';
 
   // Determine winner: highest score; ties -> first in homeEraTurnOrder (earliest era)
   const order = homeEraTurnOrder(G);
