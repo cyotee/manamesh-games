@@ -333,6 +333,50 @@ export interface TimestreamsState {
   scores: Record<string, number>;
   /** Winning player ID, or null if the game is not over */
   winner: string | null;
+
+  /** M2 rules engine: id -> full card for every card in public play. */
+  cards?: Record<string, TimestreamsCard>;
+  /** M2 rules engine: hostCardId -> attached action card ids. */
+  attachments?: Record<string, string[]>;
+  /** M2 rules engine: active duration modifiers. */
+  modifiers?: ActiveModifier[];
+  /** M2 rules engine: registered delayed/ongoing triggers. */
+  pendingTriggers?: PendingTrigger[];
+  /** M2 rules engine: per-player turn flags. */
+  turnFlags?: Record<string, TurnFlags>;
+}
+
+// =============================================================================
+// Rules Engine State (M2) — optional fields, lazily initialized by src/effects/state.ts
+// =============================================================================
+
+/** A duration-limited continuous effect (PRD §9). */
+export interface ActiveModifier {
+  sourceCardId: string;
+  ownerId: string;
+  kind: 'prevent-action-play' | 'prevent-move-future' | 'prevent-move-past';
+  duration: 'rest-of-today' | 'rest-of-game';
+}
+
+/** A registered delayed (one-shot) or ongoing trigger (PRD §7.1, §9). */
+export interface PendingTrigger {
+  sourceCardId: string;
+  ownerId: string;
+  event: 'action-played' | 'invention-played' | 'discarded-from-play';
+  /** Era to watch; null = anywhere. Anchored eras follow PRD §3.8. */
+  eraAnchor: EraId | null;
+  limit: 'once' | 'ongoing';
+  spent: boolean;
+}
+
+/** Per-player turn-manipulation flags (extra turns, skips, Navigation). */
+export interface TurnFlags {
+  skipNextTurn: boolean;
+  extraTurns: number;
+  /** During an Androids extra turn: inventions may not be played. */
+  noInventionThisTurn: boolean;
+  /** Navigation: next invention may be played into this scope instead of Today. */
+  allowNextInventionEra: 'yesterday-or-tomorrow' | null;
 }
 
 // =============================================================================

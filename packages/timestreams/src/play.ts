@@ -4,6 +4,7 @@ import { eraForDay, appendToEra, isLastDay } from "./timeline";
 import { transitionCardVisibility } from "./visibility";
 import { dealForDay } from "./crypto";
 import { dayFirstPlayer } from "./homeEra";
+import { registerCard } from "./effects/state";
 
 // Local constant (boardgame.io/core may not resolve under vitest+PnP)
 export const INVALID_MOVE = "INVALID_MOVE" as const;
@@ -39,6 +40,7 @@ export function playInvention(
   if (!card || !isInvention(card)) return INVALID_MOVE;
 
   removeCardFromHand(player, cardId);
+  registerCard(G, card);
   const era = eraForDay(G.currentDay);
   appendToEra(G.timeline, era, cardId);
   transitionCardVisibility(G, cardId, "public", playerId, "playInvention", { era });
@@ -63,6 +65,7 @@ export function playAction(
   if (!card || !isAction(card)) return INVALID_MOVE;
 
   removeCardFromHand(player, cardId);
+  registerCard(G, card);
   player.discard.push(card);
   transitionCardVisibility(G, cardId, "public", playerId, "playAction", {});
   player.hasPassedThisDay = false;
