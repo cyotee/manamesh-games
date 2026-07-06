@@ -100,4 +100,20 @@ describe('discard executor', () => {
     // victim still in stack (demo treats as fizzle after log)
     expect(G.timeline.modern.stack).toContain('victim#0');
   });
+
+  it('react:replace on discard logs replace (basic)', () => {
+    const G = makeState({ players: ['0', '1'], currentDay: 5 });
+    putInEra(G, 'modern', makeCard({ id: 'victim#0', ownerId: '1' }));
+    const replaceCard = makeCard({ id: 'victim#0', ownerId: '1', tags: ['react:replace', 'replace:discard'] });
+    putInEra(G, 'modern', replaceCard);
+    const napalm = makeCard({
+      id: 'modern-napalm#0', ownerId: '0', cardType: 'action',
+      tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
+    });
+    putInHand(G, '0', napalm);
+    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
+    expect(res.log.join(' ')).toMatch(/replaced \(replace-with-move\)/);
+    // victim still in stack (demo)
+    expect(G.timeline.modern.stack).toContain('victim#0');
+  });
 });

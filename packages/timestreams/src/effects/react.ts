@@ -56,6 +56,20 @@ export function getRedirectTargetForDiscard(G: any, cardId: string): string | nu
   return null;
 }
 
+export function getReplaceOutcomeForDiscard(G: any, cardId: string): string | null {
+  const card = G.cards?.[cardId];
+  if (!card) return null;
+
+  if (hasTag(card, 'react:replace') && hasTag(card, 'replace:discard')) {
+    // simplistic replace: e.g. replace discard with move to top of era or something
+    // for demo, return a marker like 'replace-with-move'
+    return 'replace-with-move';
+  }
+
+  // TODO: full replace logic, target resolution, etc.
+  return null;
+}
+
 export function shouldCancelMove(G: any, cardId: string): boolean {
   const card = G.cards?.[cardId];
   if (!card) return false;

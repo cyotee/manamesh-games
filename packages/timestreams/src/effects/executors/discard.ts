@@ -2,7 +2,7 @@ import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets } from '../targets';
 import { discardFromPlay, isDiscardBlocked } from '../boardOps';
 import { fireEvent } from '../triggers';
-import { shouldCancelDiscard, getRedirectTargetForDiscard } from '../react';
+import { shouldCancelDiscard, getRedirectTargetForDiscard, getReplaceOutcomeForDiscard } from '../react';
 import { done, needs, type Executor } from '../types';
 
 export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
@@ -49,6 +49,12 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
       // simplistic: if redirect to self, fizzle for demo (real would move effect)
       log.push(`${card.id}: discard of ${id} redirected to ${redirect}`);
       // for demo, treat as cancel/fizzle after log
+      continue;
+    }
+    const replace = getReplaceOutcomeForDiscard(G, id);
+    if (replace) {
+      log.push(`${card.id}: discard of ${id} replaced (${replace})`);
+      // for demo, skip the actual discard
       continue;
     }
     discardFromPlay(G, id, playerId);
