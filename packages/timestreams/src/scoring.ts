@@ -4,13 +4,18 @@ import { homeEraTurnOrder } from "./homeEra";
 import { effectiveScoreValue } from "./effects/boardOps";
 import { getCard } from "./effects/state";
 import { hasTag, tagNumber } from "./effects/tags";
+import { resolveCardScoreEffects } from "./effects/executors/score";
 
-export function cardOwner(cardId: string): string {
+export function cardOwner(cardId: string, G?: TimestreamsState): string {
+  if (G) {
+    const card = getCard(G, cardId);
+    if (card?.ownerId) return card.ownerId;
+  }
   const parts = cardId.split("-card-");
   return parts[0] || "";
 }
 
-export function resolveScoring(G: TimestreamsState): void {
+export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void {
   const scores: Record<string, number> = {};
   for (const pid of G.playerOrder) scores[pid] = 0;
 
@@ -26,20 +31,15 @@ export function resolveScoring(G: TimestreamsState): void {
     for (const cid of stack) {
       if (scoredInEra >= slots) break;
       if (G.scoredThisScoring.includes(cid)) continue;
-      const owner = cardOwner(cid);
+      const owner = cardOwner(cid, G);
       if (owner && scores[owner] !== undefined) {
         scores[owner] += effectiveScoreValue(G, cid);
       }
       // Basic M3 score tag support (bonus flat, count per etc can expand)
       const c = getCard(G, cid);
-      if (c && hasTag(c, "score:bonus-points")) {
-        const amt = tagNumber(c, "bonus-points:amount") || 0;
-        if (owner) scores[owner] += amt;
-      }
-      if (c && hasTag(c, "score:count")) {
-        // simplistic: + per:1 for now; real would count matching
-        const per = tagNumber(c, "score:per") || 1;
-        if (owner) scores[owner] += per;
+      if (c) {
+        const extra = resolveCardScoreEffects(G, c, eraId, scoredInEra);
+        if (owner) scores[owner] += extra;
       }
       G.scoredThisScoring.push(cid);
       scoredInEra++;
