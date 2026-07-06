@@ -609,6 +609,28 @@ export function dealForDay(G: TimestreamsState, _day: number): void {
 }
 
 /**
+ * Request `count` cooperative draws from the top of a player's encrypted deck.
+ * Skips indexes that already have a pending request. Tolerant of empty/short
+ * decks (same policy as dealForDay). Returns how many requests were created.
+ */
+export function requestDraws(G: TimestreamsState, playerId: string, count: number): number {
+  const deck = G.encryptedDecks[playerId];
+  if (!deck || deck.length === 0) return 0;
+  const pending = new Set(
+    G.pendingDecryptRequests
+      .filter(r => r.deckOwnerId === playerId && r.status !== 'complete')
+      .map(r => r.cardIndex),
+  );
+  let created = 0;
+  for (let i = 0; i < deck.length && created < count; i++) {
+    if (pending.has(i)) continue;
+    requestDraw(G, playerId, i, playerId);
+    created++;
+  }
+  return created;
+}
+
+/**
  * Submit one decryption layer for a pending cooperative draw request.
  *
  * Adapted from onepiece's submitDecryptionShare (lines 585+).
