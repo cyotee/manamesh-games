@@ -91,6 +91,33 @@ export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIn
     }
   }
 
+  // conditional branch (basic M3)
+  if (hasTag(card, 'score:branch')) {
+    const cond = tagValue(card, 'condition') || '';
+    let useTrue = false;
+    if (cond === 'first-score' || hasTag(card, 'condition:first-score')) {
+      // simplistic: treat as true for demo (real would track per-card first-score)
+      useTrue = true;
+    } else if (hasTag(card, 'condition:target-deck:future-tech')) {
+      // simplistic
+      useTrue = true;
+    }
+    // look for if-true: or if-false: sub-tags that carry amounts
+    const branchPrefix = useTrue ? 'if-true:' : 'if-false:';
+    for (const t of card.tags || []) {
+      if (t.startsWith(branchPrefix)) {
+        // e.g. if-true:bonus-points:amount:2 or if-true:count:per:1
+        if (t.includes('bonus-points:amount:')) {
+          const n = parseInt(t.split(':').pop() || '0', 10);
+          if (!isNaN(n)) extra += n;
+        } else if (t.includes('count:per:')) {
+          const n = parseInt(t.split(':').pop() || '0', 10);
+          if (!isNaN(n)) extra += n;
+        }
+      }
+    }
+  }
+
   return extra;
 }
 

@@ -96,4 +96,21 @@ describe("placeholder scoring", () => {
     // target 5 + performer performs target's value (5) = 10
     expect(G.scores).toEqual({ "0": 10 });
   });
+
+  it("applies score:branch with condition:first-score (basic)", () => {
+    const G = makeState({ players: ["0"], currentDay: 1 });
+    G.players["0"].homeEra = "stone";
+    G.config.scoringSlots = 6;
+
+    putInEra(G, "stone",
+      makeCard({ id: "brancher#0", ownerId: "0", scoreValue: 1, tags: [
+        "score:branch", "condition:first-score",
+        "if-true:bonus-points:amount:4", "if-false:bonus-points:amount:1"
+      ] }),
+    );
+
+    resolveScoring(G);
+    // 1 + branch if-true 4 = 5
+    expect(G.scores).toEqual({ "0": 5 });
+  });
 });
