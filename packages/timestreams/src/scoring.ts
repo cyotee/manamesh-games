@@ -84,28 +84,36 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
       G.scoredThisScoring.push(nextUnscored);
       remainingSlots--;
     }
-  }
 
-  G.scores = scores;
+    // per-era delayed and cleanup as per PRD (after this era's slots)
+    (G as any).scoringPhase = 'delayed';
+    // TODO: fire delayed:trigger:after-destination-era-scored for this eraId
 
-  (G as any).scoringPhase = 'delayed';
-  // TODO: fire delayed triggers here per PRD
+    (G as any).scoringPhase = 'cleanup';
 
-  (G as any).scoringPhase = 'cleanup';
-
-  // Basic M3 cleanup: move scored slot cards to owners' score piles
-  for (const cid of G.scoredThisScoring || []) {
-    const owner = cardOwner(cid, G);
-    if (owner && G.players[owner]) {
-      const card = getCard(G, cid);
-      if (card) {
-        if (!G.players[owner].scorePile) G.players[owner].scorePile = [];
-        G.players[owner].scorePile.push(card);
-        // Optionally remove from timeline stack (per PRD, they stay until cleanup)
-        // For now we leave them for visibility, but mark as collected logically
+    // cleanup this era: collect scored to piles, discard non-scored
+    const before = [...era.stack];
+    era.stack = [];
+    for (const cid of before) {
+      if (G.scoredThisScoring.includes(cid)) {
+        const owner = cardOwner(cid, G);
+        if (owner && G.players[owner]) {
+          const card = getCard(G, cid);
+          if (card) {
+            if (!G.players[owner].scorePile) G.players[owner].scorePile = [];
+            G.players[owner].scorePile.push(card);
+          }
+        }
+      } else {
+        const c = getCard(G, cid);
+        if (c && G.players[c.ownerId]) {
+          G.players[c.ownerId].discard.push(c);
+        }
       }
     }
   }
+
+  G.scores = scores;
 
   (G as any).scoringPhase = 'done';
 
