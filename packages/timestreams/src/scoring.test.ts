@@ -113,4 +113,21 @@ describe("placeholder scoring", () => {
     // 1 + branch if-true 4 = 5
     expect(G.scores).toEqual({ "0": 5 });
   });
+
+  it("respects react:cancel for score effects (basic)", () => {
+    const G = makeState({ players: ["0"], currentDay: 1 });
+    G.players["0"].homeEra = "stone";
+    G.config.scoringSlots = 6;
+
+    putInEra(G, "stone",
+      makeCard({ id: "cancellable#0", ownerId: "0", scoreValue: 2, tags: [
+        "score:bonus-points", "bonus-points:amount:10",
+        "react:cancel", "cancel:score-effects"
+      ] }),
+    );
+
+    resolveScoring(G);
+    // printed 2, but tag bonus cancelled by react -> only 2
+    expect(G.scores).toEqual({ "0": 2 });
+  });
 });
