@@ -82,7 +82,10 @@ function applyTriggerEffect(
 export function fireEvent(G: TimestreamsState, ev: PlayEvent): { prompts: PlayerPrompt[]; log: string[] } {
   const log: string[] = [];
   for (const trigger of getPendingTriggers(G)) {
-    if (trigger.spent || trigger.event !== ev.type) continue;
+    if (trigger.spent) continue;
+    // support both exact event and 'era-scored' for delayed score triggers
+    const matchesEvent = trigger.event === ev.type || (ev.type === 'era-scored' && trigger.event === 'delayed:era-scored');
+    if (!matchesEvent) continue;
     if (trigger.eraAnchor && trigger.eraAnchor !== ev.eraId) continue;
     const source = getCard(G, trigger.sourceCardId);
     if (!source) continue;
