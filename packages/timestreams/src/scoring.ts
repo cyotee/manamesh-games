@@ -20,29 +20,62 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
   for (const pid of G.playerOrder) scores[pid] = 0;
 
   // Initialize scored for this pass (M3 Wonky)
-  if (!G.scoredThisScoring) G.scoredThisScoring = [];
+  G.scoredThisScoring = [];
+
+  function computeSlotsForEra(eraId: string): number {
+    const base = G.config.scoringSlots ?? 6;
+    let delta = 0;
+    const era = G.timeline[eraId as any];
+    if (!era) return base;
+    for (const cid of era.stack) {
+      const c = getCard(G, cid);
+      if (!c) continue;
+      if (hasTag(c, 'score:add-scoring-slots')) {
+        delta += tagNumber(c, 'score:add-scoring-slots') || 0;
+      }
+      if (hasTag(c, 'score:remove-scoring-slots')) {
+        delta -= tagNumber(c, 'score:remove-scoring-slots') || 0;
+      }
+      // Some play-time slot effects may also be present
+      if (hasTag(c, 'play:add-scoring-slots')) {
+        delta += tagNumber(c, 'play:add-scoring-slots') || 0;
+      }
+    }
+    return Math.max(1, base + delta); // at least 1?
+  }
 
   for (const eraId of Object.keys(G.timeline) as any) {
     const era = G.timeline[eraId];
-    let slots = G.config.scoringSlots ?? 6;
-    // Simple Wonky: take top unscored in stack up to slots
-    const stack = [...era.stack];
-    let scoredInEra = 0;
-    for (const cid of stack) {
-      if (scoredInEra >= slots) break;
-      if (G.scoredThisScoring.includes(cid)) continue;
-      const owner = cardOwner(cid, G);
-      if (owner && scores[owner] !== undefined) {
-        scores[owner] += effectiveScoreValue(G, cid);
+    // TODO M3: compute dynamic slot count from effects / era cards (Slow/Fast Time etc.)
+    const computedSlots = computeSlotsForEra(eraId);
+    let remainingSlots = computedSlots;
+
+    // Wonky rule: repeatedly find the current topmost unscored card
+    while (remainingSlots > 0) {
+      const stack = era.stack;  // re-read in case of movement (future)
+      let nextUnscored: string | null = null;
+      for (const cid of stack) {
+        if (!G.scoredThisScoring.includes(cid)) {
+          nextUnscored = cid;
+          break;
+        }
       }
-      // Basic M3 score tag support (bonus flat, count per etc can expand)
-      const c = getCard(G, cid);
+      if (!nextUnscored) break;
+
+      const owner = cardOwner(nextUnscored, G);
+      if (owner && scores[owner] !== undefined) {
+        scores[owner] += effectiveScoreValue(G, nextUnscored);
+      }
+
+      // Resolve score tags on this card (M3)
+      const c = getCard(G, nextUnscored);
       if (c) {
-        const extra = resolveCardScoreEffects(G, c, eraId, scoredInEra);
+        const extra = resolveCardScoreEffects(G, c, eraId, computedSlots - remainingSlots);
         if (owner) scores[owner] += extra;
       }
-      G.scoredThisScoring.push(cid);
-      scoredInEra++;
+
+      G.scoredThisScoring.push(nextUnscored);
+      remainingSlots--;
     }
   }
 
