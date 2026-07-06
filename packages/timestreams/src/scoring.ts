@@ -12,14 +12,24 @@ export function resolveScoring(G: TimestreamsState): void {
   const scores: Record<string, number> = {};
   for (const pid of G.playerOrder) scores[pid] = 0;
 
-  for (const eraId of Object.keys(G.timeline)) {
-    const era = G.timeline[eraId as any];
-    const slotIds = scoringSlotCardIds(era, G.config.scoringSlots ?? 6);
-    for (const cid of slotIds) {
+  // Initialize scored for this pass (M3 Wonky)
+  if (!G.scoredThisScoring) G.scoredThisScoring = [];
+
+  for (const eraId of Object.keys(G.timeline) as any) {
+    const era = G.timeline[eraId];
+    let slots = G.config.scoringSlots ?? 6;
+    // Simple Wonky: take top unscored in stack up to slots
+    const stack = [...era.stack];
+    let scoredInEra = 0;
+    for (const cid of stack) {
+      if (scoredInEra >= slots) break;
+      if (G.scoredThisScoring.includes(cid)) continue;
       const owner = cardOwner(cid);
       if (owner && scores[owner] !== undefined) {
         scores[owner] += effectiveScoreValue(G, cid);
       }
+      G.scoredThisScoring.push(cid);
+      scoredInEra++;
     }
   }
 

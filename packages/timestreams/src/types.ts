@@ -346,6 +346,9 @@ export interface TimestreamsState {
   turnFlags?: Record<string, TurnFlags>;
   /** M2 rules engine: prompts awaiting UI answers for the last played card. */
   pendingPrompts?: Array<{ id: string; deciderId: string; kind: string; options: string[]; min: number; max: number; reason: string }>;
+
+  /** M3: per-card flags for cards already scored in the current scoring pass (for Wonky rule). */
+  scoredThisScoring?: string[];
 }
 
 // =============================================================================
