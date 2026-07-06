@@ -81,6 +81,20 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
 
   G.scores = scores;
 
+  // Basic M3 cleanup: move scored slot cards to owners' score piles
+  for (const cid of G.scoredThisScoring || []) {
+    const owner = cardOwner(cid, G);
+    if (owner && G.players[owner]) {
+      const card = getCard(G, cid);
+      if (card) {
+        if (!G.players[owner].scorePile) G.players[owner].scorePile = [];
+        G.players[owner].scorePile.push(card);
+        // Optionally remove from timeline stack (per PRD, they stay until cleanup)
+        // For now we leave them for visibility, but mark as collected logically
+      }
+    }
+  }
+
   // Determine winner: highest score; ties -> first in homeEraTurnOrder (earliest era)
   const order = homeEraTurnOrder(G);
   let bestPid: string | null = null;
