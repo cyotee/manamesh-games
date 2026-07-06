@@ -7,6 +7,9 @@ import { dayFirstPlayer } from "./homeEra";
 import { registerCard } from "./effects/state";
 import { clearRestOfToday } from "./effects/modifiers";
 import { fireEvent, registerStaticTriggers } from "./effects/triggers";
+import { canPlayCard } from "./effects/gates";
+import { resolvePlayEffect } from "./effects/resolvePlay";
+import type { ChoiceMap } from "./effects/types";
 
 // Local constant (boardgame.io/core may not resolve under vitest+PnP)
 export const INVALID_MOVE = "INVALID_MOVE" as const;
@@ -31,6 +34,7 @@ export function playInvention(
   ctx: Ctx,
   playerId: string,
   cardId: string,
+  choices: ChoiceMap = {},
 ): TimestreamsState | typeof INVALID_MOVE {
   if (G.phase !== "play") return INVALID_MOVE;
   if (ctx.currentPlayer !== playerId) return INVALID_MOVE;
@@ -38,18 +42,23 @@ export function playInvention(
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
 
-  const card = player.hand.find((c: TimestreamsCard) => c.id === cardId);
-  if (!card || !isInvention(card)) return INVALID_MOVE;
+  const inHand = player.hand.find((c: TimestreamsCard) => c.id === cardId);
+  const resubmission = !inHand && G.cards?.[cardId] !== undefined && (G.pendingPrompts?.length ?? 0) > 0;
+  if (!resubmission) {
+    if (!inHand || !isInvention(inHand)) return INVALID_MOVE;
+    if (!canPlayCard(G, playerId, cardId).ok) return INVALID_MOVE;
+    removeCardFromHand(player, cardId);
+    registerCard(G, inHand);
+    const era = eraForDay(G.currentDay);
+    appendToEra(G.timeline, era, cardId);
+    transitionCardVisibility(G, cardId, "public", playerId, "playInvention", { era });
+    player.hasPassedThisDay = false;
+    registerStaticTriggers(G, inHand);
+    fireEvent(G, { type: "invention-played", cardId, eraId: era, actorPlayerId: playerId });
+  }
 
-  removeCardFromHand(player, cardId);
-  registerCard(G, card);
-  const era = eraForDay(G.currentDay);
-  appendToEra(G.timeline, era, cardId);
-  registerStaticTriggers(G, card);
-  fireEvent(G, { type: "invention-played", cardId, eraId: era, actorPlayerId: playerId });
-  transitionCardVisibility(G, cardId, "public", playerId, "playInvention", { era });
-  player.hasPassedThisDay = false;
-
+  const result = resolvePlayEffect(G, playerId, cardId, choices);
+  G.pendingPrompts = result.prompts.length ? result.prompts : [];
   return G;
 }
 
@@ -58,6 +67,7 @@ export function playAction(
   ctx: Ctx,
   playerId: string,
   cardId: string,
+  choices: ChoiceMap = {},
 ): TimestreamsState | typeof INVALID_MOVE {
   if (G.phase !== "play") return INVALID_MOVE;
   if (ctx.currentPlayer !== playerId) return INVALID_MOVE;
@@ -65,16 +75,20 @@ export function playAction(
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
 
-  const card = player.hand.find((c: TimestreamsCard) => c.id === cardId);
-  if (!card || !isAction(card)) return INVALID_MOVE;
+  const inHand = player.hand.find((c: TimestreamsCard) => c.id === cardId);
+  const resubmission = !inHand && G.cards?.[cardId] !== undefined && (G.pendingPrompts?.length ?? 0) > 0;
+  if (!resubmission) {
+    if (!inHand || !isAction(inHand)) return INVALID_MOVE;
+    removeCardFromHand(player, cardId);
+    registerCard(G, inHand);
+    player.discard.push(inHand);
+    transitionCardVisibility(G, cardId, "public", playerId, "playAction", {});
+    player.hasPassedThisDay = false;
+    fireEvent(G, { type: "action-played", cardId, eraId: eraForDay(G.currentDay), actorPlayerId: playerId });
+  }
 
-  removeCardFromHand(player, cardId);
-  registerCard(G, card);
-  player.discard.push(card);
-  fireEvent(G, { type: "action-played", cardId, eraId: eraForDay(G.currentDay), actorPlayerId: playerId });
-  transitionCardVisibility(G, cardId, "public", playerId, "playAction", {});
-  player.hasPassedThisDay = false;
-
+  const result = resolvePlayEffect(G, playerId, cardId, choices);
+  G.pendingPrompts = result.prompts.length ? result.prompts : [];
   return G;
 }
 

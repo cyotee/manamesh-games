@@ -344,6 +344,8 @@ export interface TimestreamsState {
   pendingTriggers?: PendingTrigger[];
   /** M2 rules engine: per-player turn flags. */
   turnFlags?: Record<string, TurnFlags>;
+  /** M2 rules engine: prompts awaiting UI answers for the last played card. */
+  pendingPrompts?: Array<{ id: string; deciderId: string; kind: string; options: string[]; min: number; max: number; reason: string }>;
 }
 
 // =============================================================================
