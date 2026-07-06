@@ -5,6 +5,7 @@ import { transitionCardVisibility } from "./visibility";
 import { dealForDay } from "./crypto";
 import { dayFirstPlayer } from "./homeEra";
 import { registerCard } from "./effects/state";
+import { clearRestOfToday } from "./effects/modifiers";
 
 // Local constant (boardgame.io/core may not resolve under vitest+PnP)
 export const INVALID_MOVE = "INVALID_MOVE" as const;
@@ -98,6 +99,7 @@ export function pass(
 }
 
 export function endDay(G: TimestreamsState): void {
+  clearRestOfToday(G);
   if (isLastDay(G.currentDay)) {
     G.phase = "scoring";
     return;
