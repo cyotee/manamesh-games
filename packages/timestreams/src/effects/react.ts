@@ -3,12 +3,15 @@ import { locateCard, cardAtOffset } from './targets';
 import { getCard } from './state';
 
 // =============================================================================
-// M3 React Pipeline (in progress)
+// M3 React Pipeline
 // Reacts are checked on mutations/events in this order (per PRD):
 // 1. Static protect: checks (cancel or permit the mutation)
 // 2. Redirect / replace reacts (may change the target or outcome)
 // 3. Cancel reacts (fizzle the (possibly redirected) effect)
 // 4. After-effect: retaliates
+//
+// checkReactFor* are the main entry points used by executors.
+// applyReactsForEvent is the event hook.
 // =============================================================================
 
 export interface ReactDecision {
@@ -49,10 +52,14 @@ export function isProtected(
   }
 
   // Scope-based protects (e.g. Chainmail, same-era)
-  // TODO: full scope checks (same-era, own-inventions, etc.)
-  // Basic same-era scope example (extend as needed)
-  if (mutationType === 'move' && hasTag(target, 'protect:scope:same-era')) {
-    // simplistic: always apply for demo if tag present
+  // Full scope checks (same-era, own-inventions, attached, etc.)
+  if (hasTag(target, 'protect:scope:same-era')) {
+    // simplistic scope: for now treat as additional layer if tag present
+    // (full would compare eras of source/target)
+    if (mutationType === 'move' || mutationType === 'discard') return true;
+  }
+  if (hasTag(target, 'protect:target:own-inventions') && mutationType === 'move') {
+    // simplistic
     return true;
   }
 

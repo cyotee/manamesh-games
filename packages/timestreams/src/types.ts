@@ -334,6 +334,15 @@ export interface TimestreamsState {
   /** Winning player ID, or null if the game is not over */
   winner: string | null;
 
+  /** Votes to abort reveal (for voided phase / crypto failure) */
+  abortVotes?: Record<string, boolean>;
+  /** Set when majority has voted to abort */
+  aborted?: boolean;
+  abortReason?: string;
+
+  /** Tag-fired log for M4 debugging / replay (basic implementation) */
+  firedTags?: string[];
+
   /** M2 rules engine: id -> full card for every card in public play. */
   cards?: Record<string, TimestreamsCard>;
   /** M2 rules engine: hostCardId -> attached action card ids. */

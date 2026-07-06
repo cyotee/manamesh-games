@@ -2,6 +2,13 @@ import type { TimestreamsState } from '../types';
 import { requireCard } from './state';
 import { tagsWithPrefix, hasTag, tagValue } from './tags';
 import { merge, OK, type ChoiceMap, type EffectResult, type Executor, type ExecCtx } from './types';
+
+/**
+ * Resolves a play effect for the given card.
+ * Dispatches to registered executors based on tags (play:draw, play:discard, etc.).
+ * Returns merged EffectResult with prompts and logs.
+ * Part of M2 play effects pipeline.
+ */
 import { drawExecutor } from './executors/draw';
 import { discardExecutor } from './executors/discard';
 import { moveExecutor } from './executors/move';
@@ -30,6 +37,8 @@ const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
 export function resolvePlayEffect(
   G: TimestreamsState, playerId: string, cardId: string, choices: ChoiceMap = {},
 ): EffectResult {
+  if (!G.firedTags) G.firedTags = [];
+  G.firedTags.push(`play:${cardId}`);
   const card = requireCard(G, cardId) ?? G.players[playerId]?.hand.find(c => c.id === cardId);
   const ctx: ExecCtx = { G, playerId, card, choices };
   const results: EffectResult[] = [];

@@ -225,7 +225,15 @@ export const TimestreamsGame: Game<TimestreamsState> = {
       moves: {
         voteAbortReveal: {
           move: ({ G, ctx, playerID }) => {
-            // Stub - full implementation can be added later
+            if (!G.abortVotes) G.abortVotes = {};
+            G.abortVotes[playerID] = true;
+            const voted = Object.keys(G.abortVotes).length;
+            const total = G.playerOrder?.length || 0;
+            if (voted >= Math.ceil(total / 2)) {
+              // Majority voted to abort — mark for external handling (e.g. UI shows aborted state)
+              G.aborted = true;
+              G.abortReason = 'majority-vote-abort-reveal';
+            }
             return G;
           },
           client: false,

@@ -81,6 +81,9 @@ function applyTriggerEffect(
 }
 
 export function fireEvent(G: TimestreamsState, ev: PlayEvent): { prompts: PlayerPrompt[]; log: string[] } {
+  if (!G.firedTags) G.firedTags = [];
+  G.firedTags.push(`event:${ev.type || 'unknown'}`);
+  if (ev.cardId) G.firedTags.push(`card:${ev.cardId}`);
   const log: string[] = [];
   for (const trigger of getPendingTriggers(G)) {
     if (trigger.spent) continue;

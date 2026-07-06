@@ -8,8 +8,11 @@ import { done, type Executor } from '../types';
 // Basic score effect resolver for a single card during scoring (M3 skeleton)
 // Returns additional points from the card's score tags.
 // Handles common shapes: bonus-points (amount/copy), count, penalty, to:all-players (handled in caller).
+// Also records fired tags for M4 logging.
 export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIndex: number): number {
   if (!card || !card.tags) return 0;
+  if (!G.firedTags) G.firedTags = [];
+  G.firedTags.push(`score:${card.id || 'unknown'}`);
   let extra = 0;
 
   const isBonusCopy = hasTag(card, 'bonus-points:copy');
@@ -134,7 +137,8 @@ export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIn
 }
 
 export const scoreExecutor: Executor = ({ G, playerId, card, choices }) => {
-  // For play-time score? Some are score: but triggered in play? For now stub.
-  // Real score execution happens in resolveScoring per card.
+  // Play-time score effects are rare; most score: tags are resolved in the scoring phase
+  // via resolveCardScoreEffects (called from resolveScoring).
+  // If a card has play: + score: it may trigger here, but for now we log and defer.
   return done([`${card.id}: score effect (resolved during scoring phase)`]);
 };
