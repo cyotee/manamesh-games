@@ -47,4 +47,18 @@ describe("placeholder scoring", () => {
     expect(G.players["0"].scorePile?.length).toBe(1);
     expect(G.phase).toBe("gameOver");
   });
+
+  it("applies score:to:all-players bonus", () => {
+    const G = makeState({ players: ["0", "1"], currentDay: 1 });
+    G.players["0"].homeEra = "stone";
+    G.players["1"].homeEra = "future";
+    G.config.scoringSlots = 6;
+
+    putInEra(G, "stone",
+      makeCard({ id: "0-card-1", ownerId: "0", scoreValue: 1, tags: ["score:bonus-points", "bonus-points:amount:3", "score:to:all-players"] }),
+    );
+
+    resolveScoring(G);
+    expect(G.scores).toEqual({ "0": 4, "1": 3 });  // 1 + 3 to both
+  });
 });

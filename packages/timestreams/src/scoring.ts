@@ -72,7 +72,13 @@ export function resolveScoring(G: TimestreamsState, _choiceProvider?: any): void
       const c = getCard(G, nextUnscored);
       if (c) {
         const extra = resolveCardScoreEffects(G, c, eraId, computedSlots - remainingSlots);
-        if (owner) scores[owner] += extra;
+        if (hasTag(c, 'score:to:all-players')) {
+          for (const pid of Object.keys(scores)) {
+            scores[pid] += extra;
+          }
+        } else if (owner) {
+          scores[owner] += extra;
+        }
       }
 
       G.scoredThisScoring.push(nextUnscored);
