@@ -6,6 +6,7 @@ import { drawExecutor } from './executors/draw';
 import { discardExecutor } from './executors/discard';
 import { moveExecutor } from './executors/move';
 import { swapExecutor } from './executors/swap';
+import { attachExecutor } from './executors/attach';
 
 /** Executor registry: [applies?, executor]. Extended by later tasks. */
 const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
@@ -13,6 +14,7 @@ const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
   [({ card }) => tagValue(card, 'play:discard') !== undefined, discardExecutor],
   [({ card }) => hasTag(card, 'play:move'), moveExecutor],
   [({ card }) => hasTag(card, 'play:swap'), swapExecutor],
+  [({ card }) => hasTag(card, 'play:attach'), attachExecutor],
 ];
 
 export function resolvePlayEffect(
