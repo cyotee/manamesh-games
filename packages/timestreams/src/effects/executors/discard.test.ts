@@ -62,4 +62,26 @@ describe('discard executor', () => {
     expect(res.prompts).toEqual([]);
     expect(G.timeline.medieval.stack).toEqual(['under#0']);
   });
+
+  it('react:cancel on discard fizzles the discard (basic)', () => {
+    const G = makeState({ players: ['0', '1'], currentDay: 5 });
+    putInEra(G, 'modern', makeCard({ id: 'victim#0', ownerId: '1' }));
+    const cancelCard = makeCard({ id: 'victim#0', ownerId: '1', tags: ['react:cancel', 'cancel:discard'] });
+    // register so react check sees it
+    // (in real the card would be registered when played)
+    // For test, the resolve will use the one in era
+    const napalm = makeCard({
+      id: 'modern-napalm#0', ownerId: '0', cardType: 'action',
+      tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
+    });
+    putInHand(G, '0', napalm);
+    // put the cancel card in era so getCard finds it with the tags
+    putInEra(G, 'modern', cancelCard);
+    const first = resolvePlayEffect(G, '0', 'modern-napalm#0');
+    // prompt appears
+    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
+    expect(res.log.join(' ')).toMatch(/fizzles \(react:cancel\)/);
+    // victim still in stack
+    expect(G.timeline.modern.stack).toContain('victim#0');
+  });
 });

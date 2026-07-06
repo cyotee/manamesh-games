@@ -30,6 +30,18 @@ export function shouldCancelScoreEffects(G: any, cardId: string, sourceCardId?: 
   return false;
 }
 
+export function shouldCancelDiscard(G: any, cardId: string): boolean {
+  const card = G.cards?.[cardId];
+  if (!card) return false;
+
+  if (hasTag(card, 'protect:discard') || hasTag(card, 'react:cancel') && hasTag(card, 'cancel:discard')) {
+    return true;
+  }
+
+  // TODO: attached, source-specific, etc.
+  return false;
+}
+
 // Placeholder for future full react application during events.
 export function applyReactsForEvent(G: any, event: any): void {
   // TODO: implement cancel/redirect/replace/retaliate pipeline

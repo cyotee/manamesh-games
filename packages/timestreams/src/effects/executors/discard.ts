@@ -2,6 +2,7 @@ import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets } from '../targets';
 import { discardFromPlay, isDiscardBlocked } from '../boardOps';
 import { fireEvent } from '../triggers';
+import { shouldCancelDiscard } from '../react';
 import { done, needs, type Executor } from '../types';
 
 export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
@@ -39,6 +40,10 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
     if (!options.includes(id)) continue;
     const blocked = isDiscardBlocked(G, id, playerId);
     if (blocked) { log.push(`${card.id}: discard of ${id} fizzles (${blocked})`); continue; }
+    if (shouldCancelDiscard(G, id)) {
+      log.push(`${card.id}: discard of ${id} fizzles (react:cancel)`);
+      continue;
+    }
     discardFromPlay(G, id, playerId);
     fireEvent(G, { type: 'discarded-from-play', cardId: id, eraId: null, actorPlayerId: playerId });
     log.push(`${card.id}: discarded ${id}`);
