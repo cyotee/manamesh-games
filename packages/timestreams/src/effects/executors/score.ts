@@ -118,6 +118,12 @@ export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIn
     }
   }
 
+  // basic protect/suppress for score effects (M3)
+  if (hasTag(card, 'protect:score-effects') || hasTag(card, 'suppress:score-effects-on-target')) {
+    // for the card itself having the protect, zero tag-based extras (printed value still applies via effective)
+    extra = 0;
+  }
+
   return extra;
 }
 
