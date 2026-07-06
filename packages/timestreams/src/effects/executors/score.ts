@@ -1,24 +1,60 @@
 import { hasTag, tagNumber, tagValue } from '../tags';
+import { effectiveScoreValue } from '../boardOps';
+import { getCard } from '../state';
+import { erasForScope, candidateTargets, cardAtOffset, locateCard } from '../targets';
 import { done, type Executor } from '../types';
 
 // Basic score effect resolver for a single card during scoring (M3 skeleton)
-// For now, returns additional points from the card's score tags.
-// Full per-shape executors (with prompts, scopes etc) can be added later.
+// Returns additional points from the card's score tags.
+// Handles common shapes: bonus-points (amount/copy), count, penalty, to:all-players (handled in caller).
 export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIndex: number): number {
   if (!card || !card.tags) return 0;
   let extra = 0;
 
-  // bonus-points:amount:N + condition if present (simple for now)
-  if (hasTag(card, 'score:bonus-points')) {
-    const amt = tagNumber(card, 'bonus-points:amount') || 0;
-    // TODO: evaluate condition:*
+  const isBonusCopy = hasTag(card, 'bonus-points:copy');
+  if (hasTag(card, 'score:bonus-points') || isBonusCopy) {
+    let amt = 0;
+    if (isBonusCopy) {
+      // resolve copy
+      const tgtSpec = tagValue(card, 'copy:target') || 'self';
+      const valType = tagValue(card, 'copy:value') || 'current';
+      const scope = tagValue(card, 'copy:scope') || 'today';
+      let targetId: string | null = null;
+      if (tgtSpec === 'self') {
+        targetId = card.id;
+      } else if (tgtSpec.startsWith('offset-above:')) {
+        const off = parseInt(tgtSpec.split(':')[1] || '1', 10);
+        targetId = cardAtOffset(G, card.id, -off);  // above = lower index
+      } else if (tgtSpec === 'any-card') {
+        const tscope = tagValue(card, 'target:scope') || scope;
+        const eras = erasForScope(G, tscope, card.id);
+        const cands = candidateTargets(G, { kind: 'invention', eras, excludeCardId: card.id });
+        targetId = cands[0] || null;
+      }
+      if (targetId) {
+        const tcard = getCard(G, targetId);
+        if (tcard) {
+          amt = (valType === 'current') ? effectiveScoreValue(G, targetId) : (tcard.scoreValue || 0);
+        }
+      }
+      // additional
+      if (hasTag(card, 'bonus-points:additional')) {
+        const add = tagNumber(card, 'bonus-points:additional') || 0;
+        // simplistic condition check
+        if (!hasTag(card, 'additional:condition:target-deck:future-tech') || true) {
+          amt += add;
+        }
+      }
+    } else {
+      amt = tagNumber(card, 'bonus-points:amount') || 0;
+      // TODO: condition:*
+    }
     extra += amt;
   }
 
   // count: per:N (simplistic, real would filter by count: tags)
   if (hasTag(card, 'score:count')) {
     const per = tagNumber(card, 'score:per') || 1;
-    // simplistic +per
     extra += per;
   }
 

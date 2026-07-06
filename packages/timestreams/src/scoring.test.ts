@@ -61,4 +61,24 @@ describe("placeholder scoring", () => {
     resolveScoring(G);
     expect(G.scores).toEqual({ "0": 4, "1": 3 });  // 1 + 3 to both
   });
+
+  it("applies bonus-points:copy with offset-above target (e.g. Cloning)", () => {
+    const G = makeState({ players: ["0"], currentDay: 1 });
+    G.players["0"].homeEra = "stone";
+    G.config.scoringSlots = 6;
+
+    // stack order: above at index 0, cloner at 1 (topmost when scoring cloner)
+    putInEra(G, "stone",
+      makeCard({ id: "above#0", ownerId: "0", scoreValue: 4 }),
+      makeCard({ id: "cloner#0", ownerId: "0", scoreValue: 0, tags: [
+        "score:bonus-points", "bonus-points:copy",
+        "copy:target:offset-above:1", "copy:scope:today", "copy:value:current"
+      ] }),
+    );
+
+    resolveScoring(G);
+    // above contributes 4, cloner contributes 0 + copy of above (4) = 8 total
+    expect(G.scores).toEqual({ "0": 8 });
+    expect(G.players["0"].scorePile?.length).toBe(2);
+  });
 });
