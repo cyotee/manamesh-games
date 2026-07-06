@@ -11,6 +11,7 @@ import { preventExecutor } from './executors/prevent';
 import { recoverExecutor } from './executors/recover';
 import { delayedTriggerExecutor } from './executors/delayedTrigger';
 import { choiceExecutor } from './executors/choice';
+import { turnExecutor } from './executors/turn';
 
 /** Executor registry: [applies?, executor]. Extended by later tasks. */
 const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
@@ -22,7 +23,8 @@ const EXECUTORS: Array<[applies: (ctx: ExecCtx) => boolean, run: Executor]> = [
   [({ card }) => hasTag(card, 'play:prevent'), preventExecutor],
   [({ card }) => hasTag(card, 'play:recover'), recoverExecutor],
   [({ card }) => hasTag(card, 'play:delayed-trigger'), delayedTriggerExecutor],
-  [({ card }) => hasTag(card, 'play:choice'), choiceExecutor],
+  [({ card }) => hasTag(card, 'play:extra-turn') || hasTag(card, 'play:skip-turn') || hasTag(card, 'play:allow-next-invention') || (hasTag(card, 'cost:discard-self') && hasTag(card, 'play:choice')), turnExecutor],
+  [({ card }) => hasTag(card, 'play:choice') && !hasTag(card, 'cost:discard-self'), choiceExecutor],
 ];
 
 export function resolvePlayEffect(
