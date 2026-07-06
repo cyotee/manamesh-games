@@ -4,6 +4,7 @@ import { getCard, getPendingTriggers, getTurnFlags, getAttachments } from './sta
 import { hasTag, tagValue, tagNumber } from './tags';
 import { locateCard } from './targets';
 import { moveToEra, discardFromPlay } from './boardOps';
+import { applyReactsForEvent } from './react';
 import type { PlayerPrompt } from './types';
 
 export interface PlayEvent {
@@ -98,5 +99,10 @@ export function fireEvent(G: TimestreamsState, ev: PlayEvent): { prompts: Player
     applyTriggerEffect(G, trigger, source, ev, log);
     if (trigger.limit === 'once') trigger.spent = true;
   }
+
+  // Run the react pipeline on the event (central hook for M3)
+  const reactResult = applyReactsForEvent(G, ev);
+  if (reactResult.log && reactResult.log.length) log.push(...reactResult.log);
+
   return { prompts: [], log };
 }

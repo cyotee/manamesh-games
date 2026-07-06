@@ -2,7 +2,7 @@ import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets } from '../targets';
 import { discardFromPlay, isDiscardBlocked } from '../boardOps';
 import { fireEvent } from '../triggers';
-import { shouldCancelDiscard, getRedirectTargetForDiscard, getReplaceOutcomeForDiscard, getRetaliateOutcomeForDiscard } from '../react';
+import { checkReactForDiscard, shouldCancelDiscard } from '../react';
 import { done, needs, type Executor } from '../types';
 
 export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
@@ -40,42 +40,40 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
     if (!options.includes(id)) continue;
     const blocked = isDiscardBlocked(G, id, playerId);
     if (blocked) { log.push(`${card.id}: discard of ${id} fizzles (${blocked})`); continue; }
-    if (shouldCancelDiscard(G, id)) {
+
+    let effectiveId = id;
+    const react = checkReactForDiscard(G, id, playerId, card.id);
+
+    if (react.cancelled) {
       log.push(`${card.id}: discard of ${id} fizzles (react:cancel)`);
       continue;
     }
-    const redirect = getRedirectTargetForDiscard(G, id);
-    if (redirect) {
-      // simplistic: if redirect to self, fizzle for demo (real would move effect)
-      log.push(`${card.id}: discard of ${id} redirected to ${redirect}`);
-      // for demo, treat as cancel/fizzle after log
+    if (react.redirectTo) {
+      log.push(`${card.id}: discard of ${id} redirected to ${react.redirectTo}`);
+      effectiveId = react.redirectTo;
+      // re-check protect on the new target (per PRD)
+      if (shouldCancelDiscard(G, effectiveId, playerId) || isDiscardBlocked(G, effectiveId, playerId)) {
+        log.push(`${card.id}: redirected discard of ${effectiveId} fizzles`);
+        continue;
+      }
+    }
+    if (react.replaceWith) {
+      log.push(`${card.id}: discard of ${id} replaced (${react.replaceWith})`);
       continue;
     }
-    const replace = getReplaceOutcomeForDiscard(G, id);
-    if (replace) {
-      log.push(`${card.id}: discard of ${id} replaced (${replace})`);
-      // for demo, skip the actual discard
-      continue;
-    }
-    const retaliate = getRetaliateOutcomeForDiscard(G, id, playerId);
-    if (retaliate) {
-      log.push(`${card.id}: discard of ${id} triggered retaliate (${retaliate})`);
-      // simplistic: discard one from actor's hand as retaliation
+    if (react.retaliate) {
+      log.push(`${card.id}: discard of ${id} triggered retaliate`);
       const actorHand = G.players[playerId].hand;
       if (actorHand.length > 0) {
         const [ret] = actorHand.splice(0, 1);
         G.players[playerId].discard.push(ret);
         log.push(`${card.id}: retaliated by discarding ${ret.id} from actor`);
       }
-      // still perform the original discard? for demo, do it
-      discardFromPlay(G, id, playerId);
-      fireEvent(G, { type: 'discarded-from-play', cardId: id, eraId: null, actorPlayerId: playerId });
-      log.push(`${card.id}: discarded ${id}`);
-      continue;
     }
-    discardFromPlay(G, id, playerId);
-    fireEvent(G, { type: 'discarded-from-play', cardId: id, eraId: null, actorPlayerId: playerId });
-    log.push(`${card.id}: discarded ${id}`);
+
+    discardFromPlay(G, effectiveId, playerId);
+    fireEvent(G, { type: 'discarded-from-play', cardId: effectiveId, eraId: null, actorPlayerId: playerId });
+    log.push(`${card.id}: discarded ${effectiveId}`);
   }
   return done(log);
 };
