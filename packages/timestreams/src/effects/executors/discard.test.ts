@@ -116,4 +116,21 @@ describe('discard executor', () => {
     // victim still in stack (demo)
     expect(G.timeline.modern.stack).toContain('victim#0');
   });
+
+  it('react:retaliate on discard logs retaliate and performs counter (basic)', () => {
+    const G = makeState({ players: ['0', '1'], currentDay: 5 });
+    putInEra(G, 'modern', makeCard({ id: 'victim#0', ownerId: '1' }));
+    putInHand(G, '0', makeCard({ id: 'actor-card#0', ownerId: '0' }));
+    const retaliateCard = makeCard({ id: 'victim#0', ownerId: '1', tags: ['retaliate:discard'] });
+    putInEra(G, 'modern', retaliateCard);
+    const napalm = makeCard({
+      id: 'modern-napalm#0', ownerId: '0', cardType: 'action',
+      tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
+    });
+    putInHand(G, '0', napalm);
+    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
+    expect(res.log.join(' ')).toMatch(/triggered retaliate/);
+    // actor's hand card should have been retaliated (discarded); napalm remains in hand in this direct resolve flow
+    expect(G.players['0'].hand.length).toBe(1);
+  });
 });

@@ -70,6 +70,19 @@ export function getReplaceOutcomeForDiscard(G: any, cardId: string): string | nu
   return null;
 }
 
+export function getRetaliateOutcomeForDiscard(G: any, cardId: string, actorPlayerId: string): string | null {
+  const card = G.cards?.[cardId];
+  if (!card) return null;
+
+  if (hasTag(card, 'retaliate:discard')) {
+    // simplistic: retaliate by discarding from actor's hand
+    return 'retaliate-discard-from-actor';
+  }
+
+  // TODO: full retaliate logic, amounts, targets, etc.
+  return null;
+}
+
 export function shouldCancelMove(G: any, cardId: string): boolean {
   const card = G.cards?.[cardId];
   if (!card) return false;

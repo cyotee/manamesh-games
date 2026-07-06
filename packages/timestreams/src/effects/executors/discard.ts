@@ -2,7 +2,7 @@ import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets } from '../targets';
 import { discardFromPlay, isDiscardBlocked } from '../boardOps';
 import { fireEvent } from '../triggers';
-import { shouldCancelDiscard, getRedirectTargetForDiscard, getReplaceOutcomeForDiscard } from '../react';
+import { shouldCancelDiscard, getRedirectTargetForDiscard, getReplaceOutcomeForDiscard, getRetaliateOutcomeForDiscard } from '../react';
 import { done, needs, type Executor } from '../types';
 
 export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
@@ -55,6 +55,22 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
     if (replace) {
       log.push(`${card.id}: discard of ${id} replaced (${replace})`);
       // for demo, skip the actual discard
+      continue;
+    }
+    const retaliate = getRetaliateOutcomeForDiscard(G, id, playerId);
+    if (retaliate) {
+      log.push(`${card.id}: discard of ${id} triggered retaliate (${retaliate})`);
+      // simplistic: discard one from actor's hand as retaliation
+      const actorHand = G.players[playerId].hand;
+      if (actorHand.length > 0) {
+        const [ret] = actorHand.splice(0, 1);
+        G.players[playerId].discard.push(ret);
+        log.push(`${card.id}: retaliated by discarding ${ret.id} from actor`);
+      }
+      // still perform the original discard? for demo, do it
+      discardFromPlay(G, id, playerId);
+      fireEvent(G, { type: 'discarded-from-play', cardId: id, eraId: null, actorPlayerId: playerId });
+      log.push(`${card.id}: discarded ${id}`);
       continue;
     }
     discardFromPlay(G, id, playerId);
