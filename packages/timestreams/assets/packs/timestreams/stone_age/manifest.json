@@ -1,0 +1,703 @@
+{
+  "name": "Stone Age Deck",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "stone-age-alphabet",
+      "name": "Alphabet",
+      "front": "cards/Stone_Age-Alphabet.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "alphabet"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may choose any other Invention in Today. Perform its score ability now. The player of that Invention makes all decisions for that score ability. (Also perform that score ability at the normal time as usual.)",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The first alphabets included letters that represented objects, like Ox or House.",
+        "scoreValue": 2,
+        "tags": [
+          "score:perform-other",
+          "perform:target-filter:any",
+          "decider:target-owner",
+          "target:scope:today",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-anarchy",
+      "name": "Anarchy",
+      "front": "cards/Stone_Age-ANARCHY.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "anarchy",
+          "government"
+        ],
+        "addlCardText": "Only one Government can be in play in any era. Other cards cannot move, discard, or change the point value of Anarchy.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "If absolute power corrupts absolutely, what about absolute liberty?",
+        "scoreValue": 3,
+        "tags": [
+          "government",
+          "rule:one-government-per-era",
+          "protect:self",
+          "protect:move",
+          "protect:discard",
+          "protect:value-change"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-big-rock",
+      "name": "Big Rock",
+      "front": "cards/Stone_Age-Big_Rock.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "big-rock"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: Play this card when an effect is moving one of your cards. Cancel all effects of that card.",
+        "flavorText": "Grunt softly, and carry a big rock.",
+        "scoreValue": null,
+        "tags": [
+          "react:move",
+          "trigger:target:own-cards",
+          "react:cancel",
+          "cancel:all-effects-of-source"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-cave-paintings",
+      "name": "Cave Paintings",
+      "front": "cards/Stone_Age-CAVE_PAINTINGS.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "cave-paintings",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may choose another Art card in Today. The inventor of that Invention scores -3 points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The earliest known European cave paintings date to 32,000 years ago. The purpose of the cave paintings is not known.",
+        "scoreValue": 2,
+        "tags": [
+          "score:penalty",
+          "penalty:optional",
+          "penalty:target:art",
+          "penalty:amount:-3",
+          "penalty:to:target-owner",
+          "target:scope:today",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-cloth",
+      "name": "Cloth",
+      "front": "cards/Stone_Age-CLOTH.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "cloth"
+        ],
+        "addlCardText": "If an action would move one of your Inventions out of this age, it must target this card.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: The inventor of the next Invention in Today scores -2 points.",
+        "hasReact": true,
+        "reactEffectText": "If an action would move one of your Inventions out of this age, it must target this card.",
+        "flavorText": "This led to the invention of fashion, and thus the downfall of humankind.",
+        "scoreValue": 1,
+        "tags": [
+          "react:move",
+          "trigger:move-out-of-era",
+          "trigger:source:action",
+          "trigger:mandatory",
+          "protect:target:own-inventions",
+          "target:exclude-self",
+          "protect:scope:same-era",
+          "redirect:target-to:self",
+          "redirect:decider:owner",
+          "redirect:target-filter:any",
+          "redirect:on-immovable:fizzle",
+          "score:penalty:next-inventor",
+          "penalty:amount:-2"
+        ]
+      },
+      "quantity": 3
+    },
+    {
+      "id": "stone-age-damascus-steel",
+      "name": "Damascus Steel",
+      "front": "cards/Stone_Age-DAMASCUS_STEEL.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "damascus-steel"
+        ],
+        "addlCardText": "Other players may not move this card.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "A form of steel dating from 1100 BCE to 1700 BCE, Damascus was incredibly rare and hard, rumored to be able to cut other swords in half. Modern attempts to recreate it have been unsuccessful.",
+        "scoreValue": 2,
+        "tags": [
+          "protect:self",
+          "protect:move",
+          "protect:source:opponent"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-domesticated-animals",
+      "name": "Domesticated Animals",
+      "front": "cards/Stone_Age-DOMESTICATED_ANIMALS.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "domesticated-animals"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If the next Invention in this era is not a Stone Age Invention, discard it.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "We domesticated dogs. Cats domesticated us.",
+        "scoreValue": 4,
+        "tags": [
+          "score:branch",
+          "branch:target:next-invention",
+          "target:scope:current-era",
+          "condition:target-deck:stone-age",
+          "if-false:discard:target"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-fermented-fruit",
+      "name": "Fermented Fruit",
+      "front": "cards/Stone_Age-FERMENTED_FRUIT.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "fermented-fruit"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Draw two cards.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Since fruits ferment naturally, fermentation precedes human history. Most cultures have taken advantage of the fermentation process to make alcohol.",
+        "scoreValue": 2,
+        "tags": [
+          "play:draw:2"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-fire",
+      "name": "Fire",
+      "front": "cards/Stone_Age-Fire.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "fire"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Discard any one Invention or Action in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Give a man a match and he's warm for one minute. Light a man on fire and he's warm for the rest of his life.",
+        "scoreValue": 1,
+        "tags": [
+          "play:discard:1",
+          "discard:target:today:any"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-grave-robbing",
+      "name": "Grave Robbing",
+      "front": "cards/Stone_Age-GRAVE_ROBBING.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "grave-robbing"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Choose two cards in your discard pile and put them in your hand.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Well, HE'S not using it any longer...\"",
+        "scoreValue": null,
+        "tags": [
+          "play:recover",
+          "recover:from-discard:2",
+          "recover:to-hand"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-herbalism",
+      "name": "Herbalism",
+      "front": "cards/Stone_Age-HERBALISM.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "herbalism"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: Play this card when another player plays an Action card. Cancel all effects of that card and then discard Herbalism.",
+        "flavorText": "The use of plants for medicinal purposes is over 60,000 years old, and has been developed independently by every culture and people.",
+        "scoreValue": 2,
+        "tags": [
+          "react:action",
+          "trigger:source:opponent",
+          "react:cancel",
+          "cancel:all-effects-of-source",
+          "cost:discard-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-hibernation",
+      "name": "Hibernation",
+      "front": "cards/Stone_Age-HIBERNATION.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "hibernation"
+        ],
+        "addlCardText": "Play this card on any Invention in Today.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play this card on any Invention in Today. For the rest of the game, that Invention may not be moved or discarded by card effects. Do not process score effects on that Invention.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Hibernation is a state of inactivity and metabolic depression, not unlike watching television.",
+        "tags": [
+          "play:attach",
+          "attach:scope:today",
+          "modify:score:attached",
+          "modify:amount:+1",
+          "protect:target:attached",
+          "protect:move",
+          "protect:discard",
+          "suppress:score-effects-on-target",
+          "duration:rest-of-game"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-horse-riding",
+      "name": "Horse Riding",
+      "front": "cards/Stone_Age-HORSE_RIDING.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "horse-riding"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may choose one other Invention in Today. Move that card up or down two slots in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Horses and other riding animals were some of the first riding animals to be domesticated.",
+        "scoreValue": 2,
+        "tags": [
+          "play:move",
+          "move:optional",
+          "move:target:invention",
+          "target:exclude-self",
+          "move:amount:2",
+          "move:direction:up-or-down",
+          "move:scope:today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-irrigation",
+      "name": "Irrigation",
+      "front": "cards/Stone_Age-IRRIGATION.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "irrigation"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: All players score 1 point for each Invention they have in a scoring slot in Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Archaeologists have found evidence of irrigation in Mesopotamia and Egypt as far back as the 6th millennium BCE.",
+        "scoreValue": 2,
+        "tags": [
+          "score:count",
+          "score:to:all-players",
+          "score:per:1",
+          "count:own-inventions",
+          "count:in-scoring-slot",
+          "count:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-music",
+      "name": "Music",
+      "front": "cards/Stone_Age-Music.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "music"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Move a card from Today into Tomorrow.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Music is perhaps the only true universal language.",
+        "scoreValue": 3,
+        "tags": [
+          "play:move",
+          "move:target:any-card",
+          "move-source:today",
+          "move-destination:tomorrow"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-mysticism",
+      "name": "Mysticism",
+      "front": "cards/Stone_Age-MYSTICISM.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "mysticism"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Write down a number from 1 to 4. The player to your left must try to guess the number. If they guess correctly, score -3 points. Otherwise, score points equal to the number you wrote down.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"We are what we pretend to be, so we must be careful about what we pretend to be.\" - Kurt Vonnegut Jr.",
+        "scoreValue": 3,
+        "tags": [
+          "score:guess",
+          "guess:range:1-4",
+          "guess:by:left-neighbor",
+          "guess:correct:penalty:-3",
+          "guess:wrong:bonus-points:chosen-number"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-pottery",
+      "name": "Pottery",
+      "front": "cards/Stone_Age-POTTERY.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "pottery"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: When you score this card, you may move any card from Today to any future era. After scoring that era, score that card if it is still in play, even if it is not in a scoring slot.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The earliest known ceramic objects are Gravettian figurines such as those discovered at Dolni Vestonice in the modern-day Czech Republic.",
+        "scoreValue": 3,
+        "tags": [
+          "score:move",
+          "move:optional",
+          "move:target:any-card",
+          "move-source:today",
+          "move-destination:any-future-era",
+          "score:delayed",
+          "delayed:trigger:after-destination-era-scored",
+          "delayed:condition:still-in-play",
+          "delayed:even-non-scoring",
+          "delayed:in-addition-to-slot-scoring"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-shell-game",
+      "name": "Shell Game",
+      "front": "cards/Stone_Age-Shell_Game.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "shell-game"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Swap the positions of any two Inventions in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Pick any shell you like - only the con man wins.",
+        "scoreValue": null,
+        "tags": [
+          "play:swap",
+          "swap:target:invention",
+          "swap:count:2",
+          "swap:scope:today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-shipbuilding",
+      "name": "Shipbuilding",
+      "front": "cards/Stone_Age-SHIPBUILDING.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "shipbuilding"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Move the Invention below this card to the bottom of Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Archaeological evidence indicates that humans arrived on New Guinea at least 60,000 years ago.",
+        "scoreValue": 2,
+        "tags": [
+          "score:move",
+          "move:target:offset-below:1",
+          "move-destination:bottom-today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-slow-time",
+      "name": "Slow Time",
+      "front": "cards/Stone_Age-SLOW_TIME.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "slow-time"
+        ],
+        "addlCardText": "Play this card on Today.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play this card on Today.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Add two scoring slots to this era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "There's never enough time to do all the nothing you want.",
+        "scoreValue": null,
+        "tags": [
+          "play:scope:today",
+          "score:add-scoring-slots:2"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-smoke-signals",
+      "name": "Smoke Signals",
+      "front": "cards/Stone_Age-SMOKE_SIGNALS.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "smoke-signals"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: For the rest of Today, players cannot play Action cards.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Smoke signals are a great method of communicating over long distances, as long as your message is on fire!",
+        "scoreValue": 3,
+        "tags": [
+          "play:prevent",
+          "prevent:play:action",
+          "duration:rest-of-today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-sundial",
+      "name": "Sundial",
+      "front": "cards/Stone_Age-SUNDIAL.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "sundial"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: For the rest of Today, effects cannot move cards into the future.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The earliest sundials known from the archaeological record are obelisks (3500 BC) and shadow clocks (1500 BC) from ancient Egypt and Babylon.",
+        "scoreValue": 3,
+        "tags": [
+          "play:prevent",
+          "prevent:move:future",
+          "duration:rest-of-today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "stone-age-the-wheel",
+      "name": "The Wheel",
+      "front": "cards/Stone_Age-THE_WHEEL.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "the-wheel"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may move this card up two cards in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "One of the oldest of humanity's inventions, the first wheels may have been invented as early as the 4th millennium BCE.",
+        "scoreValue": 2,
+        "tags": [
+          "play:move",
+          "move:optional",
+          "move:target:self",
+          "move:amount:2",
+          "move:direction:up",
+          "move:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "stone-age-vortex",
+      "name": "Vortex",
+      "front": "cards/Stone_Age-Vortex.png",
+      "back": "backs/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "vortex"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Choose an Invention in Yesterday. Put that card at the bottom of Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Time is a stream, a flow... how can you bottle the ocean?",
+        "scoreValue": null,
+        "tags": [
+          "play:move",
+          "move-source:yesterday",
+          "move-destination:bottom-today"
+        ]
+      },
+      "quantity": 2
+    }
+  ]
+}

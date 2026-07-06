@@ -1,0 +1,13 @@
+{
+  "name": "Timestreams - Core Scanned (Stone Age + Medieval + Modern Day + Future Tech + Era + Aids)",
+  "version": "1.1.0",
+  "game": "timestreams",
+  "sets": [
+    {"name": "Stone Age Deck", "path": "stone_age"},
+    {"name": "Medieval Deck", "path": "medieval"},
+    {"name": "Modern Day Deck", "path": "modern"},
+    {"name": "Future Tech Deck", "path": "future_tech"},
+    {"name": "Era Cards", "path": "era"},
+    {"name": "Player Aids", "path": "aids"}
+  ]
+}

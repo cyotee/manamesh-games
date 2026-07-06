@@ -1,0 +1,134 @@
+{
+  "name": "Era Cards",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "era-stone",
+      "name": "Stone Age",
+      "front": "cards/Era_Card-Stone_Age.png",
+      "back": "cards/Era_Card-Stone_Age.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "stone",
+        "label": "Stone Age",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: Once per game, when an effect moves or discards a Stone Age Invention, the Stone Age player may cancel that effect.",
+        "tags": [
+          "react:move",
+          "react:cancel",
+          "protect:move",
+          "protect:discard",
+          "protect:target:era-invention",
+          "limit:once-per-game"
+        ]
+      }
+    },
+    {
+      "id": "era-medieval",
+      "name": "Medieval Era",
+      "front": "cards/Era_Card-Mideval_Era.png",
+      "back": "cards/Era_Card-Mideval_Era.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "medieval",
+        "label": "Medieval Era",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: When a player scores bonus points, the Medieval player may steal those points. No bonus points are scored by the original player. May only be used once per game.",
+        "tags": [
+          "react:bonus-points",
+          "steal:bonus-points",
+          "suppress:original-bonus-points",
+          "limit:once-per-game"
+        ]
+      }
+    },
+    {
+      "id": "era-renaissance",
+      "name": "Renaissance Period",
+      "front": "cards/Era_Card-Renaissance_Period.png",
+      "back": "cards/Era_Card-Renaissance_Period.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "renaissance",
+        "label": "Renaissance Period",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "tags": []
+      }
+    },
+    {
+      "id": "era-industrial",
+      "name": "Industrial Revolution",
+      "front": "cards/Era_Card-Industrial_Revolution.png",
+      "back": "cards/Era_Card-Industrial_Revolution.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "industrial",
+        "label": "Industrial Revolution",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "tags": []
+      }
+    },
+    {
+      "id": "era-modern",
+      "name": "Modern Day",
+      "front": "cards/Era_Card-Modern_Day.png",
+      "back": "cards/Era_Card-Modern_Day.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "modern",
+        "label": "Modern Day",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: At the beginning of the Modern Day, the Modern Day player may search their discard for any one card and put it into their hand.",
+        "tags": [
+          "react:era-begin",
+          "recover:from-discard:1",
+          "recover:to-hand"
+        ]
+      }
+    },
+    {
+      "id": "era-future",
+      "name": "Future Tech",
+      "front": "cards/Era_Card-Future_Tech.png",
+      "back": "cards/Era_Card-Future_Tech.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "future",
+        "label": "Future Tech",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: When this era scores, the Future Tech player may choose to add two scoring slots to this era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "tags": [
+          "score:choice",
+          "score:add-scoring-slots:2"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,766 @@
+{
+  "name": "Medieval Deck",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "medieval-advertising",
+      "name": "Advertising",
+      "front": "cards/Medieval-Advertising.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "advertising"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may move an Action card that was played on an Invention to a different Invention in the same era.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"You can tell the ideals of a nation by its advertisements.\" - Norman Douglas",
+        "scoreValue": 2,
+        "tags": [
+          "play:move",
+          "move:optional",
+          "move:target:action",
+          "move:scope:same-era",
+          "move-destination:different-invention"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-blacksmithing",
+      "name": "Blacksmithing",
+      "front": "cards/Medieval-Blacksmithing.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "blacksmithing"
+        ],
+        "addlCardText": "This card may not be affected by score effects.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Named for the color of the metal they work... and the color of their face and hands when they finish.",
+        "scoreValue": 5,
+        "tags": [
+          "protect:self",
+          "protect:score-effects"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-chainmail",
+      "name": "Chainmail",
+      "front": "cards/Medieval-Chainmail.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "chainmail"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: When an opponent's card moves or discards one of your other Inventions in this era, you may discard this card from play to prevent the effect.",
+        "flavorText": "A suit of chainmail could take 180 or more hours to construct.",
+        "scoreValue": 1,
+        "tags": [
+          "react:move",
+          "react:discard",
+          "react:cancel",
+          "protect:move",
+          "protect:discard",
+          "protect:target:own-inventions",
+          "target:exclude-self",
+          "protect:scope:same-era",
+          "trigger:source:opponent",
+          "cost:discard-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-coinage",
+      "name": "Coinage",
+      "front": "cards/Medieval-Coinage.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "coinage"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Choose an Invention in the current era. Score bonus points equal to that Invention's printed point value.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Money never made a man happy yet, nor will it. The more a man has, the more he wants. Instead of filling a vacuum, it makes one.\" - Benjamin Franklin",
+        "scoreValue": 0,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:copy",
+          "copy:target:invention",
+          "copy:value:printed",
+          "target:scope:current-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-coronation",
+      "name": "Coronation",
+      "front": "cards/Medieval-Coronation.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "coronation"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play an Invention. Place this card on that Invention.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If this card is on the first Invention of the current Era, score 4 points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Why is it that the more power you have, the more ridiculous your hat?",
+        "scoreValue": null,
+        "tags": [
+          "play:play-invention",
+          "play:attach",
+          "attach:to:played-invention",
+          "score:bonus-points",
+          "bonus-points:amount:4",
+          "condition:attached-to-first-invention-of-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-crop-rotation",
+      "name": "Crop Rotation",
+      "front": "cards/Medieval-Crop_Rotation.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "crop-rotation"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: Each time an Invention is played in this era, you may swap this card and the Invention above or below it.",
+        "flavorText": "By rotating different crops, ancient farmers could keep their fields in constant use without fertilisers or pesticides.",
+        "scoreValue": 2,
+        "tags": [
+          "react:invention-played",
+          "ongoing:trigger:invention-played",
+          "trigger:scope:same-era",
+          "trigger:persists:after-today-advances",
+          "swap:optional",
+          "swap:target:self",
+          "swap:with:invention",
+          "swap:scope:adjacent"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-crusades",
+      "name": "Crusades",
+      "front": "cards/Medieval-Crusades.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "crusades"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: When another player discards one of your Inventions from play, discard one of their Inventions from the same era as the discarded Invention.",
+        "flavorText": "Part attempt to spread a religion, part excuse to get out of the house for a few years.",
+        "scoreValue": null,
+        "tags": [
+          "react:discard",
+          "trigger:source:opponent",
+          "trigger:target:own-inventions",
+          "retaliate:discard",
+          "discard:target:their-invention",
+          "discard:scope:same-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-diplomacy",
+      "name": "Diplomacy",
+      "front": "cards/Medieval-Diplomacy.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "diplomacy"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Choose an opponent. The chosen player chooses either to discard 2 cards from their hand OR to allow you to draw 2 cards into your hand.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Diplomacy is the art of letting someone have your way.\" -Daniele Vare",
+        "scoreValue": 2,
+        "tags": [
+          "play:choice",
+          "target:choose:opponent",
+          "decider:chosen-opponent",
+          "option-a:discard:hand:2",
+          "option-a:discard:by:chosen-opponent",
+          "option-b:draw:2",
+          "option-b:draw:to:self"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-fast-time",
+      "name": "Fast Time",
+      "front": "cards/Medieval-Fast_Time.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "fast-time"
+        ],
+        "addlCardText": "Play on Today. If this card and \"Slow Time\" ever exist in the same era, discard both cards.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play on Today.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: There are 2 less scoring slots in this era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Clocks slay time... time is dead as long as it is being clicked off by little wheels; only when the clock stops does time come to life.\" - William Faulkner",
+        "scoreValue": null,
+        "tags": [
+          "play:scope:today",
+          "score:remove-scoring-slots:2",
+          "mutual-discard:subtype:slow-time"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-fortune-teller",
+      "name": "Fortune Teller",
+      "front": "cards/Medieval-Fortune_Teller.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "fortune-teller"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Look at the top 3 cards of your deck. You may put any 1 of those cards into your hand and place the others back in any order. Look at the top 3 cards of any one opponent's deck. Discard one of those cards and place the others back in any order.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Everyone has a wonderful history, if you are willing to make up enough past lives.",
+        "scoreValue": null,
+        "tags": [
+          "play:peek",
+          "peek:own-deck:3",
+          "to-hand:choose:1",
+          "target:choose:opponent",
+          "peek:opponent-deck:3",
+          "discard:opponent-deck-card",
+          "return:remainder:top-of-deck",
+          "return-order:decider:self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-guillotine",
+      "name": "Guillotine",
+      "front": "cards/Medieval-Guillotine.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "guillotine"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may discard the Invention at the bottom of the current Era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "These methods of execution were also referred to as \"maidens\" or \"maids.\"",
+        "scoreValue": 4,
+        "tags": [
+          "score:discard",
+          "discard:optional",
+          "discard:target:bottom-of-era",
+          "discard:scope:current-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-hunting-party",
+      "name": "Hunting Party",
+      "front": "cards/Medieval-Hunting_Party.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "hunting-party"
+        ],
+        "addlCardText": "Play on Tomorrow.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play on Tomorrow. When the sixth Invention is played in that era, discard that Invention and this card.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"When a man wants to murder a tiger he calls it sport; when a tiger wants to murder him he calls it ferocity.\" - George Bernard Shaw",
+        "scoreValue": null,
+        "tags": [
+          "play:scope:tomorrow",
+          "play:delayed-trigger",
+          "trigger:sixth-invention-in-era",
+          "trigger:limit:once",
+          "discard:triggering-invention",
+          "discard:self"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-longbow",
+      "name": "Longbow",
+      "front": "cards/Medieval-Longbow.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "longbow"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Discard the Invention 3 Inventions down from this one in the current era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Most medieval longbows were crafted from a single piece of wood.",
+        "scoreValue": 2,
+        "tags": [
+          "score:discard",
+          "discard:target:offset-below:3",
+          "discard:scope:current-era"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-mathematics",
+      "name": "Mathematics",
+      "front": "cards/Medieval-Mathematics.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "mathematics"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Score one point for each Invention in the current era that was played by another player.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"The highest form of pure thought is in mathematics.\" - Plato",
+        "scoreValue": 0,
+        "tags": [
+          "score:count",
+          "score:per:1",
+          "count:owner:opponents",
+          "count:cardtype:invention",
+          "count:scope:current-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-monarchy",
+      "name": "Monarchy",
+      "front": "cards/Medieval-Monarchy.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "monarchy",
+          "government"
+        ],
+        "addlCardText": "Only one Government may be in play in an era.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Score one point for each Medieval Era Invention in this era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Supreme power resting on a single individual seemed like a good idea at the time.",
+        "scoreValue": 3,
+        "tags": [
+          "government",
+          "rule:one-government-per-era",
+          "score:count",
+          "score:per:1",
+          "count:target-deck:medieval",
+          "count:scope:current-era",
+          "count:include-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-navigation",
+      "name": "Navigation",
+      "front": "cards/Medieval-Navigation.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "navigation"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may play your next Invention in Yesterday or Tomorrow.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Second star to the right and straight on 'til morning...\" - Peter Pan",
+        "scoreValue": 2,
+        "tags": [
+          "play:allow-next-invention",
+          "allow:scope:yesterday-or-tomorrow"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-philosophy",
+      "name": "Philosophy",
+      "front": "cards/Medieval-Philosophy.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "philosophy"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Skip your next turn. This does not count as passing.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "It's not what you think, but what you think about thinking that matters.",
+        "scoreValue": 7,
+        "tags": [
+          "play:skip-turn",
+          "skip:target:self",
+          "rule:not-passing"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-poetry",
+      "name": "Poetry",
+      "front": "cards/Medieval-Poetry.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "poetry",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If this card is in an odd numbered scoring slot (first, third, etc.) score two points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The only problem with Haiku is that you just get started and then",
+        "scoreValue": 3,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:amount:2",
+          "condition:odd-scoring-slot"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-taxes",
+      "name": "Taxes",
+      "front": "cards/Medieval-Taxes.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "taxes"
+        ],
+        "addlCardText": "If any player discards this card from play, they draw two cards.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Taxes may be as inevitable as death, but you don't die every year.",
+        "scoreValue": 6,
+        "tags": [
+          "ongoing:trigger:discarded-from-play",
+          "trigger:target:self",
+          "draw:2",
+          "draw:to:discarder"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-telescope",
+      "name": "Telescope",
+      "front": "cards/Medieval-Telescope.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "telescope"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may swap the position of any two Inventions in the next era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Galileo did not invent the telescope, but his improvements to it link his name to the invention forever.",
+        "scoreValue": 2,
+        "tags": [
+          "score:swap",
+          "swap:target:invention",
+          "swap:count:2",
+          "swap:scope:next-era",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-the-art-of-war",
+      "name": "The Art of War",
+      "front": "cards/Medieval-The_Art_of_War.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "the-art-of-war",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may discard an Art card from any era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "One of the most influential books written to this day.",
+        "scoreValue": 2,
+        "tags": [
+          "score:discard",
+          "discard:optional",
+          "discard:target:art",
+          "discard:scope:any-era"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-trebuchet",
+      "name": "Trebuchet",
+      "front": "cards/Medieval-Trebuchet.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "trebuchet"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may discard the Invention at the top of Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "B.F.G., circa the 12th century.",
+        "scoreValue": 3,
+        "tags": [
+          "play:discard:1",
+          "discard:optional",
+          "discard:target:top-today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-water-wheel",
+      "name": "Water Wheel",
+      "front": "cards/Medieval-Water_Wheel.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "water-wheel"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may discard a card from your hand to put any card from your discard pile back into your hand.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "One of the most effective ways to harness the power of water.",
+        "scoreValue": 2,
+        "tags": [
+          "play:recover",
+          "recover:optional",
+          "recover:from-discard:1",
+          "recover:to-hand",
+          "cost:discard-from-hand:1"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "medieval-waylay",
+      "name": "Waylay",
+      "front": "cards/Medieval-Waylay.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "waylay"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: Play when an Invention is played. Place this card on that Invention. Each time an Invention is played in this era, move the Invention this card is on to the end of this era.",
+        "flavorText": "\"Pardon me, do you have a moment to discuss a wonderful new business opportunity?\"",
+        "scoreValue": null,
+        "tags": [
+          "react:invention-played",
+          "play:attach",
+          "ongoing:trigger:invention-played",
+          "trigger:scope:attached-era",
+          "trigger:persists:after-today-advances",
+          "move:target:attached",
+          "move:destination:end-of-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-yoke",
+      "name": "Yoke",
+      "front": "cards/Medieval-Yoke.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "yoke"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: All players score 1 point for each of their Inventions in this era that have a printed point value of less than 3 points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Turns out the yoke's on you.",
+        "scoreValue": 1,
+        "tags": [
+          "score:count",
+          "score:to:all-players",
+          "score:per:1",
+          "count:own-inventions",
+          "count:condition:printed-value-under-3",
+          "count:scope:current-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "medieval-zero",
+      "name": "Zero",
+      "front": "cards/Medieval-Zero.png",
+      "back": "backs/Medieval-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "zero"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Select another Invention in the current era. That Invention's point value is set to 0.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Oddly, the idea of a visual representation of nothing took a long time to develop.",
+        "scoreValue": 2,
+        "tags": [
+          "score:set-value",
+          "set-value:amount:0",
+          "target:choose:invention",
+          "target:scope:current-era",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 2
+    }
+  ]
+}

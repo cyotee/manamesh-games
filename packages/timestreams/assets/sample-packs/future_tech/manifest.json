@@ -1,0 +1,22 @@
+{
+  "name": "Future Tech Deck",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "future-tech-nanotech",
+      "name": "Nanotech",
+      "front": "cards/Future_Tech-Nanotech.png",
+      "back": "cards/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "trait": null,
+        "effectText": "TODO: full OCR text for Nanotech card (Play/Score effects from scan)",
+        "playEffect": "TODO: Play portion",
+        "scoreEffect": "TODO: scoring text",
+        "tags": []
+      }
+    }
+    // ... add remaining from Future Tech Deck List.txt after OCR
+  ]
+}

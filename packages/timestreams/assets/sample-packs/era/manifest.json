@@ -1,0 +1,18 @@
+{
+  "name": "Era Cards",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "era-stone",
+      "name": "Stone Age",
+      "front": "cards/Era_Card-Stone_Age.png",
+      "metadata": {
+        "assetType": "era",
+        "era": "stone",
+        "label": "Stone Age"
+      }
+    }
+    // Add the other 5 after processing scans: medieval, renaissance, industrial, modern, future
+  ]
+}

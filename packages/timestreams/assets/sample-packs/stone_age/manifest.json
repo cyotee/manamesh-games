@@ -1,0 +1,36 @@
+{
+  "name": "Stone Age Deck",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "stone-age-cloth",
+      "name": "Cloth",
+      "front": "cards/Stone_Age-CLOTH.png",
+      "back": "cards/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "trait": null,
+        "effectText": "TODO: full OCR text for Cloth card (Play/Score effects from scan)",
+        "playEffect": "TODO: Play portion",
+        "scoreEffect": "TODO: scoring text",
+        "tags": []
+      }
+    },
+    {
+      "id": "stone-age-fire",
+      "name": "Fire",
+      "front": "cards/Stone_Age-Fire.png",
+      "back": "cards/Stone_Age-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "trait": null,
+        "effectText": "TODO: full OCR text for Fire card",
+        "playEffect": null,
+        "scoreEffect": "TODO: scoring text",
+        "tags": []
+      }
+    }
+    // ... add all unique cards from Stone Age Deck List.txt after OCR
+  ]
+}
