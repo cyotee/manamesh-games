@@ -1,4 +1,4 @@
-import { hasTag, tagNumber, tagValue } from '../tags';
+import { hasTag, tagNumber, tagValue, isDeckMember } from '../tags';
 import { effectiveScoreValue } from '../boardOps';
 import { getCard } from '../state';
 import { erasForScope, candidateTargets, cardAtOffset, locateCard } from '../targets';
@@ -52,10 +52,23 @@ export function resolveCardScoreEffects(G: any, card: any, eraId: string, slotIn
     extra += amt;
   }
 
-  // count: per:N (simplistic, real would filter by count: tags)
+  // count: per:N with filters (basic M3)
   if (hasTag(card, 'score:count')) {
     const per = tagNumber(card, 'score:per') || 1;
-    extra += per;
+    // simplistic count of matching in scope
+    const cscope = tagValue(card, 'count:scope') || 'today';
+    const eras = erasForScope(G, cscope, card.id);
+    let matches = 0;
+    for (const e of eras) {
+      for (const cid of G.timeline[e].stack) {
+        const cc = getCard(G, cid);
+        if (!cc) continue;
+        if (hasTag(card, 'count:own-inventions') && cc.ownerId !== card.ownerId) continue;
+        if (hasTag(card, 'count:target-deck:future-tech') && !isDeckMember(cid, 'future-tech')) continue;
+        matches++;
+      }
+    }
+    extra += per * Math.max(1, matches); // at least per if present
   }
 
   // penalty:amount:N (negative)
