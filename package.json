@@ -6,6 +6,11 @@
     "!packages/manamesh",
     "packages/manamesh/packages/*"
   ],
+  "scripts": {
+    "build": "yarn workspace @manamesh/frontend build",
+    "dev:frontend": "yarn workspace @manamesh/frontend dev",
+    "test:frontend": "yarn workspace @manamesh/frontend test"
+  },
   "dependencies": {
     "boardgame.io": "file:./packages/boardgame.io",
     "boardgameIO-p2p": "file:./packages/boardgameIO-p2p"
