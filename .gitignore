@@ -18,3 +18,8 @@ node_modules
 
 # macOS
 **/.DS_Store
+
+# Build artifacts and local debug/tooling output
+dist/
+debug-timestreams.png
+.playwright-mcp/
