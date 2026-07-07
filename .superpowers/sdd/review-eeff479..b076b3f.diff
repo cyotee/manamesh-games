@@ -1,0 +1,86 @@
+# Review package: eeff47924e343ee4dd078c95989ae613b17ec930..b076b3f
+
+## Commits
+b076b3f feat(timestreams): placeholder deck factory and card schema
+
+## Files changed
+ packages/timestreams/src/deck.test.ts | 28 ++++++++++++++++++++++++++++
+ packages/timestreams/src/deck.ts      | 35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+
+## Diff
+diff --git a/packages/timestreams/src/deck.test.ts b/packages/timestreams/src/deck.test.ts
+new file mode 100644
+index 0000000..0e0bbd0
+--- /dev/null
++++ b/packages/timestreams/src/deck.test.ts
+@@ -0,0 +1,28 @@
++import { describe, it, expect } from "vitest";
++import { createPlaceholderDeck, timestreamsCardSchema } from "./deck";
++
++describe("placeholder deck factory", () => {
++  it("creates owned cards titled 'Score 1 Point'", () => {
++    const deck = createPlaceholderDeck("0", 36);
++    expect(deck).toHaveLength(36);
++    expect(deck[0]).toMatchObject({
++      id: "0-card-0", ownerId: "0", name: "Score 1 Point",
++      cardType: "invention", scoreEffect: "Score 1 Point",
++    });
++    expect(new Set(deck.map((c) => c.id)).size).toBe(36);
++  });
++
++  it("includes a few inert action cards", () => {
++    const deck = createPlaceholderDeck("0", 36, 6);
++    const actions = deck.filter((c) => c.cardType === "action");
++    expect(actions.length).toBeGreaterThan(0);
++    expect(actions.length).toBeLessThan(deck.length);
++  });
++
++  it("schema validates and round-trips", () => {
++    const card = timestreamsCardSchema.create({ id: "x", name: "Score 1 Point", ownerId: "0" });
++    expect(timestreamsCardSchema.validate(card)).toBe(true);
++    expect(timestreamsCardSchema.validate({ id: "y" })).toBe(false);
++    expect(timestreamsCardSchema.getAssetKey(card)).toBe("x");
++  });
++});
+diff --git a/packages/timestreams/src/deck.ts b/packages/timestreams/src/deck.ts
+new file mode 100644
+index 0000000..3fe738f
+--- /dev/null
++++ b/packages/timestreams/src/deck.ts
+@@ -0,0 +1,35 @@
++import type { CardSchema } from "@manamesh/frontend/src/game/modules/types";
++import type { TimestreamsCard } from "./types";
++
++export function createPlaceholderDeck(
++  ownerId: string, size: number, actionEvery = 6,
++): TimestreamsCard[] {
++  const deck: TimestreamsCard[] = [];
++  for (let i = 0; i < size; i++) {
++    const isAction = actionEvery > 0 && i > 0 && i % actionEvery === 0;
++    deck.push({
++      id: `${ownerId}-card-${i}`,
++      name: "Score 1 Point",
++      ownerId,
++      cardType: isAction ? "action" : "invention",
++      scoreEffect: "Score 1 Point",
++    });
++  }
++  return deck;
++}
++
++export const timestreamsCardSchema: CardSchema<TimestreamsCard> = {
++  validate: (card): card is TimestreamsCard =>
++    typeof card === "object" && card !== null &&
++    "id" in card && "name" in card && "ownerId" in card && "cardType" in card &&
++    ["invention", "action"].includes((card as TimestreamsCard).cardType),
++  create: (data) => ({
++    id: data.id,
++    name: data.name,
++    ownerId: (data as Partial<TimestreamsCard>).ownerId ?? "",
++    cardType: (data as Partial<TimestreamsCard>).cardType ?? "invention",
++    trait: (data as Partial<TimestreamsCard>).trait,
++    scoreEffect: (data as Partial<TimestreamsCard>).scoreEffect ?? "Score 1 Point",
++  }),
++  getAssetKey: (card) => card.id,
++};

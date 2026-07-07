@@ -1,0 +1,72 @@
+# Review package: 74cad6d..5449dfc
+
+## Commits
+5449dfc fix(timestreams): verify first proof hash in proof chain
+
+## Files changed
+ packages/timestreams/src/proofChain.test.ts | 11 +++++++++++
+ packages/timestreams/src/proofChain.ts      |  9 +++++++++
+ 2 files changed, 20 insertions(+)
+
+## Diff
+diff --git a/packages/timestreams/src/proofChain.test.ts b/packages/timestreams/src/proofChain.test.ts
+index 8cd2e70..d338804 100644
+--- a/packages/timestreams/src/proofChain.test.ts
++++ b/packages/timestreams/src/proofChain.test.ts
+@@ -5,11 +5,22 @@ describe("proof chain", () => {
+   it("links proofs by previous hash and verifies", () => {
+     const s: any = { proofChain: [] };
+     const p1 = createProof("draw", { card: "a" }, null);
+     appendProof(s, p1);
+     const p2 = createProof("play", { card: "b" }, getLatestProofHash(s));
+     appendProof(s, p2);
+     expect(s.proofChain).toHaveLength(2);
+     expect(p2.previousProofHash).toBe(p1.hash);
+     expect(verifyProofChain(s).valid).toBe(true);
+   });
++
++  it("detects a tampered hash on the first (and only) proof", () => {
++    const s: any = { proofChain: [] };
++    const p1 = createProof("draw", { card: "a" }, null);
++    appendProof(s, p1);
++    // Tamper the first proof's hash field directly.
++    // With a single-proof chain the loop (i >= 1) never runs, so without an
++    // explicit check at index 0 this tampering goes undetected.
++    s.proofChain[0].hash = "deadbeef";
++    expect(verifyProofChain(s).valid).toBe(false);
++  });
+ });
+diff --git a/packages/timestreams/src/proofChain.ts b/packages/timestreams/src/proofChain.ts
+index cdc2092..bc2fb01 100644
+--- a/packages/timestreams/src/proofChain.ts
++++ b/packages/timestreams/src/proofChain.ts
+@@ -179,20 +179,29 @@ function verifyChainArray(chain: CryptographicProof[]): ProofChainVerification {
+ 
+   // First proof must have null previous hash
+   if (chain[0].previousProofHash !== null) {
+     errors.push({
+       index: 0,
+       transitionId: chain[0].transitionId,
+       error: "First proof must have null previousProofHash",
+     });
+   }
+ 
++  // Verify the first proof's own hash integrity
++  if (!verifyProofHash(chain[0])) {
++    errors.push({
++      index: 0,
++      transitionId: chain[0].transitionId,
++      error: "Invalid proof hash at index 0",
++    });
++  }
++
+   for (let i = 1; i < chain.length; i++) {
+     const current = chain[i];
+     const previous = chain[i - 1];
+ 
+     // Check chain linkage
+     if (current.previousProofHash !== previous.hash) {
+       errors.push({
+         index: i,
+         transitionId: current.transitionId,
+         error: `Chain broken: expected previousProofHash "${previous.hash}", got "${current.previousProofHash}"`,

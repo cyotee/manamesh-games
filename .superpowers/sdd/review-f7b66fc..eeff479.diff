@@ -1,0 +1,88 @@
+# Review package: f7b66fc4d3b6e0806cb706db9f7c415738711742..eeff479
+
+## Commits
+eeff479 feat(timestreams): pure timeline/era helpers
+
+## Files changed
+ packages/timestreams/src/timeline.test.ts | 33 +++++++++++++++++++++++++++++++
+ packages/timestreams/src/timeline.ts      | 32 ++++++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+
+## Diff
+diff --git a/packages/timestreams/src/timeline.test.ts b/packages/timestreams/src/timeline.test.ts
+new file mode 100644
+index 0000000..fb91ff5
+--- /dev/null
++++ b/packages/timestreams/src/timeline.test.ts
+@@ -0,0 +1,33 @@
++import { describe, it, expect } from "vitest";
++import {
++  createTimeline, eraForDay, dayForEra, appendToEra, scoringSlotCardIds, isLastDay,
++} from "./timeline";
++
++describe("timeline helpers", () => {
++  it("creates six empty era stacks", () => {
++    const t = createTimeline();
++    expect(Object.keys(t)).toHaveLength(6);
++    expect(t.stone.stack).toEqual([]);
++    expect(t.future.id).toBe("future");
++  });
++
++  it("maps days to eras 1-indexed", () => {
++    expect(eraForDay(1)).toBe("stone");
++    expect(eraForDay(6)).toBe("future");
++    expect(dayForEra("renaissance")).toBe(3);
++    expect(() => eraForDay(0)).toThrow(RangeError);
++    expect(() => eraForDay(7)).toThrow(RangeError);
++  });
++
++  it("appends cards and reads scoring slots", () => {
++    const t = createTimeline();
++    for (const id of ["a", "b", "c", "d", "e", "f", "g"]) appendToEra(t, "stone", id);
++    expect(t.stone.stack).toHaveLength(7);
++    expect(scoringSlotCardIds(t.stone, 6)).toEqual(["a", "b", "c", "d", "e", "f"]);
++  });
++
++  it("flags the last day", () => {
++    expect(isLastDay(6)).toBe(true);
++    expect(isLastDay(5)).toBe(false);
++  });
++});
+diff --git a/packages/timestreams/src/timeline.ts b/packages/timestreams/src/timeline.ts
+new file mode 100644
+index 0000000..a02df65
+--- /dev/null
++++ b/packages/timestreams/src/timeline.ts
+@@ -0,0 +1,32 @@
++import { ERA_ORDER, type EraId, type EraState } from "./types";
++
++export function createTimeline(): Record<EraId, EraState> {
++  const t = {} as Record<EraId, EraState>;
++  for (const id of ERA_ORDER) t[id] = { id, stack: [] };
++  return t;
++}
++
++export function eraForDay(day: number): EraId {
++  if (day < 1 || day > ERA_ORDER.length) {
++    throw new RangeError(`day out of range: ${day}`);
++  }
++  return ERA_ORDER[day - 1];
++}
++
++export function dayForEra(era: EraId): number {
++  return ERA_ORDER.indexOf(era) + 1;
++}
++
++export function appendToEra(
++  timeline: Record<EraId, EraState>, era: EraId, cardId: string,
++): void {
++  timeline[era].stack.push(cardId);
++}
++
++export function scoringSlotCardIds(era: EraState, scoringSlots: number): string[] {
++  return era.stack.slice(0, scoringSlots);
++}
++
++export function isLastDay(day: number): boolean {
++  return day === ERA_ORDER.length;
++}

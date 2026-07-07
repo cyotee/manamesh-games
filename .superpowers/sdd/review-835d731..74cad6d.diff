@@ -1,0 +1,544 @@
+# Review package: 835d731bc4ed8a31983b52437736487307941924..74cad6d
+
+## Commits
+74cad6d feat(timestreams): visibility state machine and proof chain
+
+## Files changed
+ packages/timestreams/src/proofChain.test.ts |  15 ++
+ packages/timestreams/src/proofChain.ts      | 288 ++++++++++++++++++++++++++++
+ packages/timestreams/src/visibility.test.ts |  34 ++++
+ packages/timestreams/src/visibility.ts      | 170 ++++++++++++++++
+ 4 files changed, 507 insertions(+)
+
+## Diff
+diff --git a/packages/timestreams/src/proofChain.test.ts b/packages/timestreams/src/proofChain.test.ts
+new file mode 100644
+index 0000000..8cd2e70
+--- /dev/null
++++ b/packages/timestreams/src/proofChain.test.ts
+@@ -0,0 +1,15 @@
++import { describe, it, expect } from "vitest";
++import { createProof, appendProof, getLatestProofHash, verifyProofChain } from "./proofChain";
++
++describe("proof chain", () => {
++  it("links proofs by previous hash and verifies", () => {
++    const s: any = { proofChain: [] };
++    const p1 = createProof("draw", { card: "a" }, null);
++    appendProof(s, p1);
++    const p2 = createProof("play", { card: "b" }, getLatestProofHash(s));
++    appendProof(s, p2);
++    expect(s.proofChain).toHaveLength(2);
++    expect(p2.previousProofHash).toBe(p1.hash);
++    expect(verifyProofChain(s).valid).toBe(true);
++  });
++});
+diff --git a/packages/timestreams/src/proofChain.ts b/packages/timestreams/src/proofChain.ts
+new file mode 100644
+index 0000000..cdc2092
+--- /dev/null
++++ b/packages/timestreams/src/proofChain.ts
+@@ -0,0 +1,288 @@
++/**
++ * Cryptographic Proof Chain
++ *
++ * Maintains an auditable chain of all game state transitions.
++ * Each proof links to the previous, forming a tamper-evident log
++ * that both players can verify for dispute resolution.
++ *
++ * Adapted from packages/onepiece/src/proofChain.ts:
++ * - OnePieceState replaced with TimestreamsState
++ * - verifyProofChain now accepts a state object (with proofChain array)
++ *   rather than a raw array, matching the TimestreamsState shape.
++ */
++
++import type { CryptographicProof, TimestreamsState } from "./types";
++import { sha256Hex } from "@manamesh/boardgameio-crypto/sha256";
++import { stableStringify } from "@manamesh/boardgameio-crypto/stable-json";
++import {
++  ecdsaSignDigestHex,
++  ecdsaVerifyDigestHex,
++} from "@manamesh/boardgameio-crypto/ecdsa";
++
++// =============================================================================
++// Proof Creation
++// =============================================================================
++
++let proofCounter = 0;
++
++/**
++ * Generate a unique transition ID.
++ */
++function generateTransitionId(): string {
++  return `proof-${Date.now()}-${proofCounter++}`;
++}
++
++/**
++ * Compute a SHA-256 hash of proof data.
++ * Uses a deterministic string representation for consistency.
++ */
++export function hashProofData(data: string): string {
++  const bytes = new TextEncoder().encode(data);
++  const hex = sha256Hex(bytes);
++  return hex; // 64-char hex string (32 bytes)
++}
++
++/**
++ * Create a new cryptographic proof for a state transition.
++ */
++export function createProof(
++  action: string,
++  data: Record<string, unknown>,
++  previousProofHash: string | null,
++): CryptographicProof {
++  const transitionId = generateTransitionId();
++  const timestamp = Date.now();
++
++  // Use stableStringify to ensure deterministic serialization for hashing
++  const proofData = stableStringify({
++    transitionId,
++    previousProofHash,
++    action,
++    data,
++    timestamp,
++  });
++
++  const hash = hashProofData(proofData);
++
++  return {
++    transitionId,
++    previousProofHash,
++    action,
++    data,
++    signatures: {},
++    timestamp,
++    hash,
++  };
++}
++
++/**
++ * Sign a proof with a player's signature.
++ * In production, this would use ECDSA or similar.
++ */
++export function signProof(
++  proof: CryptographicProof,
++  playerId: string,
++  signatureOrPrivateKeyHex: string,
++): CryptographicProof {
++  // Backwards-compatible: if caller provided a precomputed signature (arbitrary string),
++  // store it directly. If they provided a 64-char hex private key, use it to sign the
++  // proof.hash with ECDSA and store the resulting signature.
++  let signature = signatureOrPrivateKeyHex;
++  const maybeKey = signatureOrPrivateKeyHex.replace(/^0x/, "");
++  const isLikelyPrivateKey = /^[0-9a-fA-F]{64}$/.test(maybeKey);
++  if (isLikelyPrivateKey) {
++    signature = ecdsaSignDigestHex(proof.hash, maybeKey);
++  }
++
++  return {
++    ...proof,
++    signatures: {
++      ...proof.signatures,
++      [playerId]: signature,
++    },
++  };
++}
++
++/**
++ * Verify that the stored proof.hash matches a recomputed hash of the proof fields.
++ */
++export function verifyProofHash(proof: CryptographicProof): boolean {
++  const recomputed = hashProofData(
++    stableStringify({
++      transitionId: proof.transitionId,
++      previousProofHash: proof.previousProofHash,
++      action: proof.action,
++      data: proof.data,
++      timestamp: proof.timestamp,
++    }),
++  );
++  return recomputed === proof.hash;
++}
++
++/**
++ * Verify a single player's signature on a proof using their public key.
++ */
++export function verifyProofSignature(
++  proof: CryptographicProof,
++  playerId: string,
++  publicKeyHex: string,
++): boolean {
++  const signature = proof.signatures[playerId];
++  if (!signature) return false;
++  return ecdsaVerifyDigestHex(proof.hash, signature, publicKeyHex);
++}
++
++// =============================================================================
++// Proof Chain Operations
++// =============================================================================
++
++/**
++ * Append a proof to the game state's proof chain.
++ */
++export function appendProof(
++  state: Pick<TimestreamsState, "proofChain">,
++  proof: CryptographicProof,
++): void {
++  state.proofChain.push(proof);
++}
++
++// =============================================================================
++// Verification Types
++// =============================================================================
++
++export interface ProofChainError {
++  index: number;
++  transitionId: string;
++  error: string;
++}
++
++export interface ProofChainVerification {
++  valid: boolean;
++  errors: ProofChainError[];
++}
++
++export interface SignatureVerification {
++  valid: boolean;
++  missing: string[];
++}
++
++// =============================================================================
++// Internal chain verifier (operates on a raw array)
++// =============================================================================
++
++function verifyChainArray(chain: CryptographicProof[]): ProofChainVerification {
++  if (chain.length === 0) {
++    return { valid: true, errors: [] };
++  }
++
++  const errors: ProofChainError[] = [];
++
++  // First proof must have null previous hash
++  if (chain[0].previousProofHash !== null) {
++    errors.push({
++      index: 0,
++      transitionId: chain[0].transitionId,
++      error: "First proof must have null previousProofHash",
++    });
++  }
++
++  for (let i = 1; i < chain.length; i++) {
++    const current = chain[i];
++    const previous = chain[i - 1];
++
++    // Check chain linkage
++    if (current.previousProofHash !== previous.hash) {
++      errors.push({
++        index: i,
++        transitionId: current.transitionId,
++        error: `Chain broken: expected previousProofHash "${previous.hash}", got "${current.previousProofHash}"`,
++      });
++    }
++
++    // Check timestamp ordering
++    if (current.timestamp < previous.timestamp) {
++      errors.push({
++        index: i,
++        transitionId: current.transitionId,
++        error: `Timestamp regression: ${current.timestamp} < ${previous.timestamp}`,
++      });
++    }
++
++    // Verify the proof hash integrity
++    if (!verifyProofHash(current)) {
++      errors.push({
++        index: i,
++        transitionId: current.transitionId,
++        error: `Invalid proof hash: recomputed hash does not match stored hash`,
++      });
++    }
++  }
++
++  return {
++    valid: errors.length === 0,
++    errors,
++  };
++}
++
++/**
++ * Verify the integrity of the entire proof chain stored in game state.
++ *
++ * Checks that:
++ * 1. Each proof's previousProofHash matches the prior proof's hash
++ * 2. The chain starts with a null previousProofHash
++ * 3. Timestamps are monotonically increasing
++ *
++ * @returns Result with validity and any error details.
++ */
++export function verifyProofChain(
++  state: Pick<TimestreamsState, "proofChain">,
++): ProofChainVerification {
++  return verifyChainArray(state.proofChain);
++}
++
++/**
++ * Get the latest proof in the chain.
++ */
++export function getLatestProof(
++  state: Pick<TimestreamsState, "proofChain">,
++): CryptographicProof | null {
++  if (state.proofChain.length === 0) return null;
++  return state.proofChain[state.proofChain.length - 1];
++}
++
++/**
++ * Get the hash of the latest proof (for chaining).
++ */
++export function getLatestProofHash(
++  state: Pick<TimestreamsState, "proofChain">,
++): string | null {
++  const latest = getLatestProof(state);
++  return latest?.hash ?? null;
++}
++
++/**
++ * Find all proofs for a specific card.
++ */
++export function getProofsForCard(
++  state: Pick<TimestreamsState, "proofChain">,
++  cardId: string,
++): CryptographicProof[] {
++  return state.proofChain.filter((proof) => proof.data.cardId === cardId);
++}
++
++/**
++ * Verify that a specific proof has signatures from the required players.
++ */
++export function verifyProofSignatures(
++  proof: CryptographicProof,
++  requiredSigners: string[],
++): SignatureVerification {
++  const missing = requiredSigners.filter(
++    (signer) => !(signer in proof.signatures),
++  );
++
++  return {
++    valid: missing.length === 0,
++    missing,
++  };
++}
+diff --git a/packages/timestreams/src/visibility.test.ts b/packages/timestreams/src/visibility.test.ts
+new file mode 100644
+index 0000000..a3b158c
+--- /dev/null
++++ b/packages/timestreams/src/visibility.test.ts
+@@ -0,0 +1,34 @@
++import { describe, it, expect } from "vitest";
++import {
++  initializeCardVisibility, transitionCardVisibility, getCardVisibility,
++  isCardVisibleTo, isValidTransition,
++} from "./visibility";
++
++function blankState(): any {
++  return { cardVisibility: {}, proofChain: [] };
++}
++
++describe("visibility state machine", () => {
++  it("initializes cards as encrypted", () => {
++    const s = blankState();
++    initializeCardVisibility(s, ["a", "b"]);
++    expect(getCardVisibility(s, "a")).toBe("encrypted");
++  });
++  it("allows encrypted -> owner-known -> public", () => {
++    expect(isValidTransition("encrypted", "owner-known")).toBe(true);
++    expect(isValidTransition("owner-known", "public")).toBe(true);
++    expect(isValidTransition("public", "encrypted")).toBe(false);
++  });
++  it("transitions and records visibility", () => {
++    const s = blankState();
++    initializeCardVisibility(s, ["a"]);
++    transitionCardVisibility(s, "a", "owner-known", "0", "draw");
++    expect(getCardVisibility(s, "a")).toBe("owner-known");
++  });
++  it("computes viewer visibility", () => {
++    expect(isCardVisibleTo("public", false)).toBe(true);
++    expect(isCardVisibleTo("owner-known", true)).toBe(true);
++    expect(isCardVisibleTo("owner-known", false)).toBe(false);
++    expect(isCardVisibleTo("encrypted", true)).toBe(false);
++  });
++});
+diff --git a/packages/timestreams/src/visibility.ts b/packages/timestreams/src/visibility.ts
+new file mode 100644
+index 0000000..5255862
+--- /dev/null
++++ b/packages/timestreams/src/visibility.ts
+@@ -0,0 +1,170 @@
++/**
++ * Card Visibility State Machine
++ *
++ * Manages visibility state transitions for cards in Timestreams.
++ * Each card has a visibility state that tracks who can see it.
++ * All transitions produce cryptographic proofs for auditability.
++ *
++ * Adapted from packages/onepiece/src/visibility.ts:
++ * - OnePieceState replaced with TimestreamsState
++ * - CardVisibilityState reduced to "encrypted" | "owner-known" | "public"
++ * - Allowed transitions: encrypted→owner-known, encrypted→public, owner-known→public
++ */
++
++import type {
++  CardVisibilityState,
++  CryptographicProof,
++  TimestreamsState,
++} from './types';
++import { createProof, appendProof } from './proofChain';
++
++// =============================================================================
++// Local Types
++// =============================================================================
++
++/**
++ * Tracks a state transition for a card's visibility.
++ */
++export interface CardStateTransition {
++  cardId: string;
++  from: CardVisibilityState;
++  to: CardVisibilityState;
++  timestamp: number;
++  initiatedBy: string;
++  proof: CryptographicProof;
++}
++
++// =============================================================================
++// Valid Transitions
++// =============================================================================
++
++/**
++ * Map of valid visibility state transitions.
++ * Key is the source state, value is the set of valid destination states.
++ *
++ * Allowed transitions: encrypted→owner-known, encrypted→public, owner-known→public.
++ */
++const VALID_TRANSITIONS: Record<CardVisibilityState, Set<CardVisibilityState>> = {
++  'encrypted': new Set([
++    'owner-known',    // Owner decrypts (peek, draw)
++    'public',         // Revealed to all (direct reveal)
++  ]),
++  'owner-known': new Set([
++    'public',         // Played face-up, revealed to all
++  ]),
++  'public': new Set([
++    // No further transitions — public is terminal in Timestreams
++  ]),
++};
++
++// =============================================================================
++// Transition Logic
++// =============================================================================
++
++/**
++ * Check whether a visibility state transition is valid.
++ */
++export function isValidTransition(
++  from: CardVisibilityState,
++  to: CardVisibilityState,
++): boolean {
++  if (from === to) return false;
++  const validTargets = VALID_TRANSITIONS[from];
++  return validTargets ? validTargets.has(to) : false;
++}
++
++/**
++ * Get all valid transitions from a given state.
++ */
++export function getValidTransitions(from: CardVisibilityState): CardVisibilityState[] {
++  const validTargets = VALID_TRANSITIONS[from];
++  return validTargets ? Array.from(validTargets) : [];
++}
++
++/**
++ * Perform a visibility state transition on a card.
++ *
++ * Validates the transition, updates state, and produces a cryptographic proof.
++ *
++ * @returns The transition record, or null if the transition is invalid.
++ */
++export function transitionCardVisibility(
++  state: TimestreamsState,
++  cardId: string,
++  to: CardVisibilityState,
++  initiatedBy: string,
++  action: string,
++  data: Record<string, unknown> = {},
++): CardStateTransition | null {
++  const from = state.cardVisibility[cardId] ?? 'encrypted';
++
++  if (!isValidTransition(from, to)) {
++    return null;
++  }
++
++  const lastProof = state.proofChain.length > 0
++    ? state.proofChain[state.proofChain.length - 1]
++    : null;
++
++  const proof = createProof(
++    action,
++    { cardId, from, to, ...data },
++    lastProof?.hash ?? null,
++  );
++
++  const transition: CardStateTransition = {
++    cardId,
++    from,
++    to,
++    timestamp: proof.timestamp,
++    initiatedBy,
++    proof,
++  };
++
++  // Update state
++  state.cardVisibility[cardId] = to;
++  appendProof(state, proof);
++
++  return transition;
++}
++
++/**
++ * Get the current visibility state of a card.
++ * Defaults to 'encrypted' if not tracked.
++ */
++export function getCardVisibility(
++  state: TimestreamsState,
++  cardId: string,
++): CardVisibilityState {
++  return state.cardVisibility[cardId] ?? 'encrypted';
++}
++
++/**
++ * Initialize visibility tracking for a set of cards.
++ */
++export function initializeCardVisibility(
++  state: TimestreamsState,
++  cardIds: string[],
++  initialState: CardVisibilityState = 'encrypted',
++): void {
++  for (const cardId of cardIds) {
++    state.cardVisibility[cardId] = initialState;
++  }
++}
++
++/**
++ * Check if a card is visible to a specific player.
++ */
++export function isCardVisibleTo(
++  visibility: CardVisibilityState,
++  viewerIsOwner: boolean,
++): boolean {
++  switch (visibility) {
++    case 'public':
++      return true;
++    case 'encrypted':
++      return false;
++    case 'owner-known':
++      return viewerIsOwner;
++  }
++}

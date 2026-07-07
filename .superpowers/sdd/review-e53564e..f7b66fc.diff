@@ -1,0 +1,316 @@
+# Review package: e53564ec268ef36dd11104c8897a5f8c766b2314..f7b66fc
+
+## Commits
+f7b66fc feat(timestreams): core state types and era constants
+
+## Files changed
+ packages/timestreams/src/types.test.ts |  19 +++
+ packages/timestreams/src/types.ts      | 274 +++++++++++++++++++++++++++++++++
+ 2 files changed, 293 insertions(+)
+
+## Diff
+diff --git a/packages/timestreams/src/types.test.ts b/packages/timestreams/src/types.test.ts
+new file mode 100644
+index 0000000..c378c03
+--- /dev/null
++++ b/packages/timestreams/src/types.test.ts
+@@ -0,0 +1,19 @@
++import { describe, it, expect } from "vitest";
++import { ERA_ORDER, DEFAULT_CONFIG } from "./types";
++
++describe("era constants & defaults", () => {
++  it("has six eras in chronological order", () => {
++    expect(ERA_ORDER).toEqual([
++      "stone", "medieval", "renaissance", "industrial", "modern", "future",
++    ]);
++    expect(ERA_ORDER).toHaveLength(6);
++  });
++
++  it("default config matches the spec", () => {
++    expect(DEFAULT_CONFIG.scoringSlots).toBe(6);
++    expect(DEFAULT_CONFIG.deckSize).toBe(36);
++    expect(DEFAULT_CONFIG.drawTable).toEqual({ 2: 6, 3: 5, 4: 4 });
++    expect(DEFAULT_CONFIG.homeEraAssignment).toBe("selectable");
++    expect(DEFAULT_CONFIG.deckEncryption).toBe("mental-poker");
++  });
++});
+diff --git a/packages/timestreams/src/types.ts b/packages/timestreams/src/types.ts
+new file mode 100644
+index 0000000..118ef70
+--- /dev/null
++++ b/packages/timestreams/src/types.ts
+@@ -0,0 +1,274 @@
++/**
++ * Timestreams Game Module Types
++ *
++ * Type definitions for the Timestreams game module.
++ * This module is rules-agnostic — it manages game state and ensures
++ * fair deck operations through cryptographic protocols, but does NOT
++ * enforce game rules. Players are responsible for following rules;
++ * the system prevents cheating on deck operations.
++ */
++
++import type { CoreCard } from "@manamesh/frontend/src/game/modules/types";
++import type { EncryptedCard } from "@manamesh/boardgameio-crypto/mental-poker";
++
++// =============================================================================
++// Era Constants
++// =============================================================================
++
++/**
++ * The six eras of Timestreams in chronological order.
++ * Used to drive timeline layout, card placement, and scoring.
++ */
++export const ERA_ORDER = [
++  "stone",
++  "medieval",
++  "renaissance",
++  "industrial",
++  "modern",
++  "future",
++] as const;
++
++/**
++ * A valid Timestreams era identifier.
++ */
++export type EraId = (typeof ERA_ORDER)[number];
++
++// =============================================================================
++// Card Types
++// =============================================================================
++
++/**
++ * A Timestreams card — extends CoreCard with game-specific fields.
++ */
++export interface TimestreamsCard extends CoreCard {
++  /** The player who owns this card instance in their deck */
++  ownerId: string;
++  /** Distinguishes invention (permanent) from action (one-shot) cards */
++  cardType: "invention" | "action";
++  /** Optional special trait for card interactions */
++  trait?: "art" | "government";
++  /** Human-readable description of the card's scoring impact */
++  scoreEffect: string;
++}
++
++// =============================================================================
++// Era State
++// =============================================================================
++
++/**
++ * State for a single era slot on the shared timeline.
++ */
++export interface EraState {
++  /** Which era this slot represents */
++  id: EraId;
++  /** Ordered list of card IDs currently placed in this era */
++  stack: string[];
++}
++
++// =============================================================================
++// Player State
++// =============================================================================
++
++/**
++ * Per-player state in Timestreams.
++ */
++export interface TimestreamsPlayerState {
++  /** The era this player has claimed as their home era, or null until chosen */
++  homeEra: EraId | null;
++  /** Whether the player has declared ready for the current phase */
++  ready: boolean;
++  /** Cards in the player's hand */
++  hand: TimestreamsCard[];
++  /** Cards this player has discarded */
++  discard: TimestreamsCard[];
++  /** Cards this player has scored */
++  scorePile: TimestreamsCard[];
++  /** Whether this player has passed during the current day */
++  hasPassedThisDay: boolean;
++  /** Player's mental-poker public key, or null before key exchange */
++  publicKey: string | null;
++  /** Whether this player has submitted their deck encryption */
++  hasEncrypted: boolean;
++  /** Whether this player has participated in the shuffle */
++  hasShuffled: boolean;
++}
++
++// =============================================================================
++// Phase
++// =============================================================================
++
++/**
++ * The current phase of the game.
++ */
++export type TimestreamsPhase =
++  | "setup"
++  | "keyExchange"
++  | "encrypt"
++  | "shuffle"
++  | "play"
++  | "scoring"
++  | "gameOver"
++  | "voided";
++
++// =============================================================================
++// Configuration
++// =============================================================================
++
++/**
++ * Configuration for a Timestreams game session.
++ */
++export interface TimestreamsConfig {
++  /** Number of timeline era slots available for scoring */
++  scoringSlots: number;
++  /** Total number of cards in each player's deck */
++  deckSize: number;
++  /** Map of player count -> cards drawn per day */
++  drawTable: Record<number, number>;
++  /** How home eras are assigned at game start */
++  homeEraAssignment: "selectable" | "random";
++  /** Deck encryption scheme in use */
++  deckEncryption: "mental-poker";
++  /** Whether to maintain a verifiable proof chain for all state transitions */
++  proofChainEnabled: boolean;
++}
++
++// =============================================================================
++// Shuffle RNG State
++// =============================================================================
++
++/**
++ * Commit-reveal RNG state for a multi-party shuffle.
++ * Players commit to a seed, then reveal; the final seed is the XOR of all reveals.
++ */
++export interface ShuffleRngState {
++  /** Current phase of the commit-reveal protocol */
++  phase: "commit" | "reveal" | "ready";
++  /** playerId -> SHA256(seedHex) commitments (null if not yet committed) */
++  commits: Record<string, string | null>;
++  /** playerId -> seedHex reveals (null if not yet revealed) */
++  reveals: Record<string, string | null>;
++  /** Combined final seed in hex, populated when phase reaches "ready" */
++  finalSeedHex: string | null;
++  /** playerId -> true for players who have voted to abort the shuffle */
++  abortVotes: Record<string, boolean>;
++}
++
++// =============================================================================
++// Decrypt Request
++// =============================================================================
++
++/**
++ * A cooperative decryption request for revealing one encrypted card.
++ */
++export interface DecryptRequest {
++  /** Unique request ID */
++  id: string;
++  /** Player whose encrypted deck contains this card */
++  playerId: string;
++  /** Player who owns the deck being decrypted */
++  deckOwnerId: string;
++  /** Index of the card within the encrypted deck */
++  cardIndex: number;
++  /** Player who initiated the decryption request */
++  requestedBy: string;
++  /** Ordered list of player IDs whose decryption layers must be removed */
++  requiredLayers: string[];
++  /** How many layers have already been peeled */
++  currentLayer: number;
++  /** Lifecycle status of this request */
++  status: "pending" | "partial" | "complete";
++}
++
++// =============================================================================
++// Card Visibility
++// =============================================================================
++
++/**
++ * Visibility state for an individual card in the system.
++ */
++export type CardVisibilityState = "encrypted" | "owner-known" | "public";
++
++// =============================================================================
++// Cryptographic Proof
++// =============================================================================
++
++/**
++ * A single link in the cryptographic proof chain.
++ * Chains state transitions into an auditable history.
++ */
++export interface CryptographicProof {
++  /** Unique identifier for this transition */
++  transitionId: string;
++  /** Hash of the previous proof, or null for the genesis proof */
++  previousProofHash: string | null;
++  /** Human-readable action label */
++  action: string;
++  /** Arbitrary structured data for this transition */
++  data: Record<string, unknown>;
++  /** playerId -> signature over (transitionId + data) */
++  signatures: Record<string, string>;
++  /** Unix epoch milliseconds when this proof was created */
++  timestamp: number;
++  /** Hash of this proof's content (for chaining) */
++  hash: string;
++}
++
++// =============================================================================
++// Full Game State
++// =============================================================================
++
++/**
++ * The complete Timestreams game state stored in boardgame.io.
++ */
++export interface TimestreamsState {
++  /** Per-player state keyed by player ID */
++  players: Record<string, TimestreamsPlayerState>;
++  /** Ordered array of player IDs (turn order) */
++  playerOrder: string[];
++  /** Game configuration */
++  config: TimestreamsConfig;
++  /** Current game phase */
++  phase: TimestreamsPhase;
++  /** The shared timeline, one EraState per era */
++  timeline: Record<EraId, EraState>;
++  /** Which day of the game we are on (1-based) */
++  currentDay: number;
++  /** Player ID of the first player for the current day */
++  dayFirstPlayer: string;
++  /** Encrypted decks keyed by player ID */
++  encryptedDecks: Record<string, EncryptedCard[]>;
++  /** cardId -> era placement for scoring */
++  cardPoints: Record<string, string>;
++  /** State for the deck-shuffle RNG, or null outside the shuffle phase */
++  shuffleRng: ShuffleRngState | null;
++  /** State for the era-assignment RNG (when homeEraAssignment = "random") */
++  eraAssignmentRng: ShuffleRngState | null;
++  /** In-flight cooperative decryption requests */
++  pendingDecryptRequests: DecryptRequest[];
++  /** Index into playerOrder for sequential setup operations */
++  setupPlayerIndex: number;
++  /** cardId -> visibility state */
++  cardVisibility: Record<string, CardVisibilityState>;
++  /** Audit trail of cryptographic proofs */
++  proofChain: CryptographicProof[];
++  /** Current scores keyed by player ID */
++  scores: Record<string, number>;
++  /** Winning player ID, or null if the game is not over */
++  winner: string | null;
++}
++
++// =============================================================================
++// Default Configuration
++// =============================================================================
++
++/**
++ * Sensible defaults for a standard Timestreams session.
++ */
++export const DEFAULT_CONFIG: TimestreamsConfig = {
++  scoringSlots: 6,
++  deckSize: 36,
++  drawTable: { 2: 6, 3: 5, 4: 4 },
++  homeEraAssignment: "selectable",
++  deckEncryption: "mental-poker",
++  proofChainEnabled: true,
++};

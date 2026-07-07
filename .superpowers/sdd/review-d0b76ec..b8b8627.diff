@@ -1,0 +1,346 @@
+# Review package: d0b76ec997cbaa47ee428d5959be0a6889b7ef2e..b8b8627
+
+## Commits
+b8b8627 chore(timestreams): scaffold @manamesh/timestreams package
+
+## Files changed
+ .gitmodules                                        |  2 +-
+ packages/{crypto => boardgameio-crypto}/.gitignore |  0
+ packages/{crypto => boardgameio-crypto}/README.md  |  0
+ .../{crypto => boardgameio-crypto}/package.json    |  0
+ .../src/.claude/homunculus/observations.jsonl      |  0
+ .../src/ambient.d.ts                               |  0
+ .../src/circuits/README.md                         |  0
+ .../src/circuits/range_proof.circom                |  0
+ .../{crypto => boardgameio-crypto}/src/dleq.ts     |  0
+ .../src/ec-elgamal-exp.ts                          |  0
+ .../{crypto => boardgameio-crypto}/src/ecdsa.ts    |  0
+ .../src/feldman-dkg.ts                             |  0
+ .../{crypto => boardgameio-crypto}/src/index.ts    |  0
+ .../src/mental-poker/README.md                     |  0
+ .../src/mental-poker/commitment.test.ts            |  0
+ .../src/mental-poker/commitment.ts                 |  0
+ .../src/mental-poker/index.ts                      |  0
+ .../src/mental-poker/shuffle-proof.test.ts         |  0
+ .../src/mental-poker/shuffle-proof.ts              |  0
+ .../src/mental-poker/sra.test.ts                   |  0
+ .../src/mental-poker/sra.ts                        |  0
+ .../src/mental-poker/types.ts                      |  0
+ .../{crypto => boardgameio-crypto}/src/merkle.ts   |  0
+ .../src/paillier.test.ts                           |  0
+ .../{crypto => boardgameio-crypto}/src/paillier.ts |  0
+ .../src/plugin/crypto-plugin.test.ts               |  0
+ .../src/plugin/crypto-plugin.ts                    |  0
+ .../src/plugin/index.ts                            |  0
+ .../src/range-proof-vkey.ts                        |  0
+ .../src/secp256k1.ts                               |  0
+ .../{crypto => boardgameio-crypto}/src/sha256.ts   |  0
+ .../src/shamirs/index.ts                           |  0
+ .../src/shamirs/reconstruct.ts                     |  0
+ .../src/shamirs/shamirs.test.ts                    |  0
+ .../src/shamirs/split.ts                           |  0
+ .../src/shamirs/types.ts                           |  0
+ .../src/snarkjs-range.ts                           |  0
+ .../src/stable-json.ts                             |  0
+ .../{crypto => boardgameio-crypto}/src/zk/index.ts |  0
+ .../src/zk/snarkjs-smoke.test.ts                   |  0
+ .../src/zk/verify.ts                               |  0
+ .../{crypto => boardgameio-crypto}/tsconfig.json   |  0
+ .../vitest.config.ts                               |  0
+ manamesh => packages/manamesh                      |  0
+ packages/timestreams/package.json                  | 31 ++++++++++++++++++++++
+ packages/timestreams/src/index.ts                  |  1 +
+ packages/timestreams/src/smoke.test.ts             |  8 ++++++
+ packages/timestreams/tsconfig.json                 | 18 +++++++++++++
+ packages/timestreams/vitest.config.ts              | 10 +++++++
+ 49 files changed, 69 insertions(+), 1 deletion(-)
+
+## Diff
+diff --git a/.gitmodules b/.gitmodules
+index a5105f4..f975496 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -1,12 +1,12 @@
+ [submodule "manamesh"]
+-	path = manamesh
++	path = packages/manamesh
+ 	url = https://github.com/cyotee/manamesh.git
+ [submodule "packages/boardgame.io"]
+ 	path = packages/boardgame.io
+ 	url = https://github.com/boardgameio/boardgame.io.git
+ [submodule "packages/boardgameIO-p2p"]
+ 	path = packages/boardgameIO-p2p
+ 	url = https://github.com/cyotee/boardgameIO-p2p.git
+ [submodule "packages/poker/lib/forge-std"]
+ 	path = packages/poker/lib/forge-std
+ 	url = https://github.com/foundry-rs/forge-std
+diff --git a/packages/crypto/.gitignore b/packages/boardgameio-crypto/.gitignore
+similarity index 100%
+rename from packages/crypto/.gitignore
+rename to packages/boardgameio-crypto/.gitignore
+diff --git a/packages/crypto/README.md b/packages/boardgameio-crypto/README.md
+similarity index 100%
+rename from packages/crypto/README.md
+rename to packages/boardgameio-crypto/README.md
+diff --git a/packages/crypto/package.json b/packages/boardgameio-crypto/package.json
+similarity index 100%
+rename from packages/crypto/package.json
+rename to packages/boardgameio-crypto/package.json
+diff --git a/packages/crypto/src/.claude/homunculus/observations.jsonl b/packages/boardgameio-crypto/src/.claude/homunculus/observations.jsonl
+similarity index 100%
+rename from packages/crypto/src/.claude/homunculus/observations.jsonl
+rename to packages/boardgameio-crypto/src/.claude/homunculus/observations.jsonl
+diff --git a/packages/crypto/src/ambient.d.ts b/packages/boardgameio-crypto/src/ambient.d.ts
+similarity index 100%
+rename from packages/crypto/src/ambient.d.ts
+rename to packages/boardgameio-crypto/src/ambient.d.ts
+diff --git a/packages/crypto/src/circuits/README.md b/packages/boardgameio-crypto/src/circuits/README.md
+similarity index 100%
+rename from packages/crypto/src/circuits/README.md
+rename to packages/boardgameio-crypto/src/circuits/README.md
+diff --git a/packages/crypto/src/circuits/range_proof.circom b/packages/boardgameio-crypto/src/circuits/range_proof.circom
+similarity index 100%
+rename from packages/crypto/src/circuits/range_proof.circom
+rename to packages/boardgameio-crypto/src/circuits/range_proof.circom
+diff --git a/packages/crypto/src/dleq.ts b/packages/boardgameio-crypto/src/dleq.ts
+similarity index 100%
+rename from packages/crypto/src/dleq.ts
+rename to packages/boardgameio-crypto/src/dleq.ts
+diff --git a/packages/crypto/src/ec-elgamal-exp.ts b/packages/boardgameio-crypto/src/ec-elgamal-exp.ts
+similarity index 100%
+rename from packages/crypto/src/ec-elgamal-exp.ts
+rename to packages/boardgameio-crypto/src/ec-elgamal-exp.ts
+diff --git a/packages/crypto/src/ecdsa.ts b/packages/boardgameio-crypto/src/ecdsa.ts
+similarity index 100%
+rename from packages/crypto/src/ecdsa.ts
+rename to packages/boardgameio-crypto/src/ecdsa.ts
+diff --git a/packages/crypto/src/feldman-dkg.ts b/packages/boardgameio-crypto/src/feldman-dkg.ts
+similarity index 100%
+rename from packages/crypto/src/feldman-dkg.ts
+rename to packages/boardgameio-crypto/src/feldman-dkg.ts
+diff --git a/packages/crypto/src/index.ts b/packages/boardgameio-crypto/src/index.ts
+similarity index 100%
+rename from packages/crypto/src/index.ts
+rename to packages/boardgameio-crypto/src/index.ts
+diff --git a/packages/crypto/src/mental-poker/README.md b/packages/boardgameio-crypto/src/mental-poker/README.md
+similarity index 100%
+rename from packages/crypto/src/mental-poker/README.md
+rename to packages/boardgameio-crypto/src/mental-poker/README.md
+diff --git a/packages/crypto/src/mental-poker/commitment.test.ts b/packages/boardgameio-crypto/src/mental-poker/commitment.test.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/commitment.test.ts
+rename to packages/boardgameio-crypto/src/mental-poker/commitment.test.ts
+diff --git a/packages/crypto/src/mental-poker/commitment.ts b/packages/boardgameio-crypto/src/mental-poker/commitment.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/commitment.ts
+rename to packages/boardgameio-crypto/src/mental-poker/commitment.ts
+diff --git a/packages/crypto/src/mental-poker/index.ts b/packages/boardgameio-crypto/src/mental-poker/index.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/index.ts
+rename to packages/boardgameio-crypto/src/mental-poker/index.ts
+diff --git a/packages/crypto/src/mental-poker/shuffle-proof.test.ts b/packages/boardgameio-crypto/src/mental-poker/shuffle-proof.test.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/shuffle-proof.test.ts
+rename to packages/boardgameio-crypto/src/mental-poker/shuffle-proof.test.ts
+diff --git a/packages/crypto/src/mental-poker/shuffle-proof.ts b/packages/boardgameio-crypto/src/mental-poker/shuffle-proof.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/shuffle-proof.ts
+rename to packages/boardgameio-crypto/src/mental-poker/shuffle-proof.ts
+diff --git a/packages/crypto/src/mental-poker/sra.test.ts b/packages/boardgameio-crypto/src/mental-poker/sra.test.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/sra.test.ts
+rename to packages/boardgameio-crypto/src/mental-poker/sra.test.ts
+diff --git a/packages/crypto/src/mental-poker/sra.ts b/packages/boardgameio-crypto/src/mental-poker/sra.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/sra.ts
+rename to packages/boardgameio-crypto/src/mental-poker/sra.ts
+diff --git a/packages/crypto/src/mental-poker/types.ts b/packages/boardgameio-crypto/src/mental-poker/types.ts
+similarity index 100%
+rename from packages/crypto/src/mental-poker/types.ts
+rename to packages/boardgameio-crypto/src/mental-poker/types.ts
+diff --git a/packages/crypto/src/merkle.ts b/packages/boardgameio-crypto/src/merkle.ts
+similarity index 100%
+rename from packages/crypto/src/merkle.ts
+rename to packages/boardgameio-crypto/src/merkle.ts
+diff --git a/packages/crypto/src/paillier.test.ts b/packages/boardgameio-crypto/src/paillier.test.ts
+similarity index 100%
+rename from packages/crypto/src/paillier.test.ts
+rename to packages/boardgameio-crypto/src/paillier.test.ts
+diff --git a/packages/crypto/src/paillier.ts b/packages/boardgameio-crypto/src/paillier.ts
+similarity index 100%
+rename from packages/crypto/src/paillier.ts
+rename to packages/boardgameio-crypto/src/paillier.ts
+diff --git a/packages/crypto/src/plugin/crypto-plugin.test.ts b/packages/boardgameio-crypto/src/plugin/crypto-plugin.test.ts
+similarity index 100%
+rename from packages/crypto/src/plugin/crypto-plugin.test.ts
+rename to packages/boardgameio-crypto/src/plugin/crypto-plugin.test.ts
+diff --git a/packages/crypto/src/plugin/crypto-plugin.ts b/packages/boardgameio-crypto/src/plugin/crypto-plugin.ts
+similarity index 100%
+rename from packages/crypto/src/plugin/crypto-plugin.ts
+rename to packages/boardgameio-crypto/src/plugin/crypto-plugin.ts
+diff --git a/packages/crypto/src/plugin/index.ts b/packages/boardgameio-crypto/src/plugin/index.ts
+similarity index 100%
+rename from packages/crypto/src/plugin/index.ts
+rename to packages/boardgameio-crypto/src/plugin/index.ts
+diff --git a/packages/crypto/src/range-proof-vkey.ts b/packages/boardgameio-crypto/src/range-proof-vkey.ts
+similarity index 100%
+rename from packages/crypto/src/range-proof-vkey.ts
+rename to packages/boardgameio-crypto/src/range-proof-vkey.ts
+diff --git a/packages/crypto/src/secp256k1.ts b/packages/boardgameio-crypto/src/secp256k1.ts
+similarity index 100%
+rename from packages/crypto/src/secp256k1.ts
+rename to packages/boardgameio-crypto/src/secp256k1.ts
+diff --git a/packages/crypto/src/sha256.ts b/packages/boardgameio-crypto/src/sha256.ts
+similarity index 100%
+rename from packages/crypto/src/sha256.ts
+rename to packages/boardgameio-crypto/src/sha256.ts
+diff --git a/packages/crypto/src/shamirs/index.ts b/packages/boardgameio-crypto/src/shamirs/index.ts
+similarity index 100%
+rename from packages/crypto/src/shamirs/index.ts
+rename to packages/boardgameio-crypto/src/shamirs/index.ts
+diff --git a/packages/crypto/src/shamirs/reconstruct.ts b/packages/boardgameio-crypto/src/shamirs/reconstruct.ts
+similarity index 100%
+rename from packages/crypto/src/shamirs/reconstruct.ts
+rename to packages/boardgameio-crypto/src/shamirs/reconstruct.ts
+diff --git a/packages/crypto/src/shamirs/shamirs.test.ts b/packages/boardgameio-crypto/src/shamirs/shamirs.test.ts
+similarity index 100%
+rename from packages/crypto/src/shamirs/shamirs.test.ts
+rename to packages/boardgameio-crypto/src/shamirs/shamirs.test.ts
+diff --git a/packages/crypto/src/shamirs/split.ts b/packages/boardgameio-crypto/src/shamirs/split.ts
+similarity index 100%
+rename from packages/crypto/src/shamirs/split.ts
+rename to packages/boardgameio-crypto/src/shamirs/split.ts
+diff --git a/packages/crypto/src/shamirs/types.ts b/packages/boardgameio-crypto/src/shamirs/types.ts
+similarity index 100%
+rename from packages/crypto/src/shamirs/types.ts
+rename to packages/boardgameio-crypto/src/shamirs/types.ts
+diff --git a/packages/crypto/src/snarkjs-range.ts b/packages/boardgameio-crypto/src/snarkjs-range.ts
+similarity index 100%
+rename from packages/crypto/src/snarkjs-range.ts
+rename to packages/boardgameio-crypto/src/snarkjs-range.ts
+diff --git a/packages/crypto/src/stable-json.ts b/packages/boardgameio-crypto/src/stable-json.ts
+similarity index 100%
+rename from packages/crypto/src/stable-json.ts
+rename to packages/boardgameio-crypto/src/stable-json.ts
+diff --git a/packages/crypto/src/zk/index.ts b/packages/boardgameio-crypto/src/zk/index.ts
+similarity index 100%
+rename from packages/crypto/src/zk/index.ts
+rename to packages/boardgameio-crypto/src/zk/index.ts
+diff --git a/packages/crypto/src/zk/snarkjs-smoke.test.ts b/packages/boardgameio-crypto/src/zk/snarkjs-smoke.test.ts
+similarity index 100%
+rename from packages/crypto/src/zk/snarkjs-smoke.test.ts
+rename to packages/boardgameio-crypto/src/zk/snarkjs-smoke.test.ts
+diff --git a/packages/crypto/src/zk/verify.ts b/packages/boardgameio-crypto/src/zk/verify.ts
+similarity index 100%
+rename from packages/crypto/src/zk/verify.ts
+rename to packages/boardgameio-crypto/src/zk/verify.ts
+diff --git a/packages/crypto/tsconfig.json b/packages/boardgameio-crypto/tsconfig.json
+similarity index 100%
+rename from packages/crypto/tsconfig.json
+rename to packages/boardgameio-crypto/tsconfig.json
+diff --git a/packages/crypto/vitest.config.ts b/packages/boardgameio-crypto/vitest.config.ts
+similarity index 100%
+rename from packages/crypto/vitest.config.ts
+rename to packages/boardgameio-crypto/vitest.config.ts
+diff --git a/manamesh b/packages/manamesh
+similarity index 100%
+rename from manamesh
+rename to packages/manamesh
+diff --git a/packages/timestreams/package.json b/packages/timestreams/package.json
+new file mode 100644
+index 0000000..064c229
+--- /dev/null
++++ b/packages/timestreams/package.json
+@@ -0,0 +1,31 @@
++{
++  "name": "@manamesh/timestreams",
++  "version": "0.1.0",
++  "description": "Timestreams game module for ManaMesh — structured rules-free P2P play with mental-poker deck fairness.",
++  "private": true,
++  "type": "module",
++  "main": "./src/index.ts",
++  "types": "./src/index.ts",
++  "exports": {
++    ".": "./src/index.ts",
++    "./types": "./src/types.ts",
++    "./zones": "./src/zones.ts",
++    "./timeline": "./src/timeline.ts",
++    "./game": "./src/game.ts",
++    "./crypto": "./src/crypto.ts",
++    "./scoring": "./src/scoring.ts"
++  },
++  "scripts": {
++    "test": "vitest run",
++    "test:watch": "vitest"
++  },
++  "dependencies": {
++    "@manamesh/boardgameio-crypto": "workspace:*",
++    "@manamesh/frontend": "workspace:*",
++    "boardgame.io": "^0.50.2"
++  },
++  "devDependencies": {
++    "typescript": "^5.0.0",
++    "vitest": "^1.0.0"
++  }
++}
+diff --git a/packages/timestreams/src/index.ts b/packages/timestreams/src/index.ts
+new file mode 100644
+index 0000000..362d980
+--- /dev/null
++++ b/packages/timestreams/src/index.ts
+@@ -0,0 +1 @@
++export const PACKAGE_NAME = "@manamesh/timestreams";
+diff --git a/packages/timestreams/src/smoke.test.ts b/packages/timestreams/src/smoke.test.ts
+new file mode 100644
+index 0000000..87701b9
+--- /dev/null
++++ b/packages/timestreams/src/smoke.test.ts
+@@ -0,0 +1,8 @@
++import { describe, it, expect } from "vitest";
++import { PACKAGE_NAME } from "./index";
++
++describe("package scaffolding", () => {
++  it("exports the package name", () => {
++    expect(PACKAGE_NAME).toBe("@manamesh/timestreams");
++  });
++});
+diff --git a/packages/timestreams/tsconfig.json b/packages/timestreams/tsconfig.json
+new file mode 100644
+index 0000000..8135e25
+--- /dev/null
++++ b/packages/timestreams/tsconfig.json
+@@ -0,0 +1,18 @@
++{
++  "compilerOptions": {
++    "target": "ES2022",
++    "module": "ESNext",
++    "moduleResolution": "Bundler",
++    "lib": ["ES2022", "DOM", "DOM.Iterable"],
++    "jsx": "react-jsx",
++    "strict": true,
++    "esModuleInterop": true,
++    "skipLibCheck": true,
++    "forceConsistentCasingInFileNames": true,
++    "resolveJsonModule": true,
++    "isolatedModules": true,
++    "allowSyntheticDefaultImports": true,
++    "types": ["vitest/globals"]
++  },
++  "include": ["src/**/*"]
++}
+diff --git a/packages/timestreams/vitest.config.ts b/packages/timestreams/vitest.config.ts
+new file mode 100644
+index 0000000..2a8e55b
+--- /dev/null
++++ b/packages/timestreams/vitest.config.ts
+@@ -0,0 +1,10 @@
++import { defineConfig } from 'vitest/config';
++
++export default defineConfig({
++  test: {
++    globals: true,
++    environment: 'node',
++    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
++    exclude: ['node_modules/**', 'dist/**'],
++  },
++});
