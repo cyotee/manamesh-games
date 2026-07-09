@@ -1,0 +1,767 @@
+{
+  "name": "Future Tech Deck",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "future-tech-air-cars",
+      "name": "Air Cars",
+      "front": "cards/Future_Tech-Air_Cars.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "air-cars"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may move this card up two cards in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "g=9.81 (m/sec)/sec. It's not just a good idea, it's the law.",
+        "scoreValue": 2,
+        "tags": [
+          "play:move",
+          "move:optional",
+          "move:target:self",
+          "move:amount:2",
+          "move:direction:up",
+          "move:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-androids",
+      "name": "Androids",
+      "front": "cards/Future_Tech-Androids.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "androids"
+        ],
+        "addlCardText": "Androids may only be played if a \"Nanotech\" card is in Today or a previous era.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may immediately take an extra turn. You cannot play an invention during that turn.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "These are not the androids you're looking for.",
+        "scoreValue": 3,
+        "tags": [
+          "play:requires-card",
+          "requires:subtype:nanotech",
+          "requires:scope:today-or-past",
+          "play:extra-turn",
+          "extra-turn:optional",
+          "extra-turn:restriction:no-invention-play"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-anti-gravity",
+      "name": "Anti-gravity",
+      "front": "cards/Future_Tech-Anti-gravity.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "anti-gravity"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may immediately move this card to the top of Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Laws were meant to be broken.",
+        "scoreValue": 2,
+        "tags": [
+          "play:move",
+          "move:optional",
+          "move:target:self",
+          "move-destination:top-today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-artificial-intelligence",
+      "name": "Artificial Intelligence",
+      "front": "cards/Future_Tech-Artificial_Intelligence.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "artificial-intelligence"
+        ],
+        "addlCardText": "Artificial Intelligence may only be played if a \"Quantum Computing\" card is in Today.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Draw 2 cards.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Better than natural stupidity.",
+        "scoreValue": 3,
+        "tags": [
+          "play:requires-card",
+          "requires:subtype:quantum-computing",
+          "requires:scope:today",
+          "play:draw:2"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-backwards-compatibility",
+      "name": "Backwards Compatibility",
+      "front": "cards/Future_Tech-Backwards_Compatibility.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "backwards-compatibility"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Move the card at the bottom of Yesterday to the top of Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "This is the art of working with outdated technology, even if that technology sucks.",
+        "scoreValue": null,
+        "tags": [
+          "play:move",
+          "move-source:bottom-yesterday",
+          "move-destination:top-today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-biotechnology",
+      "name": "Biotechnology",
+      "front": "cards/Future_Tech-Biotechnology.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "biotechnology"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Choose another Invention in Today. This card copies the Play ability of that Invention (as if you had played it and that ability was on this card).",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Soylent Green is people - Robert Thorn",
+        "scoreValue": 2,
+        "tags": [
+          "play:copy",
+          "copy:play-ability",
+          "copy:target:invention",
+          "target:scope:today",
+          "target:exclude-self",
+          "copy:as-if-own"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-brain-taping",
+      "name": "Brain Taping",
+      "front": "cards/Future_Tech-Brain_Taping.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "brain-taping"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If \"Thought Police\" is in a scoring slot in this era, score 2 points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "In the far future, even this will be replaced by brains on DUO.",
+        "scoreValue": 2,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:amount:2",
+          "condition:subtype:thought-police",
+          "condition:in-scoring-slot",
+          "condition:scope:same-era"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-cloning",
+      "name": "Cloning",
+      "front": "cards/Future_Tech-Cloning.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "cloning"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Score points equal to the point value of the card above this card in Today. If that card is a \"Future Tech\" card, score an additional 2 points. If Cloning is the top \"Invention\" in Today, score no bonus points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "As if one of you wasn't enough",
+        "scoreValue": 0,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:copy",
+          "copy:target:offset-above:1",
+          "copy:scope:today",
+          "copy:value:current",
+          "bonus-points:additional:2",
+          "additional:condition:target-deck:future-tech"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-cold-fusion",
+      "name": "Cold Fusion",
+      "front": "cards/Future_Tech-Cold_Fusion.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "cold-fusion"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Score 1 point for each \"Future Tech\" \"Invention\" in a scoring slot in Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "All the power of the sun, at room temperature.",
+        "scoreValue": 2,
+        "tags": [
+          "score:count",
+          "score:per:1",
+          "count:target-deck:future-tech",
+          "count:cardtype:invention",
+          "count:scope:today",
+          "count:in-scoring-slot",
+          "count:include-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-cybertechnology",
+      "name": "Cybertechnology",
+      "front": "cards/Future_Tech-Cybertechnology.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "cybertechnology"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may move an Invention in Today to the top of the Future Tech era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Gentlemen, we can rebuild him. We have the technology. We have the capability to build the world's first bionic man. Steve Austin will be that man. Better than he was before. Better. Stronger. Faster.\" - Oscar Goldman",
+        "scoreValue": 1,
+        "tags": [
+          "score:move",
+          "move:target:invention",
+          "move-source:today",
+          "move-destination:top-future"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-corporate-government",
+      "name": "Corporate Government",
+      "front": "cards/Future_Tech-Corporate_Government.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "corporate-government",
+          "government"
+        ],
+        "addlCardText": "Only one Government may be in play in each era.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If this card scores in the Future Tech era, score 3 points.\nScore: If the next Invention that scores is not Future Tech, its inventor scores -2 bonus points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"We pledge allegiance to the Firm...\"",
+        "scoreValue": 3,
+        "tags": [
+          "government",
+          "rule:one-government-per-era",
+          "score:bonus-points",
+          "bonus-points:amount:3",
+          "condition:scored-in-era:future",
+          "score:branch",
+          "branch:target:next-scoring-invention",
+          "condition:target-deck:future-tech",
+          "if-false:penalty:to:target-owner",
+          "if-false:penalty:amount:-2"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-digital-secretary",
+      "name": "Digital Secretary",
+      "front": "cards/Future_Tech-DigitaL_Secretary.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "digital-secretary"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: For the rest of Today, effects cannot move cards into the Past.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: The inventor of the next Invention in this era scores -5 points, then scores bonus points equal to the value of their Invention.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "While the digital secretary has been improving for decades, it still can't make a decent cup of coffee.",
+        "scoreValue": 2,
+        "tags": [
+          "play:prevent",
+          "prevent:move:past",
+          "duration:rest-of-today",
+          "score:penalty:next-inventor",
+          "penalty:amount:-5",
+          "bonus-points:to:next-inventor",
+          "bonus-points:printed-value:their-invention"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-genetic-modification",
+      "name": "Genetic Modification",
+      "front": "cards/Future_Tech-Genetic_Modification.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "genetic-modification"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Choose any other card in Today. Score points equal to its point value.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Be the first kid in your living dome to design your own pet with the new PlastiPuppy 3000\" - advertisement, 2235 A.D.",
+        "scoreValue": 0,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:copy",
+          "copy:target:any-card",
+          "copy:value:current",
+          "target:scope:today",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-high-powered-laser",
+      "name": "High-powered Laser",
+      "front": "cards/Future_Tech-High-powered_Laser.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "high-powered-laser"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Choose one - Draw two cards OR choose a card in Today or Tomorrow and discard that card.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Warning: may cause permanent eye damage.",
+        "scoreValue": 2,
+        "tags": [
+          "play:choice",
+          "decider:self",
+          "option-a:draw:2",
+          "option-b:discard:1",
+          "option-b:discard:target:any-card",
+          "option-b:discard:scope:today-or-tomorrow"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-holograms",
+      "name": "Holograms",
+      "front": "cards/Future_Tech-Holograms.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "holograms",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may swap the positions of this card and another Art card in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Most holograms are created with light waves and generate a viewable image, but in theory holograms could be created with any wave, including electron waves or sound waves.",
+        "scoreValue": 2,
+        "tags": [
+          "play:swap",
+          "swap:optional",
+          "swap:target:self",
+          "swap:with:art",
+          "swap:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-immortality",
+      "name": "Immortality",
+      "front": "cards/Future_Tech-Immortality.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "immortality"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If this card is in the last scoring slot in the Future Tech era, score 10 points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "It's not that life is too short, it's that you're dead for so long.",
+        "scoreValue": 2,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:amount:10",
+          "condition:in-last-scoring-slot",
+          "condition:in-era:future"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-moon-base",
+      "name": "Moon Base",
+      "front": "cards/Future_Tech-Moon_Base.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "moon-base"
+        ],
+        "addlCardText": "When any effect attempts to move, destroy, or change the point value of this card, that effect is cancelled.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "When any effect attempts to move, destroy, or change the point value of this card, that effect is cancelled.",
+        "flavorText": "A great place to store all your iron mining robots.",
+        "scoreValue": 5,
+        "tags": [
+          "protect:self",
+          "protect:move",
+          "protect:discard",
+          "protect:value-change"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-multiplicity",
+      "name": "Multiplicity",
+      "front": "cards/Future_Tech-MultIplicity.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "multiplicity"
+        ],
+        "addlCardText": "Play this card on Today.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play this card on Today.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "When this era scores, score 1 point for each of your Inventions in Today that has the same name as another Invention in Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"I like idea.\"",
+        "scoreValue": null,
+        "tags": [
+          "play:scope:today",
+          "score:count",
+          "score:per:1",
+          "count:duplicates:own-inventions",
+          "count:scope:today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-nanotech",
+      "name": "Nanotech",
+      "front": "cards/Future_Tech-Nanotech.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "nanotech"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Choose any other \"Nanotech\" or \"Quantum Computing\" card in Today. Process its score effect now, then place that card in your score pile even if that card is not in a scoring slot.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"I think I've made a horrible mistake.\"",
+        "scoreValue": 2,
+        "tags": [
+          "score:perform-other",
+          "perform:target-filter:any",
+          "target:subtype:nanotech",
+          "target:subtype:quantum-computing",
+          "target:exclude-self",
+          "target:scope:today",
+          "steal:target-to:own-score-pile",
+          "steal:even-non-scoring"
+        ]
+      },
+      "quantity": 3
+    },
+    {
+      "id": "future-tech-quantum-computing",
+      "name": "Quantum Computing",
+      "front": "cards/Future_Tech-Quantum_Computing.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "quantum-computing"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Choose one - Add a scoring slot to Today OR Remove a scoring slot from Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "my computer is super fast now... I just can't find it.",
+        "scoreValue": 2,
+        "tags": [
+          "score:choice",
+          "decider:self",
+          "option-a:add-scoring-slots:1",
+          "option-b:remove-scoring-slots:1",
+          "slots:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-slow-time",
+      "name": "Slow Time",
+      "front": "cards/Future_Tech-Slow_TIme.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "slow-time"
+        ],
+        "addlCardText": "Play this card on Today.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play this card on Today.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Add two scoring slots to this era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "There's never enough time to do all the nothing you want.",
+        "scoreValue": null,
+        "tags": [
+          "play:scope:today",
+          "score:add-scoring-slots:2"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-think-about-the-future",
+      "name": "Think About The Future",
+      "front": "cards/Future_Tech-ThInk_about_The_Future.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "think-about-the-future"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Go through your deck and choose any one card. Put that card in your hand. Shuffle your deck afterwards.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"I never think of the future - it comes soon enough.\" - Albert Einstein",
+        "scoreValue": null,
+        "tags": [
+          "play:search-deck",
+          "play:to-hand",
+          "play:shuffle-after"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-thought-police",
+      "name": "Thought Police",
+      "front": "cards/Future_Tech-Thought_Police.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "thought-police"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: If a player affects this card, the Future Tech player may have the Invention above or below this card affected instead.",
+        "flavorText": "DON'T EVEN THINK ABOUT IT.",
+        "scoreValue": 2,
+        "tags": [
+          "react:targeted",
+          "trigger:target:self",
+          "redirect:optional",
+          "redirect:target-to:adjacent",
+          "decider:owner"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-time-jump",
+      "name": "Time Jump",
+      "front": "cards/Future_Tech-TIme_Jump.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "time-jump"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Swap the positions of any two Inventions. These inventions must be in different ages.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Time is a flow. End to endless end. But what if one caused flow to bend?",
+        "scoreValue": null,
+        "tags": [
+          "play:swap",
+          "swap:target:invention",
+          "swap:count:2",
+          "swap:scope:different-eras"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "future-tech-virtual-reality",
+      "name": "Virtual Reality",
+      "front": "cards/Future_Tech-VIrtual_Reality.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "virtual-reality"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may swap the position of any two Inventions in Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The question now is this: do we tell the virtual reality from the non-virtual?",
+        "scoreValue": 2,
+        "tags": [
+          "score:swap",
+          "swap:optional",
+          "swap:target:invention",
+          "swap:count:2",
+          "swap:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "future-tech-vortex",
+      "name": "Vortex",
+      "front": "cards/Future_Tech-Vortex.png",
+      "back": "backs/Future_Tech-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "vortex"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Choose an Invention in Yesterday. Put that card at the bottom of Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Time is a stream, a flow... how can you bottle the ocean?",
+        "scoreValue": null,
+        "tags": [
+          "play:move",
+          "move-source:yesterday",
+          "move-destination:bottom-today"
+        ]
+      },
+      "quantity": 1
+    }
+  ]
+}

@@ -1,0 +1,724 @@
+{
+  "name": "Modern Day Deck",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+      "id": "modern-recycling",
+      "name": "Recycling",
+      "front": "cards/Modern_Age-Recycling.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "recycling"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Choose 2 cards in your discard pile. Shuffle them into your deck, then draw a card.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "One man's junk is another man's treasure.",
+        "scoreValue": null,
+        "tags": [
+          "play:recover",
+          "recover:from-discard:2",
+          "recover:to-deck",
+          "play:shuffle-after",
+          "play:draw:1"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-telecommunications",
+      "name": "Telecommunications",
+      "front": "cards/Modern_Age-Telecommunications.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "telecommunications"
+        ],
+        "addlCardText": "While this card is in Today, your cards that affect Inventions in Today can affect Inventions in Yesterday instead.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Don't call us, we'll call you.",
+        "scoreValue": 2,
+        "tags": [
+          "extend:today-effects-to-yesterday",
+          "condition:in-today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-chaos-theory",
+      "name": "Chaos Theory",
+      "front": "cards/Modern_Day-Chaos_Theory.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "chaos-theory"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Select another Invention in the current era. Choose one: perform that card's Score effect now as if that ability was on this card OR that Invention's Score effects are cancelled.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Too much order is as bad as too much disorder. Chaos is required for creativity.",
+        "scoreValue": 2,
+        "tags": [
+          "score:choice",
+          "score:perform-other",
+          "perform:target-filter:any",
+          "suppress:score-effects-on-target",
+          "cancel:target-filter:unscored",
+          "target:scope:current-era",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-clean-power",
+      "name": "Clean Power",
+      "front": "cards/Modern_Day-Clean_Power.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "clean-power"
+        ],
+        "addlCardText": "Clean Power cannot be discarded from play by card effects.",
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Electricity that has been run through the dryer and freshly folded.",
+        "scoreValue": 4,
+        "tags": [
+          "protect:self",
+          "protect:discard"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-combination-drug-therapy",
+      "name": "Combination Drug Therapy",
+      "front": "cards/Modern_Day-Combination_Drug_Therapy.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "combination-drug-therapy"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: If this card is discarded from play, you may instead move this card to the top of the era it is in.",
+        "flavorText": "Side effects may include drowsiness, headaches, memory loss, earaches, eye aches, ache aches, restless legs, happy feet, memory loss, and the delusional belief that you actually have this disorder.",
+        "scoreValue": 4,
+        "tags": [
+          "react:discard",
+          "trigger:target:self",
+          "protect:self",
+          "protect:discard",
+          "replace:discard-with-move",
+          "move:target:self",
+          "move-destination:top-of-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-deforestation",
+      "name": "Deforestation",
+      "front": "cards/Modern_Day-Deforestation.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "deforestation"
+        ],
+        "addlCardText": "Play on Tomorrow.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play on Tomorrow.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Each player loses points equal to the number of Inventions they have in this era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Burning tomorrow's resources today.",
+        "scoreValue": null,
+        "tags": [
+          "play:scope:tomorrow",
+          "score:penalty",
+          "score:to:all-players",
+          "penalty:per:1",
+          "count:own-inventions",
+          "count:scope:this-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-dot-com",
+      "name": "Dot Com",
+      "front": "cards/Modern_Day-Dot_Com.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "dot-com"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: When any player plays or moves an Invention worth more points than this card into this era, you must discard this card.",
+        "flavorText": "In today's lesson, we learn not to invest in companies that have no actual product.",
+        "scoreValue": 4,
+        "tags": [
+          "react:invention-played",
+          "react:move",
+          "trigger:scope:same-era",
+          "trigger:mandatory",
+          "condition:higher-value-invention",
+          "discard:self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-inflation",
+      "name": "Inflation",
+      "front": "cards/Modern_Day-Inflation.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "inflation"
+        ],
+        "addlCardText": "Play on any Invention in Today.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play on any Invention in Today. If Today is the Modern Age or Future Tech, you may take an extra turn.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "This is why your grandmother could ride the bus for a dime.",
+        "tags": [
+          "play:attach",
+          "attach:scope:today",
+          "modify:score:attached",
+          "modify:amount:-1",
+          "play:extra-turn",
+          "extra-turn:optional",
+          "condition:today-modern-or-future"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-international-diplomacy",
+      "name": "International Diplomacy",
+      "front": "cards/Modern_Day-International_Diplomacy.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "international-diplomacy"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": true,
+        "reactEffectText": "React: When another player moves this card or changes this card's point value, you may discard any other Invention in Today.",
+        "flavorText": "\"Diplomacy is the art of saying 'Nice doggie' until you can find a rock.\" -Will Rogers",
+        "scoreValue": 3,
+        "tags": [
+          "react:move",
+          "react:point-value-changed",
+          "trigger:target:self",
+          "trigger:source:opponent",
+          "trigger:phase:play",
+          "trigger:phase:score",
+          "retaliate:discard",
+          "discard:scope:today",
+          "target:exclude-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-laser-show",
+      "name": "Laser Show",
+      "front": "cards/Modern_Day-Laser_Show.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "laser-show",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may discard an Art card in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"I can't explain; you would not understand. This is not who I am. I have become comfortably numb.\" - Pink Floyd",
+        "scoreValue": 2,
+        "tags": [
+          "play:discard:1",
+          "discard:optional",
+          "discard:target:art",
+          "discard:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-liquid-nitrogen",
+      "name": "Liquid Nitrogen",
+      "front": "cards/Modern_Day-Liquid_Nitrogen.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "liquid-nitrogen"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may discard the Invention below this card.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Used to make ice cream, as well as other less important applications.",
+        "scoreValue": 1,
+        "tags": [
+          "score:discard",
+          "discard:optional",
+          "discard:target:offset-below:1"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-mass-marketing",
+      "name": "Mass Marketing",
+      "front": "cards/Modern_Day-Mass_Marketing.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "mass-marketing"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Choose 1 Invention in the current era. Score points equal to its printed point value.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "If you can fool some of the people all of the time, why worry about the rest?",
+        "scoreValue": 1,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:copy",
+          "copy:target:invention",
+          "copy:value:printed",
+          "target:scope:current-era"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-media-scandal",
+      "name": "Media Scandal",
+      "front": "cards/Modern_Day-Media_Scandal.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "media-scandal",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: The next time an Action is played in Today, that Action's player must discard 3 cards. (If they have 3 or fewer cards, they discard their whole hand.)",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Finishing second in the Olympics gets you silver. Finishing second in politics gets you oblivion.\" - Richard Nixon",
+        "scoreValue": 2,
+        "tags": [
+          "play:delayed-trigger",
+          "trigger:next-action-in-today",
+          "trigger:limit:once",
+          "discard:hand:3",
+          "discard:by:triggering-action-player",
+          "discard:whole-hand-if-fewer"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-napalm",
+      "name": "Napalm",
+      "front": "cards/Modern_Day-Napalm.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "napalm"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Discard any Invention in this or any previous era.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Napalm generates temperatures of 800 to 1,200 degrees Celsius. It is as effective a psychological as a physical weapon.",
+        "scoreValue": 2,
+        "tags": [
+          "play:discard:1",
+          "discard:target:invention",
+          "discard:scope:this-or-previous-era"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-organ-transplant",
+      "name": "Organ Transplant",
+      "front": "cards/Modern_Day-Organ_Transplant.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "organ-transplant"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may swap this card with any other Invention in Today.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The first successful organ transplant was of a cornea in 1905.",
+        "scoreValue": 2,
+        "tags": [
+          "play:swap",
+          "swap:target:self",
+          "swap:with:invention",
+          "swap:scope:today"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-quantum-theory",
+      "name": "Quantum Theory",
+      "front": "cards/Modern_Day-Quantum_Theory.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "quantum-theory"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: If the next Invention in the current era is a Modern Day Invention, gain bonus points equal to that Invention's printed point value. Otherwise, the player of the next Invention in the current era loses points equal to that Invention's printed point value.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Invented by the Society of Scientists Who Hate Cats.",
+        "scoreValue": 3,
+        "tags": [
+          "score:branch",
+          "branch:target:next-invention",
+          "target:scope:current-era",
+          "condition:target-deck:modern",
+          "if-true:bonus-points:to:self",
+          "if-true:bonus-points:printed-value:target",
+          "if-false:penalty:to:target-owner",
+          "if-false:penalty:printed-value:target"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-semiconductor",
+      "name": "Semiconductor",
+      "front": "cards/Modern_Day-Semiconductor.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "semiconductor"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: You may discard this card. If you do, all other players must discard 2 cards. (If they have 2 or less cards in hand, they must discard their entire hand.)",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: Score 1 point for each Modern Day Invention in the current era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The ability to change the electrical conductivity of a material forms the basis of almost all modern electronics.",
+        "scoreValue": 1,
+        "tags": [
+          "play:choice",
+          "cost:discard-self",
+          "discard:opponents-hand:2",
+          "discard:whole-hand-if-fewer",
+          "score:count",
+          "score:per:1",
+          "count:target-deck:modern",
+          "count:scope:current-era",
+          "count:include-self"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-space-travel",
+      "name": "Space Travel",
+      "front": "cards/Modern_Day-Space_Travel.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "space-travel"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: The first time you score this card, score 2 points and move this card to the top of the next era.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"Magnificent desolation.\" - \"Buzz\" Aldrin Jr, second man on the moon",
+        "scoreValue": 2,
+        "tags": [
+          "score:bonus-points",
+          "bonus-points:amount:2",
+          "condition:first-score",
+          "score:move",
+          "move:target:self",
+          "move-destination:top-next-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-surgical-strike",
+      "name": "Surgical Strike",
+      "front": "cards/Modern_Day-Surgical_Strike.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "action",
+        "subtypes": [
+          "surgical-strike"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Choose an Invention in Today. The player of that Invention chooses to either: discard that Invention OR discard 3 cards. (If they have less than 3 cards in hand, they must discard the Invention.)",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "The art of blowing up only what you want to blow up.",
+        "scoreValue": null,
+        "tags": [
+          "play:choice",
+          "target:choose:invention",
+          "target:scope:today",
+          "decider:target-owner",
+          "option-a:discard:target",
+          "option-b:discard:hand:3",
+          "option-b:discard:by:target-owner",
+          "forced:option-a:if-hand-under-3"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-tactical-nuclear-weapons",
+      "name": "Tactical Nuclear Weapons",
+      "front": "cards/Modern_Day-Tactical_Nuclear_Weapons.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "tactical-nuclear-weapons"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": false,
+        "playEffectText": null,
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: You may discard this card and any other 2 cards in Today.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "\"I am become Death, the shatterer of worlds.\" - J. Robert Oppenheimer",
+        "scoreValue": 3,
+        "tags": [
+          "score:discard",
+          "discard:optional",
+          "cost:discard-self",
+          "discard:target:any-card",
+          "discard:count:2",
+          "discard:scope:today"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-television",
+      "name": "Television",
+      "front": "cards/Modern_Day-Television.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "television",
+          "art"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: The player that plays the next Invention skips their next turn and draws a card.",
+        "hasScoreEffect": true,
+        "scoreEffectText": "Score: The player of the next invention in Today loses 2 points.",
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "In 1998, the average television in America received only 18 channels.",
+        "scoreValue": 2,
+        "tags": [
+          "play:delayed-trigger",
+          "trigger:next-invention-played",
+          "trigger:limit:once",
+          "skip-turn:target:triggering-player",
+          "draw:1",
+          "draw:to:triggering-player",
+          "score:penalty:next-inventor",
+          "penalty:amount:-2"
+        ]
+      },
+      "quantity": 3
+    },
+    {
+      "id": "modern-the-internet",
+      "name": "The Internet",
+      "front": "cards/Modern_Day-The_Internet.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "the-internet"
+        ],
+        "addlCardText": "This card may only be played if a \"Telecommunications\" card is in a scoring slot in Today or a previous era.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Move any Invention in any era to any position in the same era.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "LOL.",
+        "scoreValue": 3,
+        "tags": [
+          "play:requires-card",
+          "requires:subtype:telecommunications",
+          "requires:in-scoring-slot",
+          "requires:scope:today-or-past",
+          "play:move",
+          "move:target:invention",
+          "move:scope:any-era",
+          "move-destination:any-position-same-era"
+        ]
+      },
+      "quantity": 1
+    },
+    {
+      "id": "modern-thermodynamics",
+      "name": "Thermodynamics",
+      "front": "cards/Modern_Day-Thermodynamics.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "thermodynamics"
+        ],
+        "addlCardText": null,
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Put the top card of your discard pile into your hand.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "While people have studied heat and energy for centuries, thermodynamics came into being as a field of study to improve the first steam engines.",
+        "scoreValue": 3,
+        "tags": [
+          "play:recover",
+          "recover:from-discard:1",
+          "recover:target:top-of-discard",
+          "recover:to-hand"
+        ]
+      },
+      "quantity": 2
+    },
+    {
+      "id": "modern-world-government",
+      "name": "World Government",
+      "front": "cards/Modern_Day-World_Government.png",
+      "back": "backs/Modern_Day-Back.png",
+      "metadata": {
+        "cardType": "invention",
+        "subtypes": [
+          "world-government",
+          "government"
+        ],
+        "addlCardText": "Only 1 Government may be in play in an era.",
+        "hasPlayEffect": true,
+        "playEffectText": "Play: Draw 3 cards. All other players draw 1 card.",
+        "hasScoreEffect": false,
+        "scoreEffectText": null,
+        "hasReact": false,
+        "reactEffectText": null,
+        "flavorText": "Government delivered by black helicopter.",
+        "scoreValue": 3,
+        "tags": [
+          "government",
+          "rule:one-government-per-era",
+          "play:draw:3",
+          "draw:to:self",
+          "opponents-draw:1"
+        ]
+      },
+      "quantity": 1
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "Player Aids",
+  "version": "1.0.0",
+  "game": "timestreams",
+  "cards": [
+    {
+        "id": "aid-scoring",
+        "name": "Scoring Aid",
+        "front": "cards/Player_Aid_Card-Scoring.png",
+        "metadata": {
+            "assetType": "playerAid",
+            "aidType": "scoring",
+            "title": "Scoring",
+            "text": "Scoring once all players have passed on the last Era (Future Tech)\n1. All players discard any remaining cards in their hands.\n2. Look at the top Invention card of the first Era (Stone Age). The player that played that card uses any Score abilities on that card. Continue until the first six inventions in the Stone Age have used their Score abilities (if any).\n3. The first six Inventions of the Stone Age are placed into the score piles of the players that invented them. Any Inventions beyond the first six in the Stone Age are discarded.\n4. Continue scoring the remaining Eras in the same way.\n5. Once all Inventions are scored, total up the value of Inventions in your score pile, plus any bonus points you have scored. Whomever has the most points has seized control of the timestream and wins."
+        }
+    },
+    {
+        "id": "aid-turn",
+        "name": "Turn Aid",
+        "front": "cards/Player_Aid_Card-Turn.png",
+        "metadata": {
+            "assetType": "playerAid",
+            "aidType": "turn",
+            "title": "Turn",
+            "text": "Take the following steps each Era:\n1-6 players draw cards according to the draw table (2 players: 6, 3:5, 4:4, 5-6: Draw 4 then discard 2).\nThe player with the earliest deck takes the first tune in the first era (The Stone Age). In each future Era, the next deck in order (Medieval Era, Renaissance Period, Industrial Revolution, Modern Day, Future Tech) takes the first tune.\n\nOn your turn you may:\n- Play an Invention from your hand into the bottom of the current era. Use any Play effects of the Invention you play immediately. Score effects are not resolved until the scoring phase.\nOR\n- Play an Action card. Do what it says on the card. Discard it unless it remains in play attached to an Invention or another card.\nOR\n- Pass. If you pass, the next player in era order takes their turn. When all players pass in sequence, the Era ends."
+        }
+    }
+  ]
+}
