@@ -166,7 +166,8 @@ export function checkReactForMove(
   const card = G.cards?.[targetCardId];
   if (card && hasTag(card, 'react:move') && hasTag(card, 'redirect:target-to')) {
     const targetTo = tagValue(card, 'redirect:target-to');
-    if (targetTo === 'self') {
+    // redirect:decider:owner — owner may choose; default self when no choice provided
+    if (targetTo === 'self' || hasTag(card, 'redirect:target-filter:any')) {
       decision.redirectTo = targetCardId;
     } else if (targetTo === 'adjacent') {
       const below = cardAtOffset(G, targetCardId, 1);
@@ -177,15 +178,51 @@ export function checkReactForMove(
       }
     }
     if (decision.redirectTo) {
-      // re-check protect on new target
+      // re-check protect on new target; redirect:on-immovable:fizzle
       if (isProtected(G, decision.redirectTo, 'move', actorPlayerId)) {
         decision.cancelled = true;
-        decision.log = 'react:redirect-fizzle';
+        decision.log = hasTag(card, 'redirect:on-immovable:fizzle')
+          ? 'react:redirect-on-immovable-fizzle'
+          : 'react:redirect-fizzle';
       }
+    } else if (hasTag(card, 'redirect:on-immovable:fizzle')) {
+      decision.cancelled = true;
+      decision.log = 'react:redirect-on-immovable-fizzle';
     }
   }
 
   return decision;
+}
+
+/**
+ * limit:once-per-game — track whether a card's limited react/steal has been used.
+ */
+export function isOncePerGameSpent(G: any, cardId: string): boolean {
+  const used = (G.oncePerGameUsed as string[] | undefined) || [];
+  return used.includes(cardId);
+}
+
+export function markOncePerGameUsed(G: any, cardId: string): void {
+  if (!G.oncePerGameUsed) G.oncePerGameUsed = [];
+  if (!G.oncePerGameUsed.includes(cardId)) G.oncePerGameUsed.push(cardId);
+}
+
+/** Steal bonus points react (era-medieval): once per game when conditions match. */
+export function tryStealBonusPoints(
+  G: any,
+  sourceCardId: string,
+  bonusOwnerId: string,
+  amount: number,
+): { stolen: number; log: string } {
+  const card = G.cards?.[sourceCardId];
+  if (!card) return { stolen: 0, log: 'no card' };
+  if (!hasTag(card, 'steal:bonus-points')) return { stolen: 0, log: 'no steal' };
+  if (hasTag(card, 'limit:once-per-game') && isOncePerGameSpent(G, sourceCardId)) {
+    return { stolen: 0, log: 'once-per-game spent' };
+  }
+  markOncePerGameUsed(G, sourceCardId);
+  // suppress:original-bonus-points handled by caller returning stolen amount to reassign
+  return { stolen: amount, log: `${sourceCardId}: stole ${amount} from ${bonusOwnerId}` };
 }
 
 // ---------------------------------------------------------------------------

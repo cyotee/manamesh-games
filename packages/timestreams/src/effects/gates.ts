@@ -4,10 +4,11 @@ import { eraForDay } from '../timeline';
 import { getCard, getTurnFlags } from './state';
 import { hasTag, tagValue, tagsWithPrefix } from './tags';
 import { isActionPlayPrevented } from './modifiers';
+import { computeScoringSlotsForEra } from '../scoring';
 
 function requiredSubtypePresent(G: TimestreamsState, subtype: string, eras: EraId[], scoringSlotOnly: boolean): boolean {
-  const slots = G.config.scoringSlots ?? 6;
   for (const era of eras) {
+    const slots = computeScoringSlotsForEra(G, era);
     const stack = scoringSlotOnly ? G.timeline[era].stack.slice(0, slots) : G.timeline[era].stack;
     for (const cardId of stack) {
       if (getCard(G, cardId)?.subtypes?.includes(subtype)) return true;

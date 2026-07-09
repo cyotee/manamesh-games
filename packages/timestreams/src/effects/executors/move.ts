@@ -26,12 +26,21 @@ function parseDestination(ctx: ExecCtx, dest: string): Destination | null {
   }
 }
 
-function pickSource(ctx: ExecCtx): { options: string[]; deterministic?: string } {
+function pickSource(ctx: ExecCtx): { options: string[]; deterministic?: string; fizzle?: string } {
   const { G, card } = ctx;
   const source = tagValue(card, 'move-source');
+  // Backwards Compatibility: "the card at the bottom of Yesterday" — fixed target, no prompt.
+  // (Vortex is move-source:yesterday and *does* prompt for a choice.)
   if (source === 'bottom-yesterday') {
     const era = erasForScope(G, 'yesterday')[0];
-    const stack = era ? G.timeline[era].stack : [];
+    if (!era) {
+      return { options: [], fizzle: 'no yesterday (day 1?)' };
+    }
+    const stack = G.timeline[era]?.stack ?? [];
+    if (stack.length === 0) {
+      return { options: [], fizzle: 'yesterday empty' };
+    }
+    // stack[0] = first scoring slot (top); last index = bottom of the era.
     return { options: [], deterministic: stack[stack.length - 1] };
   }
   if (source === 'yesterday' || source === 'today') {
@@ -48,24 +57,62 @@ function pickSource(ctx: ExecCtx): { options: string[]; deterministic?: string }
   return { options: candidateTargets(G, { kind, eras: erasForScope(G, scope, card.id), excludeCardId: exclude }) };
 }
 
+function isMoveDeclined(chosen: string | string[] | undefined): boolean {
+  if (chosen === undefined) return false;
+  if (chosen === '' || chosen === '__none__' || chosen === 'stay' || chosen === 'no') return true;
+  if (Array.isArray(chosen) && chosen.length === 0) return true;
+  if (Array.isArray(chosen) && chosen.length === 1) {
+    const v = chosen[0];
+    return v === '' || v === '__none__' || v === 'stay' || v === 'no';
+  }
+  return false;
+}
+
 export const moveExecutor: Executor = (ctx) => {
   const { G, playerId, card, choices } = ctx;
   const promptId = `${card.id}:move-card`;
   const src = pickSource(ctx);
+  const optional = isOptionalFor(card, 'move');
+
+  if (src.fizzle) {
+    return done([`${card.id}: move fizzles (${src.fizzle})`]);
+  }
 
   let moving = src.deterministic ?? undefined;
-  if (moving === undefined) {
+  if (moving !== undefined && optional) {
+    // Deterministic target (e.g. self) + move:optional — player may leave it
+    // where it was played (Air Cars / The Wheel: "you may move this up N").
     const chosen = choices[promptId];
     if (chosen === undefined) {
-      if (src.options.length === 0) return done([`${card.id}: move fizzles (no targets)`]);
       return needs({
-        id: promptId, deciderId: playerId, kind: 'choose-card',
-        options: src.options, min: isOptionalFor(card, 'move') ? 0 : 1, max: 1,
+        id: promptId,
+        deciderId: playerId,
+        kind: 'choose-option',
+        // Explicit stay vs move so the board can label clearly (min 1).
+        options: ['move', 'stay'],
+        min: 1,
+        max: 1,
         reason: 'play:move',
       });
     }
-    if (chosen === '' || (Array.isArray(chosen) && chosen.length === 0)) return done([`${card.id}: move declined`]);
+    if (isMoveDeclined(chosen)) {
+      return done([`${card.id}: move declined`]);
+    }
+    // 'move' | 'yes' | card id all mean apply the optional self-move
+  } else if (moving === undefined) {
+    const chosen = choices[promptId];
+    if (chosen === undefined) {
+      if (src.options.length === 0) return done([`${card.id}: move fizzles (no targets)`]);
+      const options = optional ? [...src.options, '__none__'] : src.options;
+      return needs({
+        id: promptId, deciderId: playerId, kind: 'choose-card',
+        options, min: optional ? 0 : 1, max: 1,
+        reason: 'play:move',
+      });
+    }
+    if (isMoveDeclined(chosen)) return done([`${card.id}: move declined`]);
     moving = Array.isArray(chosen) ? chosen[0] : chosen;
+    if (moving === '__none__') return done([`${card.id}: move declined`]);
   }
   if (!moving) return done([`${card.id}: move fizzles (nothing to move)`]);
 

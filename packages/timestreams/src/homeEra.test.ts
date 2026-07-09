@@ -47,7 +47,10 @@ describe("home-era assignment", () => {
     g.players["0"].homeEra = "future";
     g.players["1"].homeEra = "stone";
     expect(homeEraTurnOrder(g)).toEqual(["1", "0"]);
+    // RULES: Stone Age first on day 1; Future Tech first on day 2
     expect(dayFirstPlayer(g, 1)).toBe("1");
     expect(dayFirstPlayer(g, 2)).toBe("0");
+    expect(dayFirstPlayer(g, 3)).toBe("1");
   });
 });
+

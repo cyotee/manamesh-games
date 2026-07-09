@@ -4,6 +4,7 @@ import {
   createCryptoInitialState,
   submitPublicKey,
   encryptDeck,
+  buildEncryptionLayer,
   commitShuffleSeed,
   revealShuffleSeed,
   shuffleEncryptedDeck,
@@ -22,14 +23,15 @@ describe("crypto setup — initial state & key exchange", () => {
   let G: any;
   beforeEach(() => { G = state(); });
 
-  it("starts in keyExchange with null public keys and an empty timeline", () => {
-    expect(G.phase).toBe("keyExchange");
+  it("starts in setup with null public keys and an empty timeline", () => {
+    expect(G.phase).toBe("setup");
     expect(G.players["0"].publicKey).toBeNull();
     expect(Object.keys(G.timeline)).toHaveLength(6);
     expect(G.currentDay).toBe(1);
   });
 
   it("advances to encrypt once both keys are submitted", () => {
+    G.phase = "keyExchange";
     const k0 = generateKeyPair(); const k1 = generateKeyPair();
     submitPublicKey(G, ctx("0"), "0", k0.publicKey);
     expect(G.phase).toBe("keyExchange");
@@ -38,26 +40,60 @@ describe("crypto setup — initial state & key exchange", () => {
     expect(G.players["0"].publicKey).toBe(k0.publicKey);
   });
 
-  it("returns INVALID_MOVE on double-submit", () => {
+  it("is idempotent on double-submit of the same key", () => {
+    G.phase = "keyExchange";
     const k0 = generateKeyPair();
     submitPublicKey(G, ctx("0"), "0", k0.publicKey);
-    expect(submitPublicKey(G, ctx("0"), "0", k0.publicKey)).toBe("INVALID_MOVE");
-  });
-
-  it("returns INVALID_MOVE when phase is not keyExchange", () => {
-    G.phase = "encrypt";
+    expect(submitPublicKey(G, ctx("0"), "0", k0.publicKey)).not.toBe("INVALID_MOVE");
+    expect(G.players["0"].publicKey).toBe(k0.publicKey);
+    // Different key after submit is rejected
     expect(submitPublicKey(G, ctx("0"), "0", generateKeyPair().publicKey)).toBe("INVALID_MOVE");
   });
 
+  it("ignores late submit when already past keyExchange", () => {
+    G.phase = "encrypt";
+    expect(submitPublicKey(G, ctx("0"), "0", generateKeyPair().publicKey)).not.toBe("INVALID_MOVE");
+    expect(G.players["0"].publicKey).toBeNull();
+  });
+
   it("returns INVALID_MOVE for an unknown player", () => {
+    G.phase = "keyExchange";
     expect(submitPublicKey(G, ctx("9"), "9", generateKeyPair().publicKey)).toBe("INVALID_MOVE");
+  });
+});
+
+describe("crypto setup — encrypt with preEncrypted payload", () => {
+  it("accepts client-built encryption layers", () => {
+    const ids = ["0", "1"];
+    const G: any = createCryptoInitialState({ numPlayers: 2, playerIDs: ids } as any, {
+      playMode: "mental-poker",
+    } as any);
+    G.phase = "keyExchange";
+    const keys: Record<string, any> = { "0": generateKeyPair(), "1": generateKeyPair() };
+    submitPublicKey(G, ctx("0"), "0", keys["0"].publicKey);
+    submitPublicKey(G, ctx("1"), "1", keys["1"].publicKey);
+    expect(G.phase).toBe("encrypt");
+
+    const layer0 = buildEncryptionLayer(G, keys["0"].privateKey);
+    expect(encryptDeck(G, ctx("0", "encrypt"), "0", null, layer0)).not.toBe("INVALID_MOVE");
+    expect(G.players["0"].hasEncrypted).toBe(true);
+    expect(G.encryptedDecks["0"][0].layers).toBe(1);
+
+    const layer1 = buildEncryptionLayer(G, keys["1"].privateKey);
+    expect(encryptDeck(G, ctx("1", "encrypt"), "1", null, layer1)).not.toBe("INVALID_MOVE");
+    expect(G.phase).toBe("shuffle");
+    expect(G.encryptedDecks["0"][0].layers).toBe(2);
   });
 });
 
 describe("crypto setup — encrypt & shuffle round-trip", () => {
   it("runs keyExchange -> encrypt -> shuffle -> play deterministically", () => {
     const ids = ["0", "1"];
-    const G: any = createCryptoInitialState({ numPlayers: 2, playerIDs: ids } as any);
+    const G: any = createCryptoInitialState({ numPlayers: 2, playerIDs: ids } as any, {
+      playMode: "mental-poker",
+    } as any);
+    // Mental-poker path starts after setup; enter keyExchange explicitly.
+    G.phase = "keyExchange";
     const keys: Record<string, any> = { "0": generateKeyPair(), "1": generateKeyPair() };
 
     submitPublicKey(G, ctx("0"), "0", keys["0"].publicKey);
@@ -87,7 +123,10 @@ describe("crypto setup — encrypt & shuffle round-trip", () => {
 describe("crypto — shuffle seed commit binding (regression)", () => {
   function reachShufflePhase() {
     const ids = ["0", "1"];
-    const G: any = createCryptoInitialState({ numPlayers: 2, playerIDs: ids } as any);
+    const G: any = createCryptoInitialState({ numPlayers: 2, playerIDs: ids } as any, {
+      playMode: "mental-poker",
+    } as any);
+    G.phase = "keyExchange";
     const keys: Record<string, any> = { "0": generateKeyPair(), "1": generateKeyPair() };
     submitPublicKey(G, ctx("0"), "0", keys["0"].publicKey);
     submitPublicKey(G, ctx("1"), "1", keys["1"].publicKey);

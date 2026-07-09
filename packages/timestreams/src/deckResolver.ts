@@ -1,7 +1,10 @@
 import type { CardManifestEntry, LoadedAssetPack } from "@manamesh/frontend/src/game/modules/types";
-import type { TimestreamsCard, EraId } from "./types";
-import { createCardFromManifest } from "./deck";
+import type { TimestreamsCard, TimestreamsState, EraId } from "./types";
+import { createCardFromManifest, createPlaceholderDeck } from "./deck";
 import { DEFAULT_CONFIG } from "./types";
+import { initializeCardVisibility } from "./visibility";
+import { ERA_TO_SET } from "./packCatalog";
+import type { PackCatalog } from "./packCatalog";
 
 /**
  * Deck Resolver for Timestreams.
@@ -12,15 +15,7 @@ import { DEFAULT_CONFIG } from "./types";
  * For M1, decks are per-home-era sets in the pack.
  */
 
-/** Maps era id to the corresponding set name in the asset pack. */
-const ERA_TO_SET: Record<EraId, string> = {
-  stone: "stone_age",
-  medieval: "medieval",
-  renaissance: "renaissance",
-  industrial: "industrial",
-  modern: "modern",
-  future: "future_tech",
-};
+export { ERA_TO_SET };
 
 /** Internal helper to get the card entries for a given era's set from the pack. */
 function getPackSetCards(pack: LoadedAssetPack, homeEra: EraId): CardManifestEntry[] {
@@ -104,4 +99,66 @@ export function getDeckSizeFromPack(
     const qty = (card as any).quantity ?? (card.metadata as any)?.quantity ?? 1;
     return total + qty;
   }, 0);
+}
+
+/**
+ * After home eras are claimed, replace placeholder decks with pack decks
+ * matching each player's home era. Safe to call once when entering play.
+ * Falls back to placeholders when an era set is missing from the catalog.
+ */
+export function materializeHomeEraDecks(
+  G: TimestreamsState,
+  catalog?: PackCatalog | null,
+): void {
+  const pack = catalog ?? G.packCatalog;
+  if (!pack) return;
+
+  // Only materialize once (placeholder decks use "*-card-*" ids).
+  if ((G as any)._packDecksMaterialized) return;
+  (G as any)._packDecksMaterialized = true;
+
+  if (!G.cards) G.cards = {};
+  const allCardIds: string[] = [];
+
+  for (const playerId of G.playerOrder) {
+    const player = G.players[playerId];
+    if (!player) continue;
+    const era = player.homeEra as EraId | null;
+    const entries = era ? pack[era] : undefined;
+
+    let deckCards: TimestreamsCard[];
+    if (entries && entries.length > 0) {
+      deckCards = resolveDeck(entries as any, playerId);
+    } else {
+      // Missing era in pack (e.g. renaissance/industrial not scanned yet).
+      deckCards = createPlaceholderDeck(playerId, G.config?.deckSize ?? DEFAULT_CONFIG.deckSize);
+    }
+
+    // Clear any previous registry entries for this player's old placeholders
+    // (optional — new ids replace encrypted deck).
+    // Plaintext play: light shuffle so draw order isn't fixed pack order.
+    // (Mental-poker path re-shuffles cryptographically later.)
+    for (let i = deckCards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
+    }
+
+    G.encryptedDecks[playerId] = deckCards.map((card) => {
+      G.cards![card.id] = card;
+      allCardIds.push(card.id);
+      return { ciphertext: card.id, layers: 0 };
+    });
+    // Hands should still be empty at this point (dealt right after).
+    player.hand = [];
+  }
+
+  if (allCardIds.length > 0) {
+    initializeCardVisibility(G, allCardIds);
+  }
+
+  // Align deckSize to the largest materialized deck for draw table sanity.
+  const sizes = G.playerOrder.map((pid) => G.encryptedDecks[pid]?.length ?? 0);
+  if (sizes.some((s) => s > 0)) {
+    G.config.deckSize = Math.max(...sizes);
+  }
 }

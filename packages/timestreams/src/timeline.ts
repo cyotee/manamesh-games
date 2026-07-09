@@ -2,7 +2,7 @@ import { ERA_ORDER, type EraId, type EraState } from "./types";
 
 export function createTimeline(): Record<EraId, EraState> {
   const t = {} as Record<EraId, EraState>;
-  for (const id of ERA_ORDER) t[id] = { id, stack: [] };
+  for (const id of ERA_ORDER) t[id] = { id, stack: [], actions: [] };
   return t;
 }
 
@@ -21,6 +21,19 @@ export function appendToEra(
   timeline: Record<EraId, EraState>, era: EraId, cardId: string,
 ): void {
   timeline[era].stack.push(cardId);
+}
+
+/** Place an action onto an era (not into invention scoring slots). */
+export function appendActionToEra(
+  timeline: Record<EraId, EraState>, era: EraId, cardId: string,
+): void {
+  if (!timeline[era].actions) timeline[era].actions = [];
+  timeline[era].actions!.push(cardId);
+}
+
+/** All cards associated with an era (inventions + era-level actions). */
+export function eraAllCardIds(era: EraState): string[] {
+  return [...(era.actions ?? []), ...era.stack];
 }
 
 export function scoringSlotCardIds(era: EraState, scoringSlots: number): string[] {

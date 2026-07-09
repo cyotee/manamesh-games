@@ -58,7 +58,9 @@ describe('play-phase triggers', () => {
     putInEra(G, 'medieval', taxes);
     registerStaticTriggers(G, taxes);
     fireEvent(G, { type: 'discarded-from-play', cardId: 'medieval-taxes#0', eraId: 'medieval', actorPlayerId: '1' });
-    expect(G.pendingDecryptRequests).toHaveLength(2);
+    // Sequential decrypt: one active request + remaining count of 2 for discarder
+    expect(G.pendingDealRemaining?.['1']).toBe(2);
+    expect(G.pendingDecryptRequests.length).toBe(1);
   });
 
   it('Television sets skip flag and draws for the next inventor', () => {

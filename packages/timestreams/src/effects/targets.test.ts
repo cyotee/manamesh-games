@@ -17,7 +17,7 @@ function setup() {
 describe('target resolution', () => {
   it('locates cards by era and index', () => {
     const G = setup();
-    expect(locateCard(G, 'modern-dot-com#0')).toEqual({ era: 'modern', index: 1 });
+    expect(locateCard(G, 'modern-dot-com#0')).toEqual({ era: 'modern', index: 1, zone: 'stack' });
     expect(locateCard(G, 'nope')).toBeNull();
   });
 

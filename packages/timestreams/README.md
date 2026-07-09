@@ -65,13 +65,48 @@ infrastructure" for "public decentralized relays," so it is tracked as a future
 enhancement rather than the default. Note its documented ceiling on many
 simultaneous `RTCPeerConnection`s — a non-issue for small player counts.
 
-## Development
+## Development / playtest
 
 ```bash
+# From monorepo root
+yarn dev:frontend          # Vite on http://localhost:3000
+# Open the Timestreams SPA:
+#   http://localhost:3000/src/pages/timestreams/
+
 # From this package
-yarn test          # vitest run (rules engine + module tests)
+yarn test                  # vitest run (rules engine + board + module tests)
 yarn test:watch
+python3 scripts/tag_test_gap_report.py   # stamp gap report counts
 ```
+
+**Day-to-day testing is local** (not Vercel redeploy). Two tabs → Host / Join.
+
+Tag / rules progress:
+- [TAG_TEST_GAP_REPORT.md](./TAG_TEST_GAP_REPORT.md) — coverage inventory  
+- [TAG_TEST_IMPLEMENTATION_PLAN.md](./TAG_TEST_IMPLEMENTATION_PLAN.md) — plan (engine **and** board UI tests)
+
+### Menu options
+
+| Button | Purpose |
+| --- | --- |
+| **Host P2P Game** | Create invite code, wait for guest answer, then play over WebRTC |
+| **Join as Guest** | Paste host invite, send answer code back, play as player 1 |
+| **Local 2-Seat** | Two boards in one browser (shared `Local` master) — no network |
+
+Default `playMode` is **mental-poker**: after home-era setup the game runs
+key exchange → encrypt → shuffle, then **cooperative decrypt draws**. The board
+auto-peels each decryption layer (no popups); a compact **activity log** shows
+lines like “P0 requested decrypt…” and “Decrypt complete — P1 received a card.”
+Use `moduleConfig.playMode: "plaintext"` only for rules-only debugging without crypto.
+
+### Remote play with another person
+
+1. Both open the SPA URL (must be `http(s)://`, not only `file://`, for WebRTC).
+2. Host → **Host P2P Game** → **Copy Invite Code** → send via chat.
+3. Guest → **Join as Guest** → paste invite → **Generate Answer Code** → send back.
+4. Host pastes answer → **Connect** → both land on setup, claim eras, Ready, play.
+
+STUN only (Google). Peers behind hard symmetric NAT may need TURN later.
 
 See `PRD.md`, `RULES.md`, and `RULES_ENGINE_PRD.md` for game and rules-engine
 specifications.

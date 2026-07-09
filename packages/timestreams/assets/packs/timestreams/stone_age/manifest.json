@@ -84,9 +84,11 @@
         "scoreValue": null,
         "tags": [
           "react:move",
+          "react:from:hand",
           "trigger:target:own-cards",
           "react:cancel",
-          "cancel:all-effects-of-source"
+          "cancel:all-effects-of-source",
+          "cost:discard-self"
         ]
       },
       "quantity": 1
@@ -315,6 +317,7 @@
         "scoreValue": 2,
         "tags": [
           "react:action",
+          "react:from:hand",
           "trigger:source:opponent",
           "react:cancel",
           "cancel:all-effects-of-source",

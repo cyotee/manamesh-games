@@ -16,8 +16,9 @@ describe("TimestreamsGame integration", () => {
   it("has a valid setup function", () => {
     expect(typeof TimestreamsGame.setup).toBe("function");
     const initial = TimestreamsGame.setup!({ playOrder: ["0", "1"] } as any);
-    expect(initial.phase).toBe("keyExchange");
+    expect(initial.phase).toBe("setup");
     expect(Object.keys(initial.players)).toHaveLength(2);
+    expect(initial.config.playMode).toBe("mental-poker");
   });
 
   it("supports pre-resolved decks + config overrides in setup (for real packs)", () => {
@@ -31,7 +32,8 @@ describe("TimestreamsGame integration", () => {
     } as any);
     expect(initial.encryptedDecks["0"]).toHaveLength(1);
     expect(initial.config.deckSize).toBe(1);
-    expect(initial.phase).toBe("keyExchange");
+    expect(initial.phase).toBe("setup");
+    expect(initial.cards?.["0-real-0"]?.name).toBe("RealCard0");
   });
 
   it("supports full random era commit-reveal wiring + assignment in setup phase", () => {

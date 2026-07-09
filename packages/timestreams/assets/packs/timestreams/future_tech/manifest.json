@@ -454,7 +454,7 @@
     {
       "id": "future-tech-immortality",
       "name": "Immortality",
-      "front": "cards/Future_Tech-Immortalıty.png",
+      "front": "cards/Future_Tech-Immortality.png",
       "back": "backs/Future_Tech-Back.png",
       "metadata": {
         "cardType": "invention",

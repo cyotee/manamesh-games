@@ -19,6 +19,10 @@ export type {
   ShuffleProof,
 } from './types';
 
+// Point helpers used by mental-poker consumers (re-exported so Vite aliases
+// that only wire mental-poker still resolve normalize without a secp256k1 path).
+export { secpPointNormalizeHex } from '../secp256k1';
+
 // SRA Commutative Encryption
 export {
   buildCardPointLookup,
@@ -29,6 +33,7 @@ export {
   encryptDeck,
   generateKeyPair,
   getCardPoint,
+  hashToPoint,
   reencryptDeck,
   verifyCommutative,
 } from './sra';

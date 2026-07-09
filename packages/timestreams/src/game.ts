@@ -19,8 +19,13 @@
 import type { Game, Ctx } from "boardgame.io";
 
 // boardgame.io/core is the workspace source package which lacks a built dist/
-// in this monorepo. Define INVALID_MOVE locally.
+// in this monorepo. Define INVALID_MOVE / ActivePlayers locally.
 const INVALID_MOVE = "INVALID_MOVE" as const;
+/** All players may call phase moves (Stage.NULL). Avoid named stages without stage.moves. */
+const ALL_ACTIVE = { all: null as null };
+
+/** Concurrent multiplayer moves: master must accept out-of-order dual-seat/P2P races. */
+const CONCURRENT = { client: false as const, ignoreStaleStateID: true as const };
 
 import type {
   TimestreamsCard,
@@ -45,10 +50,17 @@ import {
   shuffleEncryptedDeck,
   submitDecryptionShare,
   dealForDay,
+  dealPlaintextHands,
   requestDraw,
   commitEraSeed,
   revealEraSeed,
+  pushActivityLog,
+  hasActiveDeckOp,
+  commitDeckOpSeed,
+  revealDeckOpSeed,
+  submitDeckOpReencrypt,
 } from "./crypto";
+import { resetSetupPlayer } from "@manamesh/boardgameio-crypto";
 import { createTimeline } from "./timeline";
 import { initializeCardVisibility } from "./visibility";
 import { createProof, appendProof } from "./proofChain";
@@ -58,47 +70,187 @@ import {
   allReadyWithDistinctEras,
   assignRandomHomeEras,
   homeEraTurnOrder,
+  dayFirstPlayer,
 } from "./homeEra";
-import { playInvention, playAction, pass, endDay } from "./play";
-import { resolveScoring } from "./scoring";
+import { playInvention, playAction, pass, endDay, submitReact } from "./play";
+import { beginScoringPhase, submitScoreChoice, ackScoreStep } from "./scoring";
 import { hasTag } from "./effects/tags";
-import { getCard } from "./effects/state";
+import { getCard, getTurnFlags } from "./effects/state";
 import { isMoveBlocked, isDiscardBlocked } from "./effects/boardOps";
 import { timestreamsCardSchema } from "./deck";
+import { materializeHomeEraDecks } from "./deckResolver";
+import type { PackCatalog } from "./packCatalog";
 
 // =============================================================================
 // Game Definition
 // =============================================================================
 
+function nextAfterSetup(G: TimestreamsState): string {
+  return G.config?.playMode === "mental-poker" ? "keyExchange" : "play";
+}
+
+/**
+ * Toggle rules engine mid-game (synced over P2P). Any player may call this —
+ * no turn check — so a broken rules path can be disabled without waiting for
+ * the current player.
+ */
+function setRulesEnabledMove(
+  G: TimestreamsState,
+  enabled: boolean,
+): void {
+  if (!G.config) {
+    G.config = { ...DEFAULT_CONFIG };
+  }
+  G.config.rulesEnabled = !!enabled;
+  if (!enabled) {
+    // Drop any half-resolved prompt queue so play can continue structurally.
+    G.pendingPrompts = [];
+  }
+}
+
+/** Shared move map fragment for the diagnostic toggle (every phase that needs it). */
+const setRulesEnabledMoveDef = {
+  setRulesEnabled: {
+    move: ({ G }: { G: TimestreamsState }, enabled: boolean) => {
+      setRulesEnabledMove(G, enabled);
+    },
+    client: false,
+  },
+};
+
+/** Begin the play phase: set G.phase, deal hands, mark day's first player. */
+function beginPlayPhase(G: TimestreamsState): void {
+  G.phase = "play";
+  if (!G.currentDay || G.currentDay < 1) G.currentDay = 1;
+  // Day 1 first player = earliest home era (RULES.md).
+  G.dayFirstPlayer = dayFirstPlayer(G, G.currentDay);
+  G.startOfDayPending = true;
+  // Replace placeholders with home-era decks from the asset pack catalog (if any).
+  materializeHomeEraDecks(G);
+  // Plaintext: materialize hands from the card registry immediately.
+  // Mental-poker: dealForDay only enqueues cooperative decrypt requests;
+  // the board auto-driver peels layers and fills hands.
+  if (G.config?.playMode !== "mental-poker") {
+    dealPlaintextHands(G, G.currentDay || 1);
+  } else {
+    dealForDay(G, G.currentDay || 1);
+  }
+}
+
+/**
+ * Pick the next current player after endTurn, honouring:
+ * - startOfDayPending (day-first player)
+ * - extraTurns (Androids / Inflation — same player goes again)
+ * - skipNextTurn (skip and clear the flag)
+ */
+export function resolveNextPlayOrderPos(
+  G: TimestreamsState,
+  ctx: Ctx,
+): number {
+  if (G.startOfDayPending) {
+    G.startOfDayPending = false;
+    const pid = G.dayFirstPlayer || dayFirstPlayer(G, G.currentDay || 1);
+    G.dayFirstPlayer = pid;
+    return playOrderIndexForPlayer(G, pid);
+  }
+
+  const current = ctx.currentPlayer;
+  const flags = getTurnFlags(G, current);
+  if (flags.extraTurns > 0) {
+    flags.extraTurns -= 1;
+    // Extra turn continues for this player (Androids: noInvention already set).
+    return playOrderIndexForPlayer(G, current);
+  }
+
+  // Leaving this player's turn sequence — clear per-turn restrictions.
+  flags.noInventionThisTurn = false;
+
+  const order = homeEraTurnOrder(G);
+  if (order.length === 0) {
+    return (ctx.playOrderPos + 1) % ctx.numPlayers;
+  }
+
+  let idx = order.indexOf(current);
+  if (idx < 0) idx = 0;
+
+  // Walk home-era order until we find a player who is not skipped.
+  for (let step = 0; step < order.length; step++) {
+    idx = (idx + 1) % order.length;
+    const pid = order[idx];
+    const f = getTurnFlags(G, pid);
+    if (f.skipNextTurn) {
+      f.skipNextTurn = false;
+      continue;
+    }
+    return playOrderIndexForPlayer(G, pid);
+  }
+
+  // All skipped (shouldn't happen) — fall back to next seat.
+  return (ctx.playOrderPos + 1) % ctx.numPlayers;
+}
+
+export function playOrderIndexForPlayer(G: TimestreamsState, playerId: string): number {
+  const idx = G.playerOrder.indexOf(playerId);
+  return idx >= 0 ? idx : 0;
+}
+
 export const TimestreamsGame: Game<TimestreamsState> = {
   name: "timestreams",
 
-  setup: (ctx: Ctx, setupData?: { moduleConfig?: Partial<TimestreamsConfig>; decks?: Record<string, TimestreamsCard[]> }) => {
+  setup: (arg: any, setupData?: {
+    moduleConfig?: Partial<TimestreamsConfig>;
+    decks?: Record<string, TimestreamsCard[]>;
+    packCatalog?: PackCatalog;
+    packName?: string;
+  }) => {
+    // boardgame.io calls setup(fnContext, setupData) where fnContext = { ctx, ...plugins }.
+    // Unit tests may pass a bare Ctx-like object with playOrder at the top level.
+    const ctx: Ctx = arg?.ctx ?? arg;
     const config = setupData?.moduleConfig ?? {};
-    const playerIDs = ctx.playOrder || ctx.playerIDs || [];
+    const playerIDs: string[] =
+      (ctx?.playOrder as string[] | undefined) ||
+      (arg?.playOrder as string[] | undefined) ||
+      (arg?.playerIDs as string[] | undefined) ||
+      Array.from({ length: ctx?.numPlayers || 2 }, (_, i) => String(i));
     const decks = setupData?.decks;
     // Support pre-resolved decks from packs (per rules-free design).
     // Higher layer (lobby) resolves using resolveDecksFromPack + getDeckSizeFromPack,
     // then passes decks here. Avoids direct LoadedAssetPack coupling in boardgame.io setup.
-    return createCryptoInitialState(
+    const G = createCryptoInitialState(
       { playerIDs },
       config,
       decks
     );
+    // Pack catalog is attached for materializeHomeEraDecks at play start
+    // (home eras are not known until after setup claims).
+    if (setupData?.packCatalog) {
+      G.packCatalog = setupData.packCatalog;
+      G.packName = setupData.packName;
+    }
+    return G;
   },
 
   phases: {
     setup: {
       start: true,
+      // Both players claim eras / ready concurrently (not turn-based).
+      turn: {
+        activePlayers: ALL_ACTIVE,
+      },
       moves: {
+        ...setRulesEnabledMoveDef,
         claimHomeEra: {
-          move: ({ G, ctx, playerID }, era: EraId) =>
-            claimHomeEra(G, playerID, era),
+          move: ({ G, playerID }, era: EraId) => {
+            if (!claimHomeEra(G, playerID, era)) return INVALID_MOVE;
+            // Keep G.phase aligned with the bgio setup phase while claiming.
+            G.phase = "setup";
+          },
           client: false,
         },
         setReady: {
-          move: ({ G, ctx, playerID }, ready: boolean) =>
-            setReady(G, playerID, ready),
+          move: ({ G, playerID }, ready: boolean = true) => {
+            setReady(G, playerID, ready);
+          },
           client: false,
         },
         // For random home era assignment (commit-reveal) - full wiring
@@ -114,106 +266,347 @@ export const TimestreamsGame: Game<TimestreamsState> = {
         },
         // Support loading real decks from asset pack (pre-resolved by higher layer)
         loadDecks: {
-          move: ({ G, ctx, playerID }, decks: Record<string, TimestreamsCard[]>) => {
-            if (!decks) return G;
+          move: ({ G }, decks: Record<string, TimestreamsCard[]>) => {
+            if (!decks) return;
+            if (!G.cards) G.cards = {};
             for (const pid of G.playerOrder) {
               const real = decks[pid];
               if (real && real.length > 0) {
-                G.encryptedDecks[pid] = real.map((card: TimestreamsCard) => ({
-                  ciphertext: card.id,
-                  layers: 0,
-                }));
+                G.encryptedDecks[pid] = real.map((card: TimestreamsCard) => {
+                  G.cards![card.id] = card;
+                  return { ciphertext: card.id, layers: 0 };
+                });
               }
             }
-            return G;
           },
           client: false,
         },
       },
       endIf: ({ G }) => allReadyWithDistinctEras(G),
-      next: "keyExchange",
+      next: ({ G }) => nextAfterSetup(G),
     },
 
     keyExchange: {
+      onBegin: ({ G }) => {
+        G.phase = "keyExchange";
+        // Materialize pack decks before encrypt so mental-poker layers real cards.
+        materializeHomeEraDecks(G);
+        pushActivityLog(G, "Key exchange — mental-poker setup", "system");
+      },
+      // Explicit stage so both seats always have the move (dual-seat Local + P2P).
+      turn: {
+        activePlayers: { all: "crypto" },
+        stages: {
+          crypto: {
+            moves: {
+              ...setRulesEnabledMoveDef,
+              submitPublicKey: {
+                move: ({ G, ctx, playerID }, publicKey: string) =>
+                  submitPublicKey(G, ctx, playerID, publicKey),
+                ...CONCURRENT,
+              },
+            },
+          },
+        },
+      },
+      // Phase-level copy (fallback if stage resolution differs)
       moves: {
+        ...setRulesEnabledMoveDef,
         submitPublicKey: {
           move: ({ G, ctx, playerID }, publicKey: string) =>
             submitPublicKey(G, ctx, playerID, publicKey),
-          client: false,
+          ...CONCURRENT,
         },
       },
+      endIf: ({ G }) =>
+        G.phase === "encrypt" ||
+        G.phase === "shuffle" ||
+        G.phase === "play" ||
+        G.playerOrder.every((pid) => !!G.players[pid]?.publicKey),
       next: "encrypt",
     },
 
     encrypt: {
-      moves: {
-        encryptDeck: {
-          move: ({ G, ctx, playerID }, privateKey: string) =>
-            encryptDeck(G, ctx, playerID, privateKey),
-          client: false,
+      onBegin: ({ G }) => {
+        G.phase = "encrypt";
+        resetSetupPlayer(G);
+        pushActivityLog(G, "Encrypt phase — each player layers all decks", "system");
+      },
+      turn: {
+        activePlayers: { all: "crypto" },
+        stages: {
+          crypto: {
+            moves: {
+              ...setRulesEnabledMoveDef,
+              encryptDeck: {
+                move: (
+                  { G, ctx, playerID },
+                  privateKey?: string,
+                  preEncrypted?: Record<string, { ciphertext: string; layers: number }[]>,
+                ) => encryptDeck(G, ctx, playerID, privateKey, preEncrypted as any),
+                ...CONCURRENT,
+              },
+            },
+          },
         },
       },
+      moves: {
+        ...setRulesEnabledMoveDef,
+        encryptDeck: {
+          move: (
+            { G, ctx, playerID },
+            privateKey?: string,
+            preEncrypted?: Record<string, { ciphertext: string; layers: number }[]>,
+          ) => encryptDeck(G, ctx, playerID, privateKey, preEncrypted as any),
+          ...CONCURRENT,
+        },
+      },
+      endIf: ({ G }) =>
+        G.phase === "shuffle" ||
+        G.phase === "play" ||
+        G.playerOrder.every((pid) => !!G.players[pid]?.hasEncrypted),
       next: "shuffle",
     },
 
     shuffle: {
+      onBegin: ({ G }) => {
+        G.phase = "shuffle";
+        resetSetupPlayer(G);
+        pushActivityLog(G, "Shuffle phase — commit/reveal then permute", "system");
+      },
+      turn: {
+        activePlayers: { all: "crypto" },
+        stages: {
+          crypto: {
+            moves: {
+              ...setRulesEnabledMoveDef,
+              commitShuffleSeed: {
+                move: ({ G, ctx, playerID }, commitHashHex: string, callerId?: string) =>
+                  commitShuffleSeed(G, ctx, playerID, commitHashHex, callerId),
+                ...CONCURRENT,
+              },
+              revealShuffleSeed: {
+                move: ({ G, ctx, playerID }, seedHex: string, callerId?: string) =>
+                  revealShuffleSeed(G, ctx, playerID, seedHex, callerId),
+                ...CONCURRENT,
+              },
+              shuffleEncryptedDeck: {
+                move: ({ G, ctx, playerID, events }) =>
+                  shuffleEncryptedDeck(G, ctx, playerID, events),
+                ...CONCURRENT,
+              },
+            },
+          },
+        },
+      },
       moves: {
+        ...setRulesEnabledMoveDef,
         commitShuffleSeed: {
           move: ({ G, ctx, playerID }, commitHashHex: string, callerId?: string) =>
             commitShuffleSeed(G, ctx, playerID, commitHashHex, callerId),
-          client: false,
+          ...CONCURRENT,
         },
         revealShuffleSeed: {
           move: ({ G, ctx, playerID }, seedHex: string, callerId?: string) =>
             revealShuffleSeed(G, ctx, playerID, seedHex, callerId),
-          client: false,
+          ...CONCURRENT,
         },
         shuffleEncryptedDeck: {
-          move: ({ G, ctx, playerID }) => shuffleEncryptedDeck(G, ctx, playerID),
-          client: false,
+          move: ({ G, ctx, playerID, events }) =>
+            shuffleEncryptedDeck(G, ctx, playerID, events),
+          ...CONCURRENT,
         },
       },
+      endIf: ({ G }) =>
+        G.phase === "play" ||
+        G.playerOrder.every((pid) => !!G.players[pid]?.hasShuffled),
       next: "play",
     },
 
     play: {
+      onBegin: ({ G }) => {
+        beginPlayPhase(G);
+      },
       moves: {
+        ...setRulesEnabledMoveDef,
         playInvention: {
-          move: ({ G, ctx, playerID }, cardId: string, choices?: any) =>
-            playInvention(G, ctx, playerID, cardId, choices || {}),
+          move: ({ G, ctx, playerID, events }, cardId: string, choices?: any) => {
+            const result = playInvention(G, ctx, playerID, cardId, choices || {});
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            // Hold turn for rules prompts and mid-game deck ops (search/reshuffle).
+            if (
+              !(G.pendingPrompts && G.pendingPrompts.length > 0) &&
+              !hasActiveDeckOp(G)
+            ) {
+              events?.endTurn?.();
+            }
+            return result;
+          },
           client: false,
         },
         playAction: {
-          move: ({ G, ctx, playerID }, cardId: string, choices?: any) =>
-            playAction(G, ctx, playerID, cardId, choices || {}),
+          move: ({ G, ctx, playerID, events }, cardId: string, choices?: any) => {
+            const result = playAction(G, ctx, playerID, cardId, choices || {});
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            if (
+              !(G.pendingPrompts && G.pendingPrompts.length > 0) &&
+              !hasActiveDeckOp(G) &&
+              !(G as any).pendingActionResolve
+            ) {
+              events?.endTurn?.();
+            }
+            return result;
+          },
           client: false,
         },
+        /**
+         * Hand react (Herbalism-style): any seat that owns the reactor may answer
+         * yes/no even when it is not their turn.
+         */
+        submitReact: {
+          move: (
+            { G, playerID, events },
+            promptId: string,
+            value: string | string[],
+          ) => {
+            const result = submitReact(G, playerID, promptId, value);
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            // After cancel or full resolve (no more prompts / deck op), end turn.
+            if (
+              !(G.pendingPrompts && G.pendingPrompts.length > 0) &&
+              !hasActiveDeckOp(G) &&
+              !(G as any).pendingActionResolve
+            ) {
+              events?.endTurn?.();
+            }
+            return result;
+          },
+          ...CONCURRENT,
+        },
         pass: {
-          move: ({ G, ctx, playerID }) => pass(G, ctx, playerID),
+          move: ({ G, ctx, playerID, events }) => {
+            const result = pass(G, ctx, playerID);
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            // Day may have advanced inside pass → endDay; still end the turn.
+            if (G.phase === "scoring") {
+              events?.endPhase?.();
+            } else {
+              events?.endTurn?.();
+            }
+            return result;
+          },
           client: false,
+        },
+        /** Cooperative mental-poker decrypt layer (auto-driven by board). */
+        submitDecryptionShare: {
+          move: ({ G, ctx, playerID }, requestId: string, share: any) =>
+            submitDecryptionShare(G, ctx, playerID, requestId, share),
+          ...CONCURRENT,
+        },
+        /** Mid-game fair reshuffle commit (search-deck / shuffle-after). */
+        commitDeckOpSeed: {
+          move: ({ G, playerID }, commitHashHex: string) =>
+            commitDeckOpSeed(G, playerID, commitHashHex),
+          ...CONCURRENT,
+        },
+        revealDeckOpSeed: {
+          move: ({ G, playerID, events }, seedHex: string) => {
+            const r = revealDeckOpSeed(G, playerID, seedHex);
+            if (r === INVALID_MOVE) return INVALID_MOVE;
+            // Reshuffle may finish without reencrypt (empty remainder).
+            if (!hasActiveDeckOp(G) && !(G.pendingPrompts?.length)) {
+              events?.endTurn?.();
+            }
+            return r;
+          },
+          ...CONCURRENT,
+        },
+        /** Re-encrypt remaining deck after search/reshuffle (sequential). */
+        submitDeckOpReencrypt: {
+          move: (
+            { G, playerID, events },
+            privateKey?: string | null,
+            preEncrypted?: any,
+          ) => {
+            const r = submitDeckOpReencrypt(G, playerID, privateKey, preEncrypted);
+            if (r === INVALID_MOVE) return INVALID_MOVE;
+            if (!hasActiveDeckOp(G) && !(G.pendingPrompts?.length)) {
+              events?.endTurn?.();
+            }
+            return r;
+          },
+          ...CONCURRENT,
         },
       },
       turn: {
+        // Keep all players active so either peer can toggle rules / submit decrypt
+        // shares without waiting for their turn. Invent/action/pass still check currentPlayer.
+        activePlayers: ALL_ACTIVE,
         order: {
-          // Turn order derived from homeEra chronology
-          first: (G: TimestreamsState) => {
-            const order = homeEraTurnOrder(G);
-            return G.playerOrder.indexOf(order[0]);
+          /**
+           * RULES.md: earliest home-era deck goes first on day 1; each new day
+           * the first player rotates to the next home era in chronological order.
+           * Within a day, turns cycle homeEraTurnOrder until all pass.
+           */
+          first: ({ G }: { G: TimestreamsState }) => {
+            const pid =
+              G.dayFirstPlayer || dayFirstPlayer(G, G.currentDay || 1);
+            G.dayFirstPlayer = pid;
+            G.startOfDayPending = false;
+            return playOrderIndexForPlayer(G, pid);
           },
-          next: (G: TimestreamsState, ctx: Ctx) => {
-            const order = homeEraTurnOrder(G);
-            const currentIdx = order.indexOf(ctx.currentPlayer);
-            return G.playerOrder.indexOf(order[(currentIdx + 1) % order.length]);
-          },
+          next: ({ G, ctx }: { G: TimestreamsState; ctx: Ctx }) =>
+            resolveNextPlayOrderPos(G, ctx),
         },
       },
+      endIf: ({ G }) => G.phase === "scoring" || G.phase === "gameOver",
       next: "scoring",
     },
 
     scoring: {
       onBegin: ({ G }) => {
-        resolveScoring(G);
+        try {
+          const done = beginScoringPhase(G);
+          if (done) G.phase = "gameOver";
+        } catch (err) {
+          console.error("[scoring] beginScoringPhase failed — falling back", err);
+          G.scores = Object.fromEntries(G.playerOrder.map((pid) => [pid, 0]));
+          G.winner = G.playerOrder[0] ?? null;
+          G.phase = "gameOver";
+        }
       },
+      turn: {
+        activePlayers: { all: "scoring" },
+      },
+      moves: {
+        ...setRulesEnabledMoveDef,
+        /** Answer score-phase effect choices (guess, choice, swap, …). */
+        submitScoreChoice: {
+          move: (
+            { G, playerID },
+            promptId: string,
+            value: string | string[],
+          ) => {
+            const result = submitScoreChoice(G, playerID, promptId, value);
+            if (result === "INVALID_MOVE") return INVALID_MOVE;
+            return G;
+          },
+          client: false,
+        },
+        /**
+         * Dual-ack: both players confirm the current scored card before the
+         * walk advances to the next slot (all eras, iteratively).
+         */
+        ackScoreStep: {
+          move: ({ G, playerID }) => {
+            const result = ackScoreStep(G, playerID);
+            if (result === "INVALID_MOVE") return INVALID_MOVE;
+            return G;
+          },
+          ...CONCURRENT,
+        },
+      },
+      endIf: ({ G }) => G.phase === "gameOver",
       next: "gameOver",
     },
 
@@ -224,7 +617,7 @@ export const TimestreamsGame: Game<TimestreamsState> = {
     voided: {
       moves: {
         voteAbortReveal: {
-          move: ({ G, ctx, playerID }) => {
+          move: ({ G, playerID }) => {
             if (!G.abortVotes) G.abortVotes = {};
             G.abortVotes[playerID] = true;
             const voted = Object.keys(G.abortVotes).length;
@@ -234,7 +627,6 @@ export const TimestreamsGame: Game<TimestreamsState> = {
               G.aborted = true;
               G.abortReason = 'majority-vote-abort-reveal';
             }
-            return G;
           },
           client: false,
         },
@@ -274,6 +666,10 @@ export const TimestreamsModule: GameModule<TimestreamsCard, TimestreamsState> = 
   },
 
   validateMove: (state: TimestreamsState, playerID: string, moveName: string, ...args: unknown[]): MoveValidation => {
+    // Structural-only when rules engine is disabled for testing.
+    if (state.config?.rulesEnabled === false) {
+      return { valid: true };
+    }
     // Basic rules enforcement (government, protect/move/discard blocks)
     if (moveName === 'playInvention' || moveName === 'playAction') {
       const cardId = args[0] as string;

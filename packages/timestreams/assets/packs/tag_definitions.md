@@ -6,7 +6,7 @@
 This file is a generated index of every tag used in the pack manifests.
 **Tag semantics, grammar, and executor shapes are specified in [RULES_ENGINE_PRD.md](../../RULES_ENGINE_PRD.md) (sections 4-5).** The manifests themselves are the source of truth; the hand-written tag definitions formerly in this file are superseded.
 
-293 unique tags across 58 families.
+294 unique tags across 58 families.
 
 ## `additional:`
 
@@ -92,7 +92,7 @@ This file is a generated index of every tag used in the pack manifests.
 | Tag | Uses | Cards |
 |---|---|---|
 | `cost:discard-from-hand:1` | 1 | `medieval-water-wheel` |
-| `cost:discard-self` | 4 | `medieval-chainmail`, `modern-semiconductor`, `modern-tactical-nuclear-weapons`, `stone-age-herbalism` |
+| `cost:discard-self` | 5 | `medieval-chainmail`, `modern-semiconductor`, `modern-tactical-nuclear-weapons`, `stone-age-big-rock`, `stone-age-herbalism` |
 
 ## `count:`
 
@@ -407,6 +407,7 @@ This file is a generated index of every tag used in the pack manifests.
 | `react:cancel` | 4 | `era-stone`, `medieval-chainmail`, `stone-age-big-rock`, `stone-age-herbalism` |
 | `react:discard` | 3 | `medieval-chainmail`, `medieval-crusades`, `modern-combination-drug-therapy` |
 | `react:era-begin` | 1 | `era-modern` |
+| `react:from:hand` | 2 | `stone-age-big-rock`, `stone-age-herbalism` |
 | `react:invention-played` | 3 | `medieval-crop-rotation`, `medieval-waylay`, `modern-dot-com` |
 | `react:move` | 6 | `era-stone`, `medieval-chainmail`, `modern-dot-com`, `modern-international-diplomacy`, `stone-age-big-rock`, `stone-age-cloth` |
 | `react:point-value-changed` | 1 | `modern-international-diplomacy` |

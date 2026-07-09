@@ -3,11 +3,17 @@ import type { TimestreamsState, TimestreamsCard } from '../types';
 export interface PlayerPrompt {
   id: string;
   deciderId: string;
-  kind: 'choose-card' | 'choose-option' | 'choose-position' | 'confirm';
+  kind: 'choose-card' | 'choose-option' | 'choose-position' | 'choose-number' | 'confirm';
   options: string[];
   min: number;
   max: number;
   reason: string;
+  /**
+   * When set (e.g. Biotechnology copy), UI labels for option-a/b and similar
+   * should be derived from this card's tags — the ability being resolved —
+   * not the card that was physically played.
+   */
+  labelCardId?: string;
 }
 
 export type ChoiceMap = Record<string, string | string[]>;

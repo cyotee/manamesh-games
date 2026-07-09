@@ -3,15 +3,55 @@ import { describe, it, expect } from 'vitest';
 import { resolvePlayEffect } from '../resolvePlay';
 import { makeCard, makeState, putInEra, putInHand } from '../testFixtures';
 import { addModifier } from '../modifiers';
+import { playAction } from '../../play';
 
 describe('move executor', () => {
-  it('self-move up N within Today (The Wheel), optional', () => {
+  const WHEEL_TAGS = [
+    'play:move', 'move:optional', 'move:target:self',
+    'move:amount:2', 'move:direction:up', 'move:scope:today',
+  ];
+
+  it('optional self-move prompts before applying (Air Cars / The Wheel)', () => {
     const G = makeState({ players: ['0'], currentDay: 1 });
     putInEra(G, 'stone',
       makeCard({ id: 'x#0', ownerId: '0' }), makeCard({ id: 'y#0', ownerId: '0' }),
-      makeCard({ id: 'stone-age-the-wheel#0', ownerId: '0', tags: ['play:move', 'move:optional', 'move:target:self', 'move:amount:2', 'move:direction:up', 'move:scope:today'] }),
+      makeCard({ id: 'future-tech-air-cars#0', ownerId: '0', tags: WHEEL_TAGS }),
     );
-    const res = resolvePlayEffect(G, '0', 'stone-age-the-wheel#0', { 'stone-age-the-wheel#0:move-card': 'stone-age-the-wheel#0' });
+    const first = resolvePlayEffect(G, '0', 'future-tech-air-cars#0');
+    expect(first.prompts).toHaveLength(1);
+    expect(first.prompts[0]).toMatchObject({
+      id: 'future-tech-air-cars#0:move-card',
+      kind: 'choose-option',
+      options: ['move', 'stay'],
+      reason: 'play:move',
+    });
+    // Still at bottom until player confirms
+    expect(G.timeline.stone.stack).toEqual(['x#0', 'y#0', 'future-tech-air-cars#0']);
+  });
+
+  it('optional self-move: stay leaves card where played', () => {
+    const G = makeState({ players: ['0'], currentDay: 1 });
+    putInEra(G, 'stone',
+      makeCard({ id: 'x#0', ownerId: '0' }), makeCard({ id: 'y#0', ownerId: '0' }),
+      makeCard({ id: 'future-tech-air-cars#0', ownerId: '0', tags: WHEEL_TAGS }),
+    );
+    const res = resolvePlayEffect(G, '0', 'future-tech-air-cars#0', {
+      'future-tech-air-cars#0:move-card': 'stay',
+    });
+    expect(res.prompts).toEqual([]);
+    expect(res.log.join(' ')).toMatch(/declined/);
+    expect(G.timeline.stone.stack).toEqual(['x#0', 'y#0', 'future-tech-air-cars#0']);
+  });
+
+  it('self-move up N within Today (The Wheel), optional — accept moves up 2', () => {
+    const G = makeState({ players: ['0'], currentDay: 1 });
+    putInEra(G, 'stone',
+      makeCard({ id: 'x#0', ownerId: '0' }), makeCard({ id: 'y#0', ownerId: '0' }),
+      makeCard({ id: 'stone-age-the-wheel#0', ownerId: '0', tags: WHEEL_TAGS }),
+    );
+    const res = resolvePlayEffect(G, '0', 'stone-age-the-wheel#0', {
+      'stone-age-the-wheel#0:move-card': 'move',
+    });
     expect(res.prompts).toEqual([]);
     expect(G.timeline.stone.stack).toEqual(['stone-age-the-wheel#0', 'x#0', 'y#0']);
   });
@@ -42,7 +82,48 @@ describe('move executor', () => {
     putInHand(G, '0', bc);
     const res = resolvePlayEffect(G, '0', 'future-tech-backwards-compatibility#0');
     expect(res.prompts).toEqual([]);
+    expect(res.log.join(' ')).toMatch(/moved b#0 to top of medieval/);
+    expect(G.timeline.stone.stack).toEqual(['a#0']);
     expect(G.timeline.medieval.stack).toEqual(['b#0']);
+  });
+
+  it('Backwards Compatibility via playAction moves bottom of yesterday automatically', () => {
+    const G = makeState({ players: ['0'], currentDay: 3 }); // today = renaissance, yesterday = medieval
+    G.phase = 'play';
+    putInEra(
+      G,
+      'medieval',
+      makeCard({ id: 'top#0', ownerId: '0', name: 'Top' }),
+      makeCard({ id: 'bottom#0', ownerId: '0', name: 'Bottom' }),
+    );
+    putInEra(G, 'renaissance', makeCard({ id: 'already#0', ownerId: '0' }));
+    const bc = makeCard({
+      id: 'future-tech-backwards-compatibility#0',
+      ownerId: '0',
+      cardType: 'action',
+      tags: ['play:move', 'move-source:bottom-yesterday', 'move-destination:top-today'],
+    });
+    putInHand(G, '0', bc);
+    playAction(G, { currentPlayer: '0' } as any, '0', bc.id);
+    expect(G.pendingPrompts ?? []).toEqual([]);
+    expect(G.timeline.medieval.stack).toEqual(['top#0']);
+    expect(G.timeline.renaissance.stack).toEqual(['bottom#0', 'already#0']);
+    expect(G.activityLog?.some((e) => /moved bottom#0/.test(e.message))).toBe(true);
+  });
+
+  it('Backwards Compatibility fizzles with clear log when yesterday is empty', () => {
+    const G = makeState({ players: ['0'], currentDay: 1 }); // no yesterday
+    G.phase = 'play';
+    const bc = makeCard({
+      id: 'future-tech-backwards-compatibility#0',
+      ownerId: '0',
+      cardType: 'action',
+      tags: ['play:move', 'move-source:bottom-yesterday', 'move-destination:top-today'],
+    });
+    putInHand(G, '0', bc);
+    const res = resolvePlayEffect(G, '0', bc.id);
+    expect(res.prompts).toEqual([]);
+    expect(res.log.join(' ')).toMatch(/fizzles/);
   });
 
   it('era-crossing move fizzles when direction is prevented (Sundial)', () => {

@@ -57,6 +57,9 @@ export function createCardFromManifest(
     reactEffectText: meta.reactEffectText,
     scoreValue: meta.scoreValue,
     tags: meta.tags || [],
+    // Pack loader rewrites front/back to absolute URLs when available.
+    imageUrl: entry.front || undefined,
+    backImageUrl: entry.back || undefined,
   };
 }
 

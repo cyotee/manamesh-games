@@ -56,6 +56,15 @@ export function putInEra(G: TimestreamsState, era: EraId, ...cards: TimestreamsC
   }
 }
 
+/** Place action cards onto an era (not scoring slots). */
+export function putActionOnEra(G: TimestreamsState, era: EraId, ...cards: TimestreamsCard[]): void {
+  if (!G.timeline[era].actions) G.timeline[era].actions = [];
+  for (const card of cards) {
+    registerCard(G, card);
+    G.timeline[era].actions!.push(card.id);
+  }
+}
+
 export function putInHand(G: TimestreamsState, playerId: string, ...cards: TimestreamsCard[]): void {
   for (const card of cards) {
     registerCard(G, card);

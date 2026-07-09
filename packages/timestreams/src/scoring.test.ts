@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resolveScoring, cardOwner } from "./scoring";
-import { makeState, putInEra } from "./effects/testFixtures";
-import { makeCard } from "./effects/testFixtures";
+import {
+  resolveScoring,
+  cardOwner,
+  computeScoringSlotsForEra,
+  scoringSlotModifierNotes,
+} from "./scoring";
+import { makeState, putInEra, putActionOnEra, makeCard } from "./effects/testFixtures";
 import { getPendingTriggers, registerCard } from "./effects/state";
 
 describe("placeholder scoring", () => {
@@ -167,8 +171,15 @@ describe("placeholder scoring", () => {
     G.players['0'].homeEra = 'stone';
     G.config.scoringSlots = 6;
 
-    // Slow Time style card adds +2 slots
-    const slow = makeCard({ id: 'slow#0', ownerId: '0', tags: ['score:add-scoring-slots:2'] });
+    // Slow Time is an action attached to the era — not an invention slot.
+    const slow = makeCard({
+      id: 'slow#0',
+      ownerId: '0',
+      name: 'Slow Time',
+      cardType: 'action',
+      tags: ['score:add-scoring-slots:2'],
+    });
+    putActionOnEra(G, 'stone', slow);
     putInEra(G, 'stone',
       makeCard({ id: 'c1#0', ownerId: '0', scoreValue: 1 }),
       makeCard({ id: 'c2#0', ownerId: '0', scoreValue: 1 }),
@@ -177,11 +188,81 @@ describe("placeholder scoring", () => {
       makeCard({ id: 'c5#0', ownerId: '0', scoreValue: 1 }),
       makeCard({ id: 'c6#0', ownerId: '0', scoreValue: 1 }),
       makeCard({ id: 'c7#0', ownerId: '0', scoreValue: 1 }),
-      slow,
     );
 
+    expect(G.timeline.stone.stack).not.toContain(slow.id);
+    expect(G.timeline.stone.actions).toContain(slow.id);
+    expect(computeScoringSlotsForEra(G, 'stone')).toBe(8);
+    expect(scoringSlotModifierNotes(G, 'stone')).toEqual(['+2 Slow Time']);
+
     resolveScoring(G);
-    // With base 6, +2 from card = 8 slots, so top 8 (all) should score: 7 points
+    // base 6 + 2 = 8 slots; 7 inventions × 1 point (Slow Time not a slot card)
     expect(G.scores).toEqual({ '0': 7 });
+  });
+
+  it('Fast Time reduces scoring slots for its era only', () => {
+    const G = makeState({ players: ['0'], currentDay: 2 });
+    G.config.scoringSlots = 6;
+    putInEra(
+      G,
+      'medieval',
+      makeCard({ id: 'a#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'b#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'c#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'd#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'e#0', ownerId: '0', scoreValue: 1 }),
+      makeCard({ id: 'f#0', ownerId: '0', scoreValue: 1 }),
+    );
+    putActionOnEra(
+      G,
+      'medieval',
+      makeCard({
+        id: 'fast#0',
+        ownerId: '0',
+        name: 'Fast Time',
+        cardType: 'action',
+        tags: ['score:remove-scoring-slots:2'],
+      }),
+    );
+    // stone unchanged
+    putInEra(G, 'stone', makeCard({ id: 's#0', ownerId: '0', scoreValue: 3 }));
+
+    expect(computeScoringSlotsForEra(G, 'medieval')).toBe(4);
+    expect(computeScoringSlotsForEra(G, 'stone')).toBe(6);
+    expect(G.timeline.medieval.stack).not.toContain('fast#0');
+
+    resolveScoring(G);
+    // medieval: only first 4 of 6 inventions score (a–d); e,f past slots
+    // stone: s = 3
+    expect(G.scores['0']).toBe(4 + 3);
+  });
+
+  it('Slow Time + Fast Time on same era cancel to base 6 (slot math)', () => {
+    const G = makeState({ players: ['0'], currentDay: 1 });
+    G.config.scoringSlots = 6;
+    putActionOnEra(
+      G,
+      'stone',
+      makeCard({
+        id: 'slow#0',
+        ownerId: '0',
+        name: 'Slow Time',
+        cardType: 'action',
+        tags: ['score:add-scoring-slots:2'],
+      }),
+      makeCard({
+        id: 'fast#0',
+        ownerId: '0',
+        name: 'Fast Time',
+        cardType: 'action',
+        tags: ['score:remove-scoring-slots:2'],
+      }),
+    );
+    putInEra(G, 'stone', makeCard({ id: 'c1#0', ownerId: '0', scoreValue: 1 }));
+    expect(computeScoringSlotsForEra(G, 'stone')).toBe(6);
+    expect(scoringSlotModifierNotes(G, 'stone')).toEqual([
+      '+2 Slow Time',
+      '−2 Fast Time',
+    ]);
   });
 });

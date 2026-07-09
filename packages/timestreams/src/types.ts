@@ -93,6 +93,15 @@ export interface TimestreamsCard extends CoreCard {
 
   /** Keyword tags for quick filtering and future effect dispatch. */
   tags?: string[];
+
+  /**
+   * Absolute or pack-relative URL for the card face image (from asset pack).
+   * Optional — placeholders have no art.
+   */
+  imageUrl?: string;
+
+  /** Optional card-back image URL from the asset pack. */
+  backImageUrl?: string;
 }
 
 /**
@@ -139,8 +148,16 @@ export function composeCardText(card: TimestreamsCard): string {
 export interface EraState {
   /** Which era this slot represents */
   id: EraId;
-  /** Ordered list of card IDs currently placed in this era */
+  /**
+   * Ordered list of invention card IDs in this era (scoring order).
+   * Index 0 is the first scoring slot; only inventions go here.
+   */
   stack: string[];
+  /**
+   * Actions played onto this era (Slow Time, Fast Time, Multiplicity, …).
+   * Attached to the era — never occupy scoring slots.
+   */
+  actions?: string[];
 }
 
 // =============================================================================
@@ -206,6 +223,20 @@ export interface TimestreamsConfig {
   homeEraAssignment: "selectable" | "random";
   /** Deck encryption scheme in use */
   deckEncryption: "mental-poker";
+  /**
+   * Play mode:
+   * - mental-poker (default): keyExchange → encrypt → shuffle → cooperative
+   *   decrypt draws (board auto-peels layers; activity log notices).
+   * - plaintext: skip crypto after setup; deal from card registry (debug only).
+   */
+  playMode: "plaintext" | "mental-poker";
+  /**
+   * When false, skip the rules engine (gates, play/score effects, triggers,
+   * modifiers). Structural moves still work: play invention → era stack,
+   * play action → discard, pass/day advance, simple scoreValue scoring.
+   * Use this to test P2P/UI when the rules engine is broken or in flux.
+   */
+  rulesEnabled: boolean;
   /** Whether to maintain a verifiable proof chain for all state transitions */
   proofChainEnabled: boolean;
 }
@@ -255,6 +286,57 @@ export interface DecryptRequest {
   currentLayer: number;
   /** Lifecycle status of this request */
   status: "pending" | "partial" | "complete";
+  /** True once the fully-peeled card has been placed into the owner's hand */
+  materialized?: boolean;
+  /**
+   * draw — materialize into hand (default).
+   * search — materialize into activeDeckOp.revealed for deck-search UI.
+   */
+  purpose?: "draw" | "search";
+}
+
+/**
+ * Mid-game deck operation (search + fair reshuffle + re-encrypt).
+ * Holds the turn until phase is done.
+ */
+export interface ActiveDeckOp {
+  id: string;
+  kind: "search-deck";
+  sourceCardId: string;
+  ownerId: string;
+  phase:
+    | "decrypt"
+    | "choose"
+    | "reshuffle-commit"
+    | "reshuffle-reveal"
+    | "reshuffle-apply"
+    | "reencrypt"
+    | "done";
+  /** Total cards to peel for search */
+  decryptTotal: number;
+  decryptDone: number;
+  /** Revealed card ids (order is current physical order during decrypt) */
+  revealed: string[];
+  toHand: boolean;
+  shuffleAfter: boolean;
+  /** Multi-party shuffle seed for remaining deck after pick */
+  shuffleCommits: Record<string, string | null>;
+  shuffleReveals: Record<string, string | null>;
+  finalSeedHex: string | null;
+  /** Index into playerOrder for sequential re-encrypt of owner's remaining deck */
+  reencryptPlayerIndex: number;
+  statusMessage?: string;
+}
+
+/** Compact activity-log line for decrypt / system notices (non-modal). */
+export interface ActivityLogEntry {
+  id: string;
+  /** Unix ms */
+  at: number;
+  /** Short human message */
+  message: string;
+  /** Optional category for styling */
+  kind?: "decrypt" | "deal" | "system" | "info";
 }
 
 // =============================================================================
@@ -313,6 +395,12 @@ export interface TimestreamsState {
   currentDay: number;
   /** Player ID of the first player for the current day */
   dayFirstPlayer: string;
+  /**
+   * When true, the next endTurn should start the day's first player
+   * (earliest home era on day 1, then rotate chronologically each day).
+   * Set by endDay / play onBegin; cleared when consumed by turn.order.next.
+   */
+  startOfDayPending?: boolean;
   /** Encrypted decks keyed by player ID */
   encryptedDecks: Record<string, EncryptedCard[]>;
   /** cardId -> era placement for scoring */
@@ -323,6 +411,15 @@ export interface TimestreamsState {
   eraAssignmentRng: ShuffleRngState | null;
   /** In-flight cooperative decryption requests */
   pendingDecryptRequests: DecryptRequest[];
+  /**
+   * Remaining automatic draws to enqueue per player (mental-poker day deal / play:draw).
+   * Sequential: only one active decrypt request per deck at a time (always top card).
+   */
+  pendingDealRemaining?: Record<string, number>;
+  /** Rolling activity log (newest last); shown as a small non-blocking panel */
+  activityLog?: ActivityLogEntry[];
+  /** In-flight search-deck / mid-game reshuffle (mental-poker) */
+  activeDeckOp?: ActiveDeckOp | null;
   /** Index into playerOrder for sequential setup operations */
   setupPlayerIndex: number;
   /** cardId -> visibility state */
@@ -345,6 +442,14 @@ export interface TimestreamsState {
 
   /** M2 rules engine: id -> full card for every card in public play. */
   cards?: Record<string, TimestreamsCard>;
+  /**
+   * Optional pack catalog (per-era card lists with absolute image URLs).
+   * When present, beginPlayPhase materializes real decks from each player's home era.
+   * Serializable JSON only — no blobs.
+   */
+  packCatalog?: import("./packCatalog").PackCatalog;
+  /** Display name of the loaded pack (UI). */
+  packName?: string;
   /** M2 rules engine: hostCardId -> attached action card ids. */
   attachments?: Record<string, string[]>;
   /** M2 rules engine: active duration modifiers. */
@@ -354,10 +459,96 @@ export interface TimestreamsState {
   /** M2 rules engine: per-player turn flags. */
   turnFlags?: Record<string, TurnFlags>;
   /** M2 rules engine: prompts awaiting UI answers for the last played card. */
-  pendingPrompts?: Array<{ id: string; deciderId: string; kind: string; options: string[]; min: number; max: number; reason: string }>;
+  pendingPrompts?: Array<{
+    id: string;
+    deciderId: string;
+    kind: string;
+    options: string[];
+    min: number;
+    max: number;
+    reason: string;
+    labelCardId?: string;
+    eventCardId?: string;
+    eventActorId?: string;
+    eventType?: string;
+  }>;
+  /**
+   * Action play paused while opponents answer hand reacts (Herbalism-style).
+   * Set by openHandReactWindowForAction; cleared when resolves/cancels.
+   */
+  pendingActionResolve?: {
+    cardId: string;
+    actorPlayerId: string;
+    choices: Record<string, string | string[]>;
+    event: { type: string; cardId: string; actorPlayerId: string; eraId?: string };
+    remainingPromptIds: string[];
+    cancelled: boolean;
+  };
+  /** Score-phase answers (guess secret/answer, score:choice, …) keyed by prompt id. */
+  scoreChoices?: Record<string, string | string[]>;
 
   /** M3: per-card flags for cards already scored in the current scoring pass (for Wonky rule). */
   scoredThisScoring?: string[];
+
+  /**
+   * Iterative scoring walk (all eras, card-by-card dual-ack).
+   * Present while phase === "scoring" until gameOver.
+   */
+  scoringWalk?: ScoringWalk;
+
+  /**
+   * While walking scoring, "today" for scope tags means this era (the one
+   * currently being scored), not G.currentDay.
+   */
+  scoringActiveEra?: EraId | null;
+}
+
+/** One card (or era-action) to process during iterative scoring. */
+export interface ScoringStep {
+  eraId: EraId;
+  /** 0-based index among scoring slots; -1 for era-level actions. */
+  slotIndex: number;
+  cardId: string;
+  kind: "slot" | "era-action";
+}
+
+/** Dual-ack card-by-card scoring session. */
+export interface ScoringWalk {
+  /**
+   * Steps discovered so far (grows dynamically via the Wonky rule —
+   * later score effects can change which cards fill remaining slots).
+   */
+  steps: ScoringStep[];
+  /** Index of the step currently awaiting choices / dual-ack. */
+  stepIndex: number;
+  /** Waiting for owner effect choices, or for both players to OK. */
+  stepPhase: "choice" | "ack";
+  /** playerId → has acknowledged the current card result. */
+  acks: Record<string, boolean>;
+  /** Cards fully finished (acked) — for UI highlight. */
+  processedCardIds: string[];
+  /** Card currently being scored (yellow highlight). */
+  currentCardId: string | null;
+  /** Human summary of the last applied card (shown with OK). */
+  lastSummary: string;
+  /** Eras that have completed cleanup. */
+  erasCompleted: EraId[];
+  /**
+   * Points accumulated while walking. Not committed to `G.scores` until
+   * every card is processed — later cards can change which earlier slots
+   * still count via moves/swaps/discards (Wonky rule).
+   */
+  provisionalScores: Record<string, number>;
+  /** Era currently being walked (null before first pick / after done). */
+  activeEraId: EraId | null;
+  /** Scoring-slot capacity for `activeEraId` (computed when the era starts). */
+  eraSlotTotal: number;
+  /** How many scoring slots still remain in the active era. */
+  remainingSlots: number;
+  /** How many invention slots have been applied in the active era. */
+  slotsUsedInEra: number;
+  /** True once invention slots are exhausted; era-actions are next. */
+  eraActionsPhase: boolean;
 }
 
 // =============================================================================
@@ -406,6 +597,13 @@ export const DEFAULT_CONFIG: TimestreamsConfig = {
   drawTable: { 2: 6, 3: 5, 4: 4 },
   homeEraAssignment: "selectable",
   deckEncryption: "mental-poker",
+  /**
+   * Default mental-poker: keyExchange → encrypt → shuffle → cooperative decrypt draws.
+   * Board auto-peels layers; activity log records request/complete (non-modal).
+   * Use playMode: "plaintext" only for rules-only debugging without crypto.
+   */
+  playMode: "mental-poker",
+  rulesEnabled: true,
   proofChainEnabled: true,
 };
 

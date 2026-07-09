@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolvePlayEffect } from '../resolvePlay';
 import { makeCard, makeState, putInEra, putInHand } from '../testFixtures';
+import { describeChoiceOption } from './choice';
 
 const SURGICAL = ['play:choice', 'target:choose:invention', 'target:scope:today', 'decider:target-owner',
   'option-a:discard:target', 'option-b:discard:hand:3', 'option-b:discard:by:target-owner', 'forced:option-a:if-hand-under-3'];
@@ -54,6 +55,85 @@ describe('choice executor', () => {
       'medieval-diplomacy#0:choose-opponent': '1',
       'medieval-diplomacy#0:option': 'option-b',
     });
-    expect(G.pendingDecryptRequests).toHaveLength(2);
+    // Sequential: draw 2 queued for acting player
+    expect(G.pendingDealRemaining?.['0']).toBe(2);
+    expect(G.pendingDecryptRequests.length).toBe(1);
+  });
+
+  it('High-powered Laser: option-a draws 2', () => {
+    const G = makeState({ players: ['0'], currentDay: 6 });
+    G.encryptedDecks['0'] = [{}, {}, {}] as any;
+    const laser = makeCard({
+      id: 'future-tech-high-powered-laser#0',
+      ownerId: '0',
+      tags: [
+        'play:choice',
+        'decider:self',
+        'option-a:draw:2',
+        'option-b:discard:1',
+        'option-b:discard:target:any-card',
+        'option-b:discard:scope:today-or-tomorrow',
+      ],
+    });
+    putInEra(G, 'future', laser);
+    const first = resolvePlayEffect(G, '0', laser.id);
+    expect(first.prompts[0]).toMatchObject({
+      id: `${laser.id}:option`,
+      options: ['option-a', 'option-b'],
+      reason: 'play:choice',
+    });
+    resolvePlayEffect(G, '0', laser.id, { [`${laser.id}:option`]: 'option-a' });
+    expect(G.pendingDealRemaining?.['0']).toBe(2);
+  });
+
+  it('High-powered Laser: option-b prompts discard in Today or Tomorrow', () => {
+    const G = makeState({ players: ['0', '1'], currentDay: 6 }); // Today = future
+    putInEra(G, 'future', makeCard({ id: 'victim#0', ownerId: '1' }));
+    const laser = makeCard({
+      id: 'future-tech-high-powered-laser#0',
+      ownerId: '0',
+      tags: [
+        'play:choice',
+        'decider:self',
+        'option-a:draw:2',
+        'option-b:discard:1',
+        'option-b:discard:target:any-card',
+        'option-b:discard:scope:today-or-tomorrow',
+      ],
+    });
+    putInEra(G, 'future', laser);
+
+    const mid = resolvePlayEffect(G, '0', laser.id, {
+      [`${laser.id}:option`]: 'option-b',
+    });
+    expect(mid.prompts[0]).toMatchObject({
+      id: `${laser.id}:option-b-discard-target`,
+      reason: 'play:choice-discard',
+    });
+    expect(mid.prompts[0].options).toContain('victim#0');
+
+    resolvePlayEffect(G, '0', laser.id, {
+      [`${laser.id}:option`]: 'option-b',
+      [`${laser.id}:option-b-discard-target`]: 'victim#0',
+    });
+    expect(G.timeline.future.stack).not.toContain('victim#0');
+    expect(G.players['1'].discard.map(c => c.id)).toContain('victim#0');
+  });
+});
+
+describe('describeChoiceOption', () => {
+  it('labels High-powered Laser branches from tags', () => {
+    const laser = makeCard({
+      id: 'laser',
+      ownerId: '0',
+      tags: [
+        'option-a:draw:2',
+        'option-b:discard:1',
+        'option-b:discard:target:any-card',
+        'option-b:discard:scope:today-or-tomorrow',
+      ],
+    });
+    expect(describeChoiceOption(laser, 'option-a')).toMatch(/Draw 2 cards/i);
+    expect(describeChoiceOption(laser, 'option-b')).toMatch(/Today or Tomorrow/i);
   });
 });

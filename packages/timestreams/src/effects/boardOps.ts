@@ -4,6 +4,17 @@ import { hasTag, tagNumber } from './tags';
 import { locateCard } from './targets';
 
 export function effectiveScoreValue(G: TimestreamsState, cardId: string): number {
+  const overrides = (G as any).scoreValueOverrides as Record<string, number> | undefined;
+  if (overrides && overrides[cardId] !== undefined) {
+    let value = overrides[cardId];
+    for (const attId of getAttachments(G)[cardId] ?? []) {
+      const att = getCard(G, attId);
+      if (att && hasTag(att, 'modify:score:attached')) {
+        value += tagNumber(att, 'modify:amount') ?? 0;
+      }
+    }
+    return value;
+  }
   const card = requireCard(G, cardId);
   let value = card.scoreValue ?? 0;
   for (const attId of getAttachments(G)[cardId] ?? []) {
@@ -43,7 +54,14 @@ export function isDiscardBlocked(G: TimestreamsState, cardId: string, actorPlaye
 function removeFromStack(G: TimestreamsState, cardId: string): EraId | null {
   const loc = locateCard(G, cardId);
   if (!loc) return null;
-  G.timeline[loc.era].stack.splice(loc.index, 1);
+  if (loc.zone === "actions") {
+    const actions = G.timeline[loc.era].actions ?? [];
+    const idx = actions.indexOf(cardId);
+    if (idx !== -1) actions.splice(idx, 1);
+    G.timeline[loc.era].actions = actions;
+  } else {
+    G.timeline[loc.era].stack.splice(loc.index, 1);
+  }
   return loc.era;
 }
 

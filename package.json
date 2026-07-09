@@ -9,7 +9,9 @@
   "scripts": {
     "build": "yarn workspace @manamesh/frontend build",
     "dev:frontend": "yarn workspace @manamesh/frontend dev",
-    "test:frontend": "yarn workspace @manamesh/frontend test"
+    "test:frontend": "yarn workspace @manamesh/frontend test",
+    "build:timestreams-vercel": "node packages/timestreams/scripts/build-vercel.mjs",
+    "deploy:timestreams": "node packages/timestreams/scripts/build-vercel.mjs && cd deploy/timestreams && vercel deploy --prod --yes --name timestreams"
   },
   "dependencies": {
     "boardgame.io": "file:./packages/boardgame.io",
