@@ -108,7 +108,11 @@ describe('move executor', () => {
     expect(G.pendingPrompts ?? []).toEqual([]);
     expect(G.timeline.medieval.stack).toEqual(['top#0']);
     expect(G.timeline.renaissance.stack).toEqual(['bottom#0', 'already#0']);
-    expect(G.activityLog?.some((e) => /moved bottom#0/.test(e.message))).toBe(true);
+    expect(
+      G.activityLog?.some(
+        (e) => /moved (bottom#0|Bottom)/.test(e.message),
+      ),
+    ).toBe(true);
   });
 
   it('Backwards Compatibility fizzles with clear log when yesterday is empty', () => {

@@ -692,13 +692,14 @@ export function revealEraSeed(
 // Cooperative Decryption + activity log
 // =============================================================================
 
-const ACTIVITY_LOG_MAX = 80;
+/** Keep more lines so scoring reviews stay readable. */
+const ACTIVITY_LOG_MAX = 200;
 
 /** Append a non-modal activity-log line (newest last). */
 export function pushActivityLog(
   G: TimestreamsState,
   message: string,
-  kind: "decrypt" | "deal" | "system" | "info" = "info",
+  kind: "decrypt" | "deal" | "system" | "info" | "score" | "play" = "info",
 ): void {
   if (!G.activityLog) G.activityLog = [];
   G.activityLog.push({
@@ -848,6 +849,13 @@ export function startSearchDeckReveal(
           reason: "play:search-deck",
         },
       ];
+      if (G.playEffectsComplete) delete G.playEffectsComplete[sourceCardId];
+      G.pendingPlayEffect = {
+        cardId: sourceCardId,
+        actorPlayerId: ownerId,
+        kind: G.pendingPlayEffect?.kind || "action",
+        choices: { ...(G.pendingPlayEffect?.choices || {}) },
+      };
     }
     return op;
   }
@@ -908,6 +916,15 @@ function finishSearchDecrypt(G: TimestreamsState): void {
       reason: "play:search-deck",
     },
   ];
+  // Re-open play resolution so submitPlayChoice can complete the pick
+  // (decrypt returned done() with no prompts and may have marked effects complete).
+  if (G.playEffectsComplete) delete G.playEffectsComplete[op.sourceCardId];
+  G.pendingPlayEffect = {
+    cardId: op.sourceCardId,
+    actorPlayerId: op.ownerId,
+    kind: G.pendingPlayEffect?.kind || "action",
+    choices: { ...(G.pendingPlayEffect?.choices || {}) },
+  };
   pushActivityLog(
     G,
     `Deck search ready for P${op.ownerId} (${op.revealed.length} cards)`,

@@ -16,7 +16,7 @@ describe('resolvePlayEffect + draw executor', () => {
     expect(G.pendingDealRemaining?.['0']).toBe(2);
     expect(G.pendingDecryptRequests.length).toBe(1);
     expect(G.pendingDecryptRequests[0].deckOwnerId).toBe('0');
-    expect(res.log.some(l => l.includes('play:draw:2'))).toBe(true);
+    expect(res.log.some(l => /draws 2 card/.test(l))).toBe(true);
   });
 
   it('opponents-draw:1 queues draws for all other players', () => {

@@ -2,6 +2,7 @@ import { hasTag, tagValue, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets, locateCard, cardAtOffset } from '../targets';
 import { isMoveBlocked } from '../boardOps';
 import { done, needs, type Executor } from '../types';
+import { playOnce } from '../playOnce';
 
 /** Swap two cards' positions on the timeline (same or different eras). */
 export function swapPositions(G: any, aId: string, bId: string): boolean {
@@ -23,10 +24,14 @@ export const swapExecutor: Executor = ({ G, playerId, card, choices }) => {
       const blocked = isMoveBlocked(G, id, playerId);
       if (blocked) return done([`${card.id}: swap fizzles (${id} ${blocked})`]);
     }
-    if (!swapPositions(G, aId, bId)) {
-      return done([`${card.id}: swap fizzles (locate failed)`]);
-    }
-    return done([`${card.id}: swapped ${aId} <-> ${bId}`]);
+    const pairKey = [aId, bId].slice().sort().join('<->');
+    const logs = playOnce(G, card.id, `swap:${pairKey}`, () => {
+      if (!swapPositions(G, aId, bId)) {
+        return [`${card.id}: swap fizzles (locate failed)`];
+      }
+      return [`${card.id}: swapped ${aId} <-> ${bId}`];
+    });
+    return done(logs);
   };
 
   if (tagValue(card, 'swap:target') === 'self') {

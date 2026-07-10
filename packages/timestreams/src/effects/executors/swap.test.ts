@@ -1,7 +1,7 @@
 // src/effects/executors/swap.test.ts
 import { describe, it, expect } from 'vitest';
 import { resolvePlayEffect } from '../resolvePlay';
-import { playAction } from '../../play';
+import { playAction, submitPlayChoice } from '../../play';
 import { makeCard, makeState, putInEra, putInHand } from '../testFixtures';
 
 const ctxFor = (pid: string) => ({ currentPlayer: pid } as any);
@@ -44,29 +44,16 @@ describe('swap executor', () => {
     playAction(G, ctxFor('0'), '0', sg.id);
     expect(G.pendingPrompts?.[0]).toMatchObject({ min: 2, max: 2, reason: 'swap:count:2' });
 
-    // One id only → fizzle/decline, stack unchanged
-    playAction(G, ctxFor('0'), '0', sg.id, {
-      [`${sg.id}:swap-pair`]: 'a#0',
-    });
-    expect(G.timeline.stone.stack).toEqual(['a#0', 'b#0', 'c#0']);
+    // Answer with a valid pair via submitPlayChoice (hardened path)
+    submitPlayChoice(G, '0', `${sg.id}:swap-pair`, ['a#0', 'c#0']);
+    expect(G.timeline.stone.stack).toEqual(['c#0', 'b#0', 'a#0']);
+    expect(G.pendingPrompts ?? []).toEqual([]);
 
-    // Re-play (card already discarded) as resubmission with a real pair
-    G.pendingPrompts = [
-      {
-        id: `${sg.id}:swap-pair`,
-        deciderId: '0',
-        kind: 'choose-card',
-        options: ['a#0', 'b#0', 'c#0'],
-        min: 2,
-        max: 2,
-        reason: 'swap:count:2',
-      },
-    ];
+    // Re-submit after complete is a no-op (does not re-swap back)
     playAction(G, ctxFor('0'), '0', sg.id, {
       [`${sg.id}:swap-pair`]: ['a#0', 'c#0'],
     });
     expect(G.timeline.stone.stack).toEqual(['c#0', 'b#0', 'a#0']);
-    expect(G.pendingPrompts ?? []).toEqual([]);
   });
 
   it('Organ Transplant swaps itself with a chosen invention in Today', () => {

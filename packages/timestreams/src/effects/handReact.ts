@@ -167,8 +167,8 @@ export function applyHandReact(
 
   pushActivityLog(
     G,
-    `${card.name || card.id}: reacted to cancel ${event.cardId}`,
-    "info",
+    `  · hand react: ${card.name || card.id} cancelled ${event.cardId}`,
+    "play",
   );
   return { cancelled, log };
 }
@@ -222,8 +222,10 @@ export function openHandReactWindowForAction(
 
   pushActivityLog(
     G,
-    `Hand react available — waiting (${prompts.map((p) => p.deciderId).join(", ")})`,
-    "system",
+    `  ⏳ Hand react available for ${actionCardId} — waiting on P${prompts
+      .map((p) => p.deciderId)
+      .join(", P")}`,
+    "play",
   );
   return true;
 }

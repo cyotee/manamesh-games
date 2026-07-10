@@ -85,13 +85,18 @@ describe('discard executor', () => {
     expect(G.timeline.modern.stack).toContain('victim#0');
   });
 
-  it('react:redirect on discard retargets to adjacent and performs discard on the new target (Thought Police style)', () => {
+  it('optional redirect prompts owner; choosing adjacent discards that card (Thought Police)', () => {
     const G = makeState({ players: ['0', '1'], currentDay: 5 });
     // Stack order: adjA (above, index 0), tp=victim (index 1)
-    const adj = makeCard({ id: 'adjA#0', ownerId: '1' });
+    const adj = makeCard({ id: 'adjA#0', ownerId: '1', name: 'Adj' });
     const tp = makeCard({
-      id: 'victim#0', ownerId: '1',
-      tags: ['react:redirect', 'redirect:discard', 'redirect:target-to:adjacent', 'redirect:optional', 'decider:owner'],
+      id: 'victim#0', ownerId: '1', name: 'Thought Police',
+      tags: [
+        'react:targeted',
+        'redirect:target-to:adjacent',
+        'redirect:optional',
+        'decider:owner',
+      ],
     });
     putInEra(G, 'modern', adj, tp);
     const napalm = makeCard({
@@ -99,11 +104,101 @@ describe('discard executor', () => {
       tags: ['play:discard:1', 'discard:target:invention', 'discard:scope:today'],
     });
     putInHand(G, '0', napalm);
-    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', { 'modern-napalm#0:discard': 'victim#0' });
+    // First answer discard target → owner redirect prompt
+    const mid = resolvePlayEffect(G, '0', 'modern-napalm#0', {
+      'modern-napalm#0:discard': 'victim#0',
+    });
+    expect(mid.prompts[0]?.id).toBe('victim#0:redirect-choice');
+    expect(mid.prompts[0]?.deciderId).toBe('1');
+    expect(mid.prompts[0]?.options).toContain('take');
+    expect(mid.prompts[0]?.options).toContain('adjA#0');
+
+    const res = resolvePlayEffect(G, '0', 'modern-napalm#0', {
+      'modern-napalm#0:discard': 'victim#0',
+      'victim#0:redirect-choice': 'adjA#0',
+    });
     expect(res.log.join(' ')).toMatch(/redirected to adjA#0/);
-    // TP (victim) remains; the adjacent was retargeted and discarded
     expect(G.timeline.modern.stack).toEqual(['victim#0']);
     expect(G.players['1'].discard.map(c => c.id)).toEqual(['adjA#0']);
+  });
+
+  it('Fire stays in era when Thought Police owner declines redirect (take the hit)', () => {
+    // Repro: Fire lands below TP; auto-redirect used to discard Fire itself.
+    const G = makeState({ players: ['0', '1'], currentDay: 1 });
+    const tp = makeCard({
+      id: 'future-tech-thought-police#0',
+      ownerId: '1',
+      name: 'Thought Police',
+      tags: [
+        'react:targeted',
+        'trigger:target:self',
+        'redirect:optional',
+        'redirect:target-to:adjacent',
+        'decider:owner',
+      ],
+    });
+    putInEra(G, 'stone', tp);
+    const fire = makeCard({
+      id: 'stone-age-fire#0',
+      ownerId: '0',
+      name: 'Fire',
+      cardType: 'invention',
+      tags: ['play:discard:1', 'discard:target:today:any'],
+    });
+    // Fire already played into the era (as playInvention does before resolve)
+    putInEra(G, 'stone', fire);
+    expect(G.timeline.stone.stack).toEqual([
+      'future-tech-thought-police#0',
+      'stone-age-fire#0',
+    ]);
+
+    const mid = resolvePlayEffect(G, '0', 'stone-age-fire#0', {
+      'stone-age-fire#0:discard': 'future-tech-thought-police#0',
+    });
+    expect(mid.prompts[0]?.reason).toBe('redirect:optional');
+    expect(mid.prompts[0]?.options).toContain('stone-age-fire#0'); // adjacent below
+    expect(mid.prompts[0]?.options).toContain('take');
+
+    // Owner takes the hit — TP discarded, Fire remains
+    const res = resolvePlayEffect(G, '0', 'stone-age-fire#0', {
+      'stone-age-fire#0:discard': 'future-tech-thought-police#0',
+      'future-tech-thought-police#0:redirect-choice': 'take',
+    });
+    expect(res.prompts).toEqual([]);
+    expect(G.timeline.stone.stack).toEqual(['stone-age-fire#0']);
+    expect(G.players['1'].discard.map((c) => c.id)).toContain(
+      'future-tech-thought-police#0',
+    );
+  });
+
+  it('Fire stays in era when redirect choice is pending (does not auto-self-discard)', () => {
+    const G = makeState({ players: ['0', '1'], currentDay: 1 });
+    putInEra(
+      G,
+      'stone',
+      makeCard({
+        id: 'tp#0',
+        ownerId: '1',
+        tags: [
+          'react:targeted',
+          'redirect:optional',
+          'redirect:target-to:adjacent',
+          'decider:owner',
+        ],
+      }),
+      makeCard({
+        id: 'fire#0',
+        ownerId: '0',
+        tags: ['play:discard:1', 'discard:target:today:any'],
+      }),
+    );
+    const mid = resolvePlayEffect(G, '0', 'fire#0', {
+      'fire#0:discard': 'tp#0',
+    });
+    expect(mid.prompts.length).toBe(1);
+    // Critical: Fire must not have been discarded while waiting for redirect
+    expect(G.timeline.stone.stack).toContain('fire#0');
+    expect(G.timeline.stone.stack).toContain('tp#0');
   });
 
   it('react:replace on discard substitutes move instead of discard (Combination Drug Therapy)', () => {

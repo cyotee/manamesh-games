@@ -22,7 +22,11 @@ import { describeChoiceOption } from '../effects/executors/choice';
 import {
   computeScoringSlotsForEra,
   scoringSlotModifierNotes,
+  isCardProcessedForUi,
+  scorePileInventory,
 } from '../scoring';
+import { effectiveScoreValue } from '../effects/boardOps';
+import { HandPanel } from './HandPanel';
 
 /**
  * Prompt ids are `${playedCardId}:${suffix}` (card ids never contain ':').
@@ -540,6 +544,13 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
     activePrompt?.reason === 'score:guess-secret' ||
     activePrompt?.reason === 'score:choice' ||
     activePrompt?.reason === 'score:swap' ||
+    activePrompt?.reason === 'score:perform-other' ||
+    activePrompt?.reason === 'score:steal-perform' ||
+    activePrompt?.reason === 'score:bonus-copy' ||
+    activePrompt?.reason === 'score:penalty-target' ||
+    activePrompt?.reason === 'score:move-optional' ||
+    activePrompt?.reason === 'score:move-target' ||
+    activePrompt?.reason === 'score:move-era' ||
     activePrompt?.kind === 'choose-number' ||
     (activePrompt?.id?.includes(':score-') ?? false);
 
@@ -572,7 +583,38 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       return;
     }
 
+    // Off-turn play-effect answers (Thought Police redirect, etc.)
+    if (
+      (activePrompt.reason === 'redirect:optional' ||
+        activePrompt.id?.endsWith(':redirect-choice') ||
+        (G.pendingPlayEffect &&
+          activePrompt.deciderId === playerID &&
+          G.pendingPlayEffect.actorPlayerId !== playerID)) &&
+      moves.submitPlayChoice
+    ) {
+      moves.submitPlayChoice(activePrompt.id, choiceValue);
+      setPromptSelection([]);
+      return;
+    }
+
     const playedCardId = playedCardIdFromPromptId(activePrompt.id);
+
+    // Prefer submitPlayChoice whenever a play effect is in-flight — avoids
+    // re-entering playInvention/playAction (which re-ran moves/draws).
+    if (
+      moves.submitPlayChoice &&
+      G.pendingPlayEffect &&
+      (G.pendingPlayEffect.cardId === playedCardId ||
+        activePrompt.deciderId === playerID)
+    ) {
+      moves.submitPlayChoice(activePrompt.id, choiceValue);
+      setPromptSelection([]);
+      setPromptAnswers((prev) => ({
+        ...prev,
+        [activePrompt.id]: choiceValue,
+      }));
+      return;
+    }
 
     const choices: Record<string, string | string[]> = {
       ...promptAnswers,
@@ -592,7 +634,7 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       activePrompt.reason === 'play:swap' ||
       activePrompt.reason?.startsWith('swap:') ||
       activePrompt.reason === 'play:recover';
-    // play:move can be on inventions (Air Cars) or actions — prefer cardType.
+    // Fallback only when pendingPlayEffect is missing (should be rare).
     if (isAction && moves.playAction) {
       moves.playAction(playedCardId, choices);
     } else if (moves.playInvention) {
@@ -745,14 +787,22 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
         </div>
       )}
 
-      {/* Non-blocking activity log (decrypt notices, deals, system) */}
+      {/* Non-blocking activity log (decrypt, deals, scoring process) */}
       {(G.activityLog?.length ?? 0) > 0 && (
         <div
           data-testid="activity-log"
           style={{
             marginBottom: 10,
             padding: '6px 10px',
-            maxHeight: 88,
+            maxHeight:
+              G.phase === 'scoring' ||
+              ctx.phase === 'scoring' ||
+              G.phase === 'gameOver' ||
+              ctx.phase === 'gameOver' ||
+              G.phase === 'play' ||
+              ctx.phase === 'play'
+                ? 220
+                : 88,
             overflowY: 'auto',
             background: '#0b1220',
             border: '1px solid #1e2937',
@@ -760,12 +810,40 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
             fontSize: 11,
             color: '#94a3b8',
             lineHeight: 1.45,
+            fontFamily:
+              G.phase === 'scoring' ||
+              ctx.phase === 'scoring' ||
+              G.phase === 'play' ||
+              ctx.phase === 'play'
+                ? 'ui-monospace, SFMono-Regular, Menlo, monospace'
+                : 'inherit',
           }}
         >
           <div style={{ fontWeight: 700, color: '#64748b', marginBottom: 4, fontSize: 10, letterSpacing: 0.4 }}>
             ACTIVITY
+            {(G.phase === 'scoring' ||
+              ctx.phase === 'scoring' ||
+              G.phase === 'gameOver' ||
+              G.phase === 'play' ||
+              ctx.phase === 'play') && (
+              <span style={{ fontWeight: 500, opacity: 0.8 }}>
+                {' '}
+                · rules engine (play + scoring trail — scroll)
+              </span>
+            )}
           </div>
-          {(G.activityLog ?? []).slice(-12).map((entry) => (
+          {(G.activityLog ?? [])
+            .slice(
+              -(G.phase === 'scoring' ||
+              ctx.phase === 'scoring' ||
+              G.phase === 'gameOver' ||
+              ctx.phase === 'gameOver' ||
+              G.phase === 'play' ||
+              ctx.phase === 'play'
+                ? 80
+                : 12),
+            )
+            .map((entry) => (
             <div
               key={entry.id}
               data-testid={`activity-log-entry-${entry.kind || 'info'}`}
@@ -777,7 +855,12 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                       ? '#86efac'
                       : entry.kind === 'system'
                         ? '#c4b5fd'
-                        : '#94a3b8',
+                        : entry.kind === 'score'
+                          ? '#fde68a'
+                          : entry.kind === 'play'
+                            ? '#6ee7b7'
+                            : '#94a3b8',
+                whiteSpace: 'pre-wrap',
               }}
             >
               {entry.message}
@@ -817,21 +900,129 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
               : 'Game over'}
           </div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
-            {(G.playerOrder || []).map((pid) => (
-              <div key={pid} data-testid={`score-player-${pid}`}>
-                P{pid}
-                {pid === playerID ? ' (you)' : ''}:{' '}
-                {G.phase === 'scoring' || ctx.phase === 'scoring' ? (
-                  <strong data-testid={`score-pending-${pid}`} style={{ opacity: 0.7 }}>
-                    pending
-                  </strong>
-                ) : (
-                  <strong>{G.scores?.[pid] ?? 0}</strong>
-                )}
-                {G.winner === pid ? ' — winner' : ''}
-              </div>
-            ))}
+            {(G.playerOrder || []).map((pid) => {
+              const live =
+                G.scoringWalk?.provisionalScores?.[pid] ??
+                G.scores?.[pid] ??
+                0;
+              const bonus = G.bonusPoints?.[pid] ?? G.scoringWalk?.bonusPoints?.[pid] ?? 0;
+              const pileSum = (G.players?.[pid]?.scorePile || []).reduce(
+                (s, c) => s + effectiveScoreValue(G, c.id),
+                0,
+              );
+              return (
+                <div key={pid} data-testid={`score-player-${pid}`}>
+                  P{pid}
+                  {pid === playerID ? ' (you)' : ''}:{' '}
+                  <strong data-testid={`score-total-${pid}`}>{live}</strong>
+                  {(G.phase === 'scoring' || ctx.phase === 'scoring') && (
+                    <span
+                      data-testid={`score-breakdown-${pid}`}
+                      style={{ fontSize: 11, opacity: 0.85, marginLeft: 6 }}
+                    >
+                      (pile {pileSum} + bonus {bonus >= 0 ? '+' : ''}
+                      {bonus})
+                    </span>
+                  )}
+                  {G.winner === pid ? ' — winner' : ''}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Score pile + bonus inventory (verify hybrid scoring) */}
+          {(G.phase === 'scoring' ||
+            ctx.phase === 'scoring' ||
+            G.phase === 'gameOver' ||
+            ctx.phase === 'gameOver') && (
+            <div
+              data-testid="score-inventory"
+              style={{
+                marginBottom: 10,
+                padding: 10,
+                background: '#0f172a',
+                borderRadius: 6,
+                border: '1px solid #475569',
+                fontSize: 12,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                Score inventory
+              </div>
+              {(G.playerOrder || []).map((pid) => {
+                const pile = scorePileInventory(G)[pid] || [];
+                const ledger = (G.bonusLedger || []).filter(
+                  (e) => e.playerId === pid,
+                );
+                const bonus =
+                  G.bonusPoints?.[pid] ??
+                  G.scoringWalk?.bonusPoints?.[pid] ??
+                  0;
+                return (
+                  <div
+                    key={pid}
+                    data-testid={`score-inventory-player-${pid}`}
+                    style={{ marginBottom: 8 }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                      P{pid}
+                    </div>
+                    <div data-testid={`score-pile-list-${pid}`}>
+                      <span style={{ opacity: 0.8 }}>Score pile: </span>
+                      {pile.length === 0 ? (
+                        <span style={{ opacity: 0.55 }}>(empty)</span>
+                      ) : (
+                        pile.map((item, idx) => (
+                          <span
+                            key={item.cardId}
+                            data-testid={`score-pile-card-${item.cardId}`}
+                            style={{ marginRight: 8 }}
+                          >
+                            {item.name}{' '}
+                            <strong>
+                              {item.printed >= 0 ? '+' : ''}
+                              {item.printed}
+                            </strong>
+                            {idx < pile.length - 1 ? ',' : ''}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    <div data-testid={`bonus-ledger-${pid}`} style={{ marginTop: 2 }}>
+                      <span style={{ opacity: 0.8 }}>
+                        Bonus points ({bonus >= 0 ? '+' : ''}
+                        {bonus}):{' '}
+                      </span>
+                      {ledger.length === 0 ? (
+                        <span style={{ opacity: 0.55 }}>(none)</span>
+                      ) : (
+                        ledger.map((e, i) => (
+                          <span
+                            key={`${e.sourceCardId || 'x'}-${i}`}
+                            data-testid={`bonus-entry-${pid}-${i}`}
+                            style={{ marginRight: 8 }}
+                          >
+                            {e.sourceName || e.sourceCardId || 'effect'}{' '}
+                            <strong>
+                              {e.amount >= 0 ? '+' : ''}
+                              {e.amount}
+                            </strong>
+                            {e.note ? (
+                              <span style={{ opacity: 0.65 }}>
+                                {' '}
+                                ({e.note})
+                              </span>
+                            ) : null}
+                            {i < ledger.length - 1 ? ';' : ''}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {G.scoringWalk && (G.phase === 'scoring' || ctx.phase === 'scoring') && (
             <div data-testid="scoring-walk-banner" style={{ fontSize: 13 }}>
@@ -871,6 +1062,41 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   {G.scoringWalk.lastSummary}
                 </div>
               )}
+              {G.scoringWalk.stepPhase === 'choice' &&
+                !(G.pendingPrompts && G.pendingPrompts.length > 0) && (
+                  <div
+                    data-testid="scoring-choice-stuck"
+                    style={{
+                      padding: '8px 10px',
+                      background: '#7f1d1d',
+                      borderRadius: 6,
+                      marginBottom: 8,
+                      fontSize: 12,
+                    }}
+                  >
+                    Scoring is waiting for a choice but none is open. Click OK to
+                    continue.
+                    <button
+                      type="button"
+                      data-testid="ack-score-step-recovery"
+                      disabled={!moves?.ackScoreStep || !playerID}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => moves?.ackScoreStep?.()}
+                      style={{
+                        marginLeft: 10,
+                        padding: '6px 12px',
+                        background: '#eab308',
+                        color: '#0f172a',
+                        border: 'none',
+                        borderRadius: 4,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Force continue
+                    </button>
+                  </div>
+                )}
               {G.scoringWalk.stepPhase === 'ack' && (
                 <div
                   style={{
@@ -910,7 +1136,7 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                       : 'OK — next card'}
                   </button>
                   <span style={{ fontSize: 11, opacity: 0.85 }}>
-                    Acks:{' '}
+                    Both players must OK each card · Acks:{' '}
                     {(G.playerOrder || []).map((pid) => (
                       <span key={pid} style={{ marginRight: 8 }}>
                         P{pid}
@@ -921,9 +1147,9 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                 </div>
               )}
               <div style={{ marginTop: 8, fontSize: 11, opacity: 0.75 }}>
-                Green = processed · Gold = current · Both players OK each card.
-                Final totals only after every card (later effects can change remaining
-                slots — Wonky rule). Stone → Future.
+                Green = processed in this era · Gold = current · Cards moved to a
+                later era can process again there (printed points bank once in the
+                pile). Both players OK each card. Stone → Future.
               </div>
             </div>
           )}
@@ -1096,11 +1322,17 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                 }}
                 title={
                   slotNotes.length
-                    ? `Base ${baseSlots}; ${slotNotes.join(', ')}`
-                    : `Base scoring slots: ${baseSlots}`
+                    ? `Capacity ${slots} (base ${baseSlots}; ${slotNotes.join(', ')}). Left = inventions that can score; not reduced when cards are stolen.`
+                    : `Scoring capacity: ${slots} (base ${baseSlots})`
                 }
               >
-                Slots: {Math.min(slots, stack.length)} / {slots}
+                {/* Always show capacity on the right. Left is inventions currently
+                    filling slots (min of capacity and stack) — do not treat left
+                    as capacity (stealing QC shrinks stack, not capacity). */}
+                Capacity: {slots}
+                {stack.length > 0
+                  ? ` · ${Math.min(slots, stack.length)} card(s) in range`
+                  : ''}
                 {slots !== baseSlots ? ` (base ${baseSlots})` : ''}
               </div>
               {slotNotes.length > 0 && (
@@ -1169,7 +1401,8 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                     const label = card?.name || cardId.split('#')[0] || cardId;
                     const inScoringSlot = i < slots;
                     const processed =
-                      G.scoringWalk?.processedCardIds?.includes(cardId) ?? false;
+                      (G.phase === 'scoring' || ctx.phase === 'scoring') &&
+                      isCardProcessedForUi(G, cardId, era);
                     const isCurrent =
                       G.scoringWalk?.currentCardId === cardId;
                     const fullCard = card || {
@@ -1355,131 +1588,23 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
         </label>
       </div>
 
-      {/* Hand and Controls */}
+      {/* Hand and Controls — local group / sort / drag-reorder */}
       {showHand && (
-        <div
-          data-testid="player-hand"
-          style={{ marginTop: '8px', padding: '8px', border: '1px solid #334155', borderRadius: '4px', background: '#1e2937' }}
-        >
-          <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
-            Your Hand (P{playerID}) — {myHand.length} cards
-            {isMyTurn && isPlayPhase ? ' — Your turn' : ''}
-            {!isMyTurn && isPlayPhase ? ` — Waiting for P${currentPlayer}` : ''}
-          </div>
-
-          {myHand.length === 0 ? (
-            <div style={{ color: '#94a3b8', fontSize: '12px' }}>
-              {isSetupPhase || isCryptoPhase ? 'Cards deal after setup completes.' : 'No cards in hand'}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {myHand.map((card: TimestreamsCard, idx: number) => (
-                <div
-                  key={`${card.id}-${idx}`}
-                  data-card-id={card.id}
-                  style={{
-                    border: '1px solid #64748b',
-                    padding: '6px',
-                    fontSize: '11px',
-                    background: '#0f172a',
-                    borderRadius: 4,
-                    width: card.imageUrl ? 120 : 110,
-                  }}
-                  onMouseEnter={() => handleCardHover(card)}
-                  onMouseLeave={() => handleCardHover(null)}
-                >
-                  {card.imageUrl ? (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: 168,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 4,
-                        marginBottom: 4,
-                        background: '#0b1220',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <img
-                        src={card.imageUrl}
-                        alt={card.name || card.id}
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          width: 'auto',
-                          height: 'auto',
-                          objectFit: 'contain',
-                          objectPosition: 'center',
-                          display: 'block',
-                        }}
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : null}
-                  <div style={{ fontWeight: 600 }}>{card.name || card.id}</div>
-                  <div style={{ color: '#94a3b8', fontSize: 10 }}>{card.cardType}</div>
-                  <div style={{ marginTop: '4px' }}>
-                    {card.cardType === 'invention' && (
-                      <button
-                        data-testid={`play-invention-${card.id}`}
-                        onClick={() => handlePlayInvention(card.id)}
-                        disabled={
-                          !isMyTurn ||
-                          !isPlayPhase ||
-                          !!activePrompt ||
-                          (G.config?.rulesEnabled !== false &&
-                            !canPlayCard(G, playerID || '', card.id).ok)
-                        }
-                        style={{ fontSize: '10px', marginRight: '4px' }}
-                      >
-                        Play Invention
-                      </button>
-                    )}
-                    {card.cardType === 'action' && (
-                      <button
-                        data-testid={`play-action-${card.id}`}
-                        onClick={() => handlePlayAction(card.id)}
-                        disabled={
-                          !isMyTurn ||
-                          !isPlayPhase ||
-                          !!activePrompt ||
-                          (G.config?.rulesEnabled !== false &&
-                            !canPlayCard(G, playerID || '', card.id).ok)
-                        }
-                        title={
-                          G.config?.rulesEnabled !== false &&
-                          playerID &&
-                          !canPlayCard(G, playerID, card.id).ok
-                            ? canPlayCard(G, playerID, card.id).reason
-                            : undefined
-                        }
-                        style={{ fontSize: '10px' }}
-                      >
-                        Play Action
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{ marginTop: '10px' }}>
-            <button
-              data-testid="pass-turn"
-              onClick={handlePass}
-              disabled={!isMyTurn || !isPlayPhase}
-              style={{ padding: '6px 12px', marginRight: '8px' }}
-            >
-              Pass
-            </button>
-            <span style={{ fontSize: '11px', color: '#64748b' }}>
-              Play one invention, one action, or pass each turn.
-            </span>
-          </div>
-        </div>
+        <HandPanel
+          G={G}
+          playerID={playerID ?? null}
+          myHand={myHand}
+          isMyTurn={!!isMyTurn}
+          isPlayPhase={!!isPlayPhase}
+          isSetupPhase={!!isSetupPhase}
+          isCryptoPhase={!!isCryptoPhase}
+          currentPlayer={currentPlayer}
+          activePrompt={!!activePrompt}
+          onPlayInvention={handlePlayInvention}
+          onPlayAction={handlePlayAction}
+          onPass={handlePass}
+          onCardHover={handleCardHover}
+        />
       )}
 
       {/* Rules prompts — options only for the decider (private decks / choices). */}
@@ -1542,6 +1667,20 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                             ? 'Mysticism — guess the secret number'
                             : activePrompt.reason === 'score:choice'
                               ? 'Choose a score option'
+                              : activePrompt.reason === 'score:perform-other'
+                                ? 'Choose an invention in Today to perform its score ability'
+                                : activePrompt.reason === 'score:steal-perform'
+                                  ? 'Choose Nanotech or Quantum Computing to process, then steal to your score pile'
+                                : activePrompt.reason === 'score:bonus-copy'
+                                  ? 'Choose a card in Today — score bonus equal to its value'
+                                : activePrompt.reason === 'score:penalty-target'
+                                  ? 'You may choose another Art card — its inventor scores −3 (or skip)'
+                                : activePrompt.reason === 'score:move-optional'
+                                  ? 'Use this score move ability?'
+                                  : activePrompt.reason === 'score:move-target'
+                                    ? 'Choose a card in Today to move'
+                                    : activePrompt.reason === 'score:move-era'
+                                      ? 'Choose a future era (bottom of that era)'
                               : activePrompt.reason === 'react:from:hand' ||
                                   activePrompt.id?.endsWith(':use-react')
                                 ? (() => {
@@ -1564,6 +1703,18 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                                     const srcName = src?.name || srcId || 'that Action';
                                     return `React — play ${reactorName} to cancel ${srcName}?`;
                                   })()
+                                : activePrompt.reason === 'redirect:optional' ||
+                                    activePrompt.id?.endsWith(':redirect-choice')
+                                  ? (() => {
+                                      const hostId =
+                                        activePrompt.labelCardId ||
+                                        playedCardIdFromPromptId(activePrompt.id);
+                                      const host = G.cards?.[hostId] as
+                                        | TimestreamsCard
+                                        | undefined;
+                                      const hostName = host?.name || hostId;
+                                      return `React — redirect discard from ${hostName}? (or take the hit)`;
+                                    })()
                                 : `Prompt: ${activePrompt.reason}`}
           </div>
           {(activePrompt.reason === 'react:from:hand' ||
@@ -1680,9 +1831,48 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
           {/* Card / option grid for non-number prompts */}
           {activePrompt.kind !== 'choose-number' &&
             activePrompt.reason !== 'score:guess' &&
-            activePrompt.reason !== 'score:guess-secret' && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-              {activePrompt.options.map((optId: string) => {
+            activePrompt.reason !== 'score:guess-secret' && (() => {
+              const groupOptsByEra =
+                activePrompt.reason === 'swap:different-eras' ||
+                activePrompt.reason === 'score:perform-other' ||
+                activePrompt.reason === 'score:steal-perform' ||
+                activePrompt.reason === 'score:bonus-copy' ||
+                activePrompt.reason === 'score:penalty-target' ||
+                activePrompt.reason === 'score:move-target' ||
+                activePrompt.reason === 'score:steal-perform' ||
+                activePrompt.reason === 'play:swap';
+              const locateOptEra = (id: string): EraId | null => {
+                for (const e of ERA_ORDER) {
+                  const era = G.timeline[e];
+                  if (!era) continue;
+                  if (era.stack?.includes(id) || era.actions?.includes(id)) {
+                    return e;
+                  }
+                }
+                return null;
+              };
+              const eraRows: { era: EraId | null; ids: string[] }[] = [];
+              if (groupOptsByEra) {
+                const buckets = new Map<EraId | 'other', string[]>();
+                for (const id of activePrompt.options) {
+                  const e = locateOptEra(id);
+                  const key = e ?? 'other';
+                  if (!buckets.has(key)) buckets.set(key, []);
+                  buckets.get(key)!.push(id);
+                }
+                for (const e of ERA_ORDER) {
+                  if (buckets.has(e)) {
+                    eraRows.push({ era: e, ids: buckets.get(e)! });
+                  }
+                }
+                if (buckets.has('other')) {
+                  eraRows.push({ era: null, ids: buckets.get('other')! });
+                }
+              } else {
+                eraRows.push({ era: null, ids: activePrompt.options });
+              }
+
+              const renderOptButton = (optId: string) => {
                 const isNone = optId === '__none__' || optId === '';
                 const isPlayerOpt =
                   activePrompt.kind === 'choose-option' &&
@@ -1702,11 +1892,17 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   (activePrompt.reason === 'play:extra-turn' ||
                     activePrompt.reason === 'cost:discard-self' ||
                     activePrompt.reason === 'react:from:hand' ||
+                    activePrompt.reason === 'score:move-optional' ||
                     activePrompt.id?.endsWith(':use-react') ||
                     activePrompt.kind === 'confirm') &&
                   (optId === 'yes' || optId === 'no');
-                // Prefer the ability source (copied card) so option labels
-                // re-read that card's tags, not Biotechnology's empty options.
+                const isRedirectOpt =
+                  activePrompt.reason === 'redirect:optional' ||
+                  activePrompt.id?.endsWith(':redirect-choice');
+                const isRedirectTake = isRedirectOpt && optId === 'take';
+                const isEraOpt =
+                  activePrompt.reason === 'score:move-era' &&
+                  (ERA_ORDER as readonly string[]).includes(optId);
                 const sourceCard = isBranchOpt
                   ? (G.cards?.[
                       activePrompt.labelCardId ||
@@ -1722,6 +1918,8 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   ? 'None'
                   : isPlayerOpt
                     ? `Player ${optId}`
+                    : isEraOpt
+                      ? ERA_LABELS[optId as EraId] || optId
                     : isBranchOpt
                       ? describeChoiceOption(
                           sourceCard,
@@ -1740,6 +1938,10 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                           ? optId === 'yes'
                             ? 'Yes — take extra turn'
                             : 'No — end my turn'
+                          : activePrompt.reason === 'score:move-optional'
+                            ? optId === 'yes'
+                              ? 'Yes — move a card'
+                              : 'No — skip move'
                           : activePrompt.reason === 'react:from:hand' ||
                               activePrompt.id?.endsWith(':use-react')
                             ? optId === 'yes'
@@ -1748,13 +1950,19 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                             : optId === 'yes'
                               ? 'Yes'
                               : 'No'
-                      : card.name || optId;
+                      : isRedirectTake
+                        ? 'Take the hit (this card is discarded)'
+                        : isRedirectOpt && card?.name
+                          ? `Redirect to ${card.name}`
+                          : card.name || optId;
                 const hoverCard =
                   !isNone &&
                   !isPlayerOpt &&
                   !isBranchOpt &&
                   !isMoveOpt &&
                   !isYesNoOpt &&
+                  !isRedirectTake &&
+                  !isEraOpt &&
                   card?.id
                     ? card
                     : null;
@@ -1765,6 +1973,7 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                     data-testid={`prompt-option-${optId || 'none'}`}
                     data-selected={selected ? 'true' : 'false'}
                     data-pick-order={pickOrder || undefined}
+                    data-era={locateOptEra(optId) || undefined}
                     onClick={() => togglePromptOption(optId)}
                     onMouseEnter={() => hoverCard && handleCardHover(hoverCard)}
                     onMouseLeave={() => handleCardHover(null)}
@@ -1772,12 +1981,21 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                     onBlur={() => handleCardHover(null)}
                     style={{
                       width:
-                        isPlayerOpt || isNone || isBranchOpt || isMoveOpt || isYesNoOpt
-                          ? isBranchOpt || isYesNoOpt
-                            ? 200
+                        isPlayerOpt ||
+                        isNone ||
+                        isBranchOpt ||
+                        isMoveOpt ||
+                        isYesNoOpt ||
+                        isRedirectTake ||
+                        isEraOpt
+                          ? isBranchOpt || isYesNoOpt || isRedirectTake || isEraOpt
+                            ? 220
                             : 140
                           : 110,
-                      minHeight: isBranchOpt || isMoveOpt || isYesNoOpt ? 56 : undefined,
+                      minHeight:
+                        isBranchOpt || isMoveOpt || isYesNoOpt || isRedirectTake || isEraOpt
+                          ? 56
+                          : undefined,
                       padding: 6,
                       borderRadius: 6,
                       border: selected ? '2px solid #22c55e' : '1px solid #64748b',
@@ -1809,7 +2027,13 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                         {pickOrder}
                       </span>
                     )}
-                    {!isNone && !isPlayerOpt && !isBranchOpt && !isMoveOpt && !isYesNoOpt && card.imageUrl ? (
+                    {!isNone &&
+                    !isPlayerOpt &&
+                    !isBranchOpt &&
+                    !isMoveOpt &&
+                    !isYesNoOpt &&
+                    !isEraOpt &&
+                    card.imageUrl ? (
                       <div
                         style={{
                           width: '100%',
@@ -1838,15 +2062,91 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                         />
                       </div>
                     ) : null}
-                    <div style={{ fontSize: isBranchOpt || isMoveOpt || isYesNoOpt ? 13 : 11, fontWeight: 600 }}>{label}</div>
-                    {!isNone && !isPlayerOpt && !isBranchOpt && !isMoveOpt && !isYesNoOpt && (
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>{card.cardType || ''}</div>
-                    )}
+                    <div
+                      style={{
+                        fontSize:
+                          isBranchOpt || isMoveOpt || isYesNoOpt || isEraOpt
+                            ? 13
+                            : 11,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {label}
+                    </div>
+                    {!isNone &&
+                      !isPlayerOpt &&
+                      !isBranchOpt &&
+                      !isMoveOpt &&
+                      !isYesNoOpt &&
+                      !isEraOpt && (
+                        <div style={{ fontSize: 10, color: '#94a3b8' }}>
+                          {card.cardType || ''}
+                          {locateOptEra(optId)
+                            ? ` · ${ERA_LABELS[locateOptEra(optId)!]}`
+                            : ''}
+                        </div>
+                      )}
                   </button>
                 );
-              })}
-            </div>
-          )}
+              };
+
+              return (
+                <div
+                  data-testid="prompt-options-panel"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                    maxHeight: 420,
+                    overflowY: 'auto',
+                  }}
+                >
+                  {eraRows.map((row) => (
+                    <div
+                      key={row.era || 'other'}
+                      data-testid={
+                        row.era
+                          ? `prompt-era-row-${row.era}`
+                          : 'prompt-era-row-other'
+                      }
+                    >
+                      {groupOptsByEra && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#94a3b8',
+                            marginBottom: 4,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {row.era ? ERA_LABELS[row.era] : 'Other'}
+                          <span style={{ fontWeight: 400, marginLeft: 6 }}>
+                            ({row.ids.length})
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          padding: groupOptsByEra ? '6px 4px' : 0,
+                          borderRadius: 6,
+                          background: groupOptsByEra ? '#0f172a88' : undefined,
+                          border: groupOptsByEra
+                            ? '1px solid #334155'
+                            : undefined,
+                        }}
+                      >
+                        {row.ids.map((optId) => renderOptButton(optId))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 type="button"

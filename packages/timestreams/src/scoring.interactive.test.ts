@@ -94,17 +94,17 @@ describe("interactive score prompts (Mysticism number picker)", () => {
 
     const r2 = submitScoreChoice(G, "1", "stone-age-mysticism#0:score-guess-answer", "1");
     expect(r2).toBe(false);
-    // Applied to provisional only, waiting for dual ack
+    // Bonus ledger updated immediately; printed value waits for pile
     expect(G.scoringWalk?.stepPhase).toBe("ack");
-    expect(G.scores!["0"]).toBe(0);
-    expect(G.scoringWalk!.provisionalScores["0"]).toBe(3); // wrong guess → secret bonus 3
+    expect(G.bonusPoints!["0"]).toBe(3); // wrong guess → secret bonus 3
+    expect(G.scoringWalk!.provisionalScores["0"]).toBe(3);
 
     expect(ackScoreStep(G, "0")).toBe(false);
     expect(G.scoringWalk?.acks["0"]).toBe(true);
     const finished = ackScoreStep(G, "1");
     expect(finished).toBe(true);
     expect(G.phase).toBe("gameOver");
-    expect(G.scores!["0"]).toBe(3); // committed at end
+    expect(G.scores!["0"]).toBe(3); // pile (0) + bonus 3
   });
 
   it("Virtual Reality queues optional two-card score:swap prompt and applies swap", () => {
@@ -226,17 +226,17 @@ describe("interactive score prompts (Mysticism number picker)", () => {
     putInEra(G, "stone", makeCard({ id: "s#0", ownerId: "0", scoreValue: 2 }));
     putInEra(G, "future", makeCard({ id: "f#0", ownerId: "1", scoreValue: 5 }));
     expect(beginScoringPhase(G)).toBe(false);
-    // stone card first — official G.scores still zero
+    // stone card first — printed value not banked until era pile collect
     expect(G.scoringWalk?.stepPhase).toBe("ack");
     expect(G.scoringWalk?.currentCardId).toBe("s#0");
     expect(G.scores!["0"]).toBe(0);
-    expect(G.scoringWalk!.provisionalScores["0"]).toBe(2);
+    expect(G.scoringWalk!.provisionalScores["0"]).toBe(0);
     dualAck(G);
-    // future card
+    // stone era cleaned → s#0 in pile; future card processing
     expect(G.phase).toBe("scoring");
     expect(G.scoringWalk?.currentCardId).toBe("f#0");
-    expect(G.scores!["1"]).toBe(0);
-    expect(G.scoringWalk!.provisionalScores["1"]).toBe(5);
+    expect(G.scores!["0"]).toBe(2); // stone pile
+    expect(G.scores!["1"]).toBe(0); // future not piled yet
     dualAck(G);
     expect(G.phase).toBe("gameOver");
     expect(G.scores).toEqual({ "0": 2, "1": 5 });
@@ -272,7 +272,7 @@ describe("interactive score prompts (Mysticism number picker)", () => {
     expect(beginScoringPhase(G)).toBe(false);
     expect(G.scoringWalk?.currentCardId).toBe("d#0");
     expect(G.scores!["0"]).toBe(0);
-    expect(G.scoringWalk!.provisionalScores["0"]).toBe(1);
+    expect(G.scoringWalk!.provisionalScores["0"]).toBe(0);
     dualAck(G);
 
     // A discarded → B is topmost unscored for remaining slot
@@ -282,7 +282,7 @@ describe("interactive score prompts (Mysticism number picker)", () => {
     dualAck(G);
 
     expect(G.phase).toBe("gameOver");
-    // Totals only after all cards: discarder 1 + B 3 = 4 (not 1+10)
+    // Piles: discarder 1 + B 3 = 4 (not 1+10)
     expect(G.scores!["0"]).toBe(4);
     expect(G.scoredThisScoring).toEqual(expect.arrayContaining(["d#0", "b#0"]));
     expect(G.scoredThisScoring?.includes("a#0")).toBe(false);

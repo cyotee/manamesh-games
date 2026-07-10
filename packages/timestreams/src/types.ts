@@ -336,7 +336,7 @@ export interface ActivityLogEntry {
   /** Short human message */
   message: string;
   /** Optional category for styling */
-  kind?: "decrypt" | "deal" | "system" | "info";
+  kind?: "decrypt" | "deal" | "system" | "info" | "score" | "play";
 }
 
 // =============================================================================
@@ -428,6 +428,11 @@ export interface TimestreamsState {
   proofChain: CryptographicProof[];
   /** Current scores keyed by player ID */
   scores: Record<string, number>;
+  /**
+   * Immediate bonus/penalty ledger during scoring (Digital Secretary, Poetry, …).
+   * Final score = pile printed values + bonusPoints. Can be negative.
+   */
+  bonusPoints?: Record<string, number>;
   /** Winning player ID, or null if the game is not over */
   winner: string | null;
 
@@ -484,11 +489,60 @@ export interface TimestreamsState {
     remainingPromptIds: string[];
     cancelled: boolean;
   };
+  /**
+   * In-flight play effect (invention or action) waiting on prompts.
+   * Lets a non-current player answer redirects (Thought Police owner) via
+   * submitPlayChoice without re-playing the card.
+   */
+  pendingPlayEffect?: {
+    cardId: string;
+    actorPlayerId: string;
+    kind: "invention" | "action";
+    choices: Record<string, string | string[]>;
+  };
+  /**
+   * cardId → play effects fully resolved for this physical play.
+   * Further playInvention/playAction/submitPlayChoice for that id are no-ops
+   * until the card is reset (new play from hand).
+   */
+  playEffectsComplete?: Record<string, boolean>;
   /** Score-phase answers (guess secret/answer, score:choice, …) keyed by prompt id. */
   scoreChoices?: Record<string, string | string[]>;
 
-  /** M3: per-card flags for cards already scored in the current scoring pass (for Wonky rule). */
+  /**
+   * Per-era process tracking for the Wonky rule.
+   * A card processed in era A can still process again if moved into an open
+   * scoring slot of era B — only `scoringProcessedByEra[B]` blocks it there.
+   * Printed points still bank once (score pile), so reprocessing does not double
+   * printed values.
+   */
+  scoringProcessedByEra?: Partial<Record<EraId, string[]>>;
+
+  /**
+   * Running ±scoring-slot counter per era from resolved score effects
+   * (option-a:add-scoring-slots, option-b:remove-scoring-slots, etc.).
+   * Each successful resolution **adds** to the counter; no per-card registry.
+   * Survives the source card leaving the board (steal/discard).
+   */
+  scoringSlotBonusByEra?: Partial<Record<EraId, number>>;
+
+  /**
+   * @deprecated Prefer scoringProcessedByEra. Flat list of card ids ever marked
+   * processed this scoring (union across eras) — kept for older tests / logs.
+   */
   scoredThisScoring?: string[];
+
+  /**
+   * Itemized bonus/penalty entries during scoring (for inventory UI).
+   * Sums per player should match `bonusPoints`.
+   */
+  bonusLedger?: Array<{
+    playerId: string;
+    amount: number;
+    sourceCardId?: string;
+    sourceName?: string;
+    note?: string;
+  }>;
 
   /**
    * Iterative scoring walk (all eras, card-by-card dual-ack).
@@ -534,11 +588,12 @@ export interface ScoringWalk {
   /** Eras that have completed cleanup. */
   erasCompleted: EraId[];
   /**
-   * Points accumulated while walking. Not committed to `G.scores` until
-   * every card is processed — later cards can change which earlier slots
-   * still count via moves/swaps/discards (Wonky rule).
+   * Live display scores during walk (pile values + bonus ledger).
+   * Recomputed after each step; final G.scores match this at finalize.
    */
   provisionalScores: Record<string, number>;
+  /** Bonus/penalty ledger during the walk (same as G.bonusPoints). */
+  bonusPoints: Record<string, number>;
   /** Era currently being walked (null before first pick / after done). */
   activeEraId: EraId | null;
   /** Scoring-slot capacity for `activeEraId` (computed when the era starts). */

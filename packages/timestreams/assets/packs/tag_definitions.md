@@ -6,7 +6,7 @@
 This file is a generated index of every tag used in the pack manifests.
 **Tag semantics, grammar, and executor shapes are specified in [RULES_ENGINE_PRD.md](../../RULES_ENGINE_PRD.md) (sections 4-5).** The manifests themselves are the source of truth; the hand-written tag definitions formerly in this file are superseded.
 
-294 unique tags across 58 families.
+295 unique tags across 58 families.
 
 ## `additional:`
 
@@ -247,7 +247,7 @@ This file is a generated index of every tag used in the pack manifests.
 | `move:destination:end-of-era` | 1 | `medieval-waylay` |
 | `move:direction:up` | 2 | `future-tech-air-cars`, `stone-age-the-wheel` |
 | `move:direction:up-or-down` | 1 | `stone-age-horse-riding` |
-| `move:optional` | 6 | `future-tech-air-cars`, `future-tech-anti-gravity`, `medieval-advertising`, `stone-age-horse-riding`, `stone-age-pottery`, `stone-age-the-wheel` |
+| `move:optional` | 7 | `future-tech-air-cars`, `future-tech-anti-gravity`, `future-tech-cybertechnology`, `medieval-advertising`, `stone-age-horse-riding`, `stone-age-pottery`, … (7 total) |
 | `move:scope:any-era` | 1 | `modern-the-internet` |
 | `move:scope:same-era` | 1 | `medieval-advertising` |
 | `move:scope:today` | 3 | `future-tech-air-cars`, `stone-age-horse-riding`, `stone-age-the-wheel` |
@@ -345,6 +345,7 @@ This file is a generated index of every tag used in the pack manifests.
 
 | Tag | Uses | Cards |
 |---|---|---|
+| `perform:optional` | 1 | `stone-age-alphabet` |
 | `perform:target-filter:any` | 3 | `future-tech-nanotech`, `modern-chaos-theory`, `stone-age-alphabet` |
 
 ## `play:`

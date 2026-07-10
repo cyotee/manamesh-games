@@ -294,12 +294,10 @@ describe("score P0 families", () => {
     const G = makeState({ players: ["0"], currentDay: 6 });
     G.players["0"].homeEra = "future";
     G.config.scoringSlots = 2;
+    // QC must process in a scoring slot first so its option-a can expand capacity
     putInEra(
       G,
       "future",
-      makeCard({ id: "a#0", ownerId: "0", scoreValue: 1 }),
-      makeCard({ id: "b#0", ownerId: "0", scoreValue: 1 }),
-      makeCard({ id: "c#0", ownerId: "0", scoreValue: 1 }),
       makeCard({
         id: "future-tech-quantum-computing#0",
         ownerId: "0",
@@ -312,12 +310,23 @@ describe("score P0 families", () => {
           "slots:scope:today",
         ],
       }),
+      makeCard({ id: "a#0", ownerId: "0", scoreValue: 1 }),
+      makeCard({ id: "b#0", ownerId: "0", scoreValue: 1 }),
+      makeCard({ id: "c#0", ownerId: "0", scoreValue: 1 }),
     );
     resolveScoring(G, {
       "future-tech-quantum-computing#0:score-choice": "option-a",
     });
-    // base 2 + 1 = 3 slots worth of points
-    expect(G.scores!["0"]).toBeGreaterThanOrEqual(3);
+    // base 2 + 1 = 3 slots: QC + a + b (c past capacity)
+    expect(G.scoringSlotBonusByEra?.future).toBe(1);
+    expect(G.scores!["0"]).toBeGreaterThanOrEqual(2); // a+b printed
+    expect(G.players["0"].scorePile.map((c) => c.id)).toEqual(
+      expect.arrayContaining([
+        "future-tech-quantum-computing#0",
+        "a#0",
+        "b#0",
+      ]),
+    );
   });
 
   it("score:count + score:per (high-use P1)", () => {

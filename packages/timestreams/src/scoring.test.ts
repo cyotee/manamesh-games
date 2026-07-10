@@ -87,19 +87,35 @@ describe("placeholder scoring", () => {
     expect(G.players["0"].scorePile?.length).toBe(2);
   });
 
-  it("applies score:perform-other (basic target resolution)", () => {
+  it("applies score:perform-other ability (not printed points) when target chosen", () => {
     const G = makeState({ players: ["0"], currentDay: 1 });
     G.players["0"].homeEra = "stone";
     G.config.scoringSlots = 6;
 
     putInEra(G, "stone",
-      makeCard({ id: "target#0", ownerId: "0", scoreValue: 5 }),
-      makeCard({ id: "performer#0", ownerId: "0", scoreValue: 0, tags: ["score:perform-other", "perform:target-filter:any", "target:scope:today"] }),
+      makeCard({
+        id: "target#0",
+        ownerId: "0",
+        scoreValue: 5,
+        tags: ["score:bonus-points", "bonus-points:amount:3"],
+      }),
+      makeCard({
+        id: "performer#0",
+        ownerId: "0",
+        scoreValue: 1,
+        tags: [
+          "score:perform-other",
+          "perform:target-filter:any",
+          "target:scope:today",
+          "target:exclude-self",
+        ],
+      }),
     );
 
-    resolveScoring(G);
-    // target 5 + performer performs target's value (5) = 10
-    expect(G.scores).toEqual({ "0": 10 });
+    // Alphabet-style: run target's score ability (bonus +3), not copy printed 5
+    resolveScoring(G, { "performer#0:score-target": "target#0" });
+    // target scores 5+3=8 first; performer 1 + performed ability bonus 3 = 4; total 12
+    expect(G.scores!["0"]).toBe(12);
   });
 
   it("applies score:branch with condition:first-score (basic)", () => {

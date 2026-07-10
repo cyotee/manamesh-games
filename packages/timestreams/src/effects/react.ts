@@ -1,4 +1,4 @@
-import { hasTag, tagValue } from './tags';
+import { hasTag, tagValue, isOptionalFor } from './tags';
 import { locateCard, cardAtOffset } from './targets';
 import { getCard } from './state';
 
@@ -91,27 +91,59 @@ export function shouldCancelDiscard(G: any, cardId: string, actorPlayerId?: stri
   return false;
 }
 
+/**
+ * Auto redirect only for *mandatory* redirects (e.g. Cloth → self).
+ * Thought Police has `redirect:optional` + `decider:owner` — those must prompt
+ * the owner. Auto-picking "adjacent" was wrong: after Fire lands below TP,
+ * adjacent is often Fire itself, so the discarder self-destructed.
+ */
 export function getRedirectTargetForDiscard(G: any, cardId: string, actorPlayerId?: string): string | null {
   const card = G.cards?.[cardId];
   if (!card) return null;
 
-  // Match cards that declare redirect reacts (actual cards use react:targeted/react:discard + redirect:target-to:* ; some use react:redirect + redirect:discard)
-  const declaresRedirect = hasTag(card, 'react:redirect') || hasTag(card, 'react:discard') || hasTag(card, 'react:targeted');
+  const declaresRedirect =
+    hasTag(card, 'react:redirect') ||
+    hasTag(card, 'react:discard') ||
+    hasTag(card, 'react:targeted');
   const targetTo = tagValue(card, 'redirect:target-to');
-  if (declaresRedirect && targetTo) {
-    if (targetTo === 'self') return cardId;
-    if (targetTo === 'adjacent') {
-      // Proper adjacent lookup: prefer below then above (index +1, -1)
-      const below = cardAtOffset(G, cardId, 1);
-      if (below) return below;
-      const above = cardAtOffset(G, cardId, -1);
-      if (above) return above;
-      return null; // no adjacent to retarget to
-    }
-    // decider:owner etc. would require prompting the owner
-    return cardId;
+  if (!declaresRedirect || !targetTo) return null;
+
+  // Optional redirects are handled by the discard executor via a prompt.
+  if (hasTag(card, 'redirect:optional') || isOptionalFor(card, 'redirect')) {
+    return null;
   }
-  return null;
+
+  if (targetTo === 'self') return cardId;
+  if (targetTo === 'adjacent') {
+    const below = cardAtOffset(G, cardId, 1);
+    if (below) return below;
+    const above = cardAtOffset(G, cardId, -1);
+    if (above) return above;
+    return null;
+  }
+  return cardId;
+}
+
+/** True when the card may redirect a discard and the owner must choose. */
+export function hasOptionalDiscardRedirect(card: any): boolean {
+  if (!card) return false;
+  const declares =
+    hasTag(card, 'react:redirect') ||
+    hasTag(card, 'react:discard') ||
+    hasTag(card, 'react:targeted');
+  if (!declares) return false;
+  if (!tagValue(card, 'redirect:target-to')) return false;
+  return hasTag(card, 'redirect:optional') || isOptionalFor(card, 'redirect');
+}
+
+/** Adjacent invention ids for Thought Police–style redirect choices. */
+export function adjacentRedirectOptions(G: any, cardId: string): string[] {
+  const opts: string[] = [];
+  const below = cardAtOffset(G, cardId, 1);
+  const above = cardAtOffset(G, cardId, -1);
+  if (below) opts.push(below);
+  if (above) opts.push(above);
+  return opts;
 }
 
 export function getReplaceOutcomeForDiscard(G: any, cardId: string): string | null {

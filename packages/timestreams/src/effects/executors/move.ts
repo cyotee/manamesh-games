@@ -5,6 +5,7 @@ import { moveWithinEra, moveToEra, isMoveBlocked } from '../boardOps';
 import { isMoveDirectionPrevented } from '../modifiers';
 import { checkReactForMove } from '../react';
 import { done, needs, type Executor, type ExecCtx } from '../types';
+import { playOnce } from '../playOnce';
 
 interface Destination { era: EraId; position: 'top' | 'bottom'; }
 
@@ -96,6 +97,10 @@ export const moveExecutor: Executor = (ctx) => {
       });
     }
     if (isMoveDeclined(chosen)) {
+      if (!G.firedTags) G.firedTags = [];
+      const declineKey = `play-move-declined:${card.id}`;
+      if (G.firedTags.includes(declineKey)) return done([]);
+      G.firedTags.push(declineKey);
       return done([`${card.id}: move declined`]);
     }
     // 'move' | 'yes' | card id all mean apply the optional self-move
@@ -110,9 +115,14 @@ export const moveExecutor: Executor = (ctx) => {
         reason: 'play:move',
       });
     }
-    if (isMoveDeclined(chosen)) return done([`${card.id}: move declined`]);
+    if (isMoveDeclined(chosen) || (Array.isArray(chosen) ? chosen[0] : chosen) === '__none__') {
+      if (!G.firedTags) G.firedTags = [];
+      const declineKey = `play-move-declined:${card.id}`;
+      if (G.firedTags.includes(declineKey)) return done([]);
+      G.firedTags.push(declineKey);
+      return done([`${card.id}: move declined`]);
+    }
     moving = Array.isArray(chosen) ? chosen[0] : chosen;
-    if (moving === '__none__') return done([`${card.id}: move declined`]);
   }
   if (!moving) return done([`${card.id}: move fizzles (nothing to move)`]);
 
@@ -146,8 +156,17 @@ export const moveExecutor: Executor = (ctx) => {
       }
       delta = posChoice === 'down' ? amount : -amount;
     }
-    moveWithinEra(G, effectiveMoving, from.index + delta);
-    return done([`${card.id}: moved ${effectiveMoving} ${delta < 0 ? 'up' : 'down'} ${Math.abs(delta)}`]);
+    // Re-resolve after prompts must not shove the card again.
+    const logs = playOnce(G, card.id, `move-rel:${effectiveMoving}:${delta}`, () => {
+      // Re-locate at apply time (stack may have shifted since `from`).
+      const live = locateCard(G, effectiveMoving);
+      if (!live) return [`${card.id}: move fizzles (${effectiveMoving} not in play)`];
+      moveWithinEra(G, effectiveMoving, live.index + delta);
+      return [
+        `${card.id}: moved ${effectiveMoving} ${delta < 0 ? 'up' : 'down'} ${Math.abs(delta)}`,
+      ];
+    });
+    return done(logs);
   }
 
   const destTag = tagValue(card, 'move-destination');
@@ -157,6 +176,16 @@ export const moveExecutor: Executor = (ctx) => {
   if (dest.era !== from.era && isMoveDirectionPrevented(G, from.era, dest.era)) {
     return done([`${card.id}: move of ${effectiveMoving} to ${dest.era} fizzles (prevented direction)`]);
   }
-  moveToEra(G, effectiveMoving, dest.era, dest.position);
-  return done([`${card.id}: moved ${effectiveMoving} to ${dest.position} of ${dest.era}`]);
+  const logs = playOnce(
+    G,
+    card.id,
+    `move-era:${effectiveMoving}:${dest.era}:${dest.position}`,
+    () => {
+      moveToEra(G, effectiveMoving, dest.era, dest.position);
+      return [
+        `${card.id}: moved ${effectiveMoving} to ${dest.position} of ${dest.era}`,
+      ];
+    },
+  );
+  return done(logs);
 };

@@ -5,6 +5,7 @@ import { erasForScope, candidateTargets } from '../targets';
 import { discardFromPlay, isDiscardBlocked } from '../boardOps';
 import { requireCard } from '../state';
 import { done, needs, type Executor, type ExecCtx } from '../types';
+import { playOnce } from '../playOnce';
 
 export function parseBranch(card: { tags?: string[] }, key: 'option-a' | 'option-b'): string[] {
   const prefix = `${key}:`;
@@ -164,8 +165,13 @@ export const choiceExecutor: Executor = (ctx: ExecCtx) => {
   const drawN = branchNumber(branch, 'draw');
   if (drawN !== undefined) {
     const to = branch.includes('draw:to:self') ? playerId : deciderId;
-    requestDraws(G, to, drawN);
-    log.push(`${card.id}: ${option} -> ${to} draws ${drawN}`);
+    // Idempotent: re-submitting the same option must not queue another draw.
+    log.push(
+      ...playOnce(G, card.id, `choice-draw:${option}:${to}:${drawN}`, () => {
+        requestDraws(G, to, drawN);
+        return [`${card.id}: ${option} -> ${to} draws ${drawN}`];
+      }),
+    );
   }
 
   // Pre-chosen invention target (Surgical Strike option-a: discard:target)

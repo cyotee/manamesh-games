@@ -72,7 +72,14 @@ import {
   homeEraTurnOrder,
   dayFirstPlayer,
 } from "./homeEra";
-import { playInvention, playAction, pass, endDay, submitReact } from "./play";
+import {
+  playInvention,
+  playAction,
+  pass,
+  endDay,
+  submitReact,
+  submitPlayChoice,
+} from "./play";
 import { beginScoringPhase, submitScoreChoice, ackScoreStep } from "./scoring";
 import { hasTag } from "./effects/tags";
 import { getCard, getTurnFlags } from "./effects/state";
@@ -483,6 +490,29 @@ export const TimestreamsGame: Game<TimestreamsState> = {
           },
           ...CONCURRENT,
         },
+        /**
+         * Play-effect prompts for a non-actor (e.g. Thought Police redirect).
+         * Concurrent so the defending owner can answer off-turn.
+         */
+        submitPlayChoice: {
+          move: (
+            { G, playerID, events },
+            promptId: string,
+            value: string | string[],
+          ) => {
+            const result = submitPlayChoice(G, playerID, promptId, value);
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            if (
+              !(G.pendingPrompts && G.pendingPrompts.length > 0) &&
+              !hasActiveDeckOp(G) &&
+              !G.pendingPlayEffect
+            ) {
+              events?.endTurn?.();
+            }
+            return result;
+          },
+          ...CONCURRENT,
+        },
         pass: {
           move: ({ G, ctx, playerID, events }) => {
             const result = pass(G, ctx, playerID);
@@ -575,8 +605,11 @@ export const TimestreamsGame: Game<TimestreamsState> = {
           G.phase = "gameOver";
         }
       },
+      // Stage.NULL (all: null) keeps phase-level moves available for every seat.
+      // A named stage without stages.moves drops ackScoreStep/submitScoreChoice
+      // after multi-step chains (Nanotech loop) — dual-seat then looks "stuck".
       turn: {
-        activePlayers: { all: "scoring" },
+        activePlayers: ALL_ACTIVE,
       },
       moves: {
         ...setRulesEnabledMoveDef,
@@ -591,7 +624,8 @@ export const TimestreamsGame: Game<TimestreamsState> = {
             if (result === "INVALID_MOVE") return INVALID_MOVE;
             return G;
           },
-          client: false,
+          // Dual-seat / P2P: nested Nanotech prompts + concurrent acks race stateIDs.
+          ...CONCURRENT,
         },
         /**
          * Dual-ack: both players confirm the current scored card before the

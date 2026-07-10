@@ -41,6 +41,10 @@ export {
   resolveScoring,
   computeScoringSlotsForEra,
   scoringSlotModifierNotes,
+  recomputeScoresFromPilesAndBonuses,
+  scorePileInventory,
+  processedInEra,
+  isCardProcessedForUi,
 } from "./scoring";
 export { checkReactForDiscard, checkReactForMove, applyReactsForEvent, isProtected } from "./effects/react";
 export {
@@ -50,4 +54,12 @@ export {
   submitHandReactAnswer,
 } from "./effects/handReact";
 export { TimestreamsBoard } from "./board/TimestreamsBoard";
+export { HandPanel } from "./board/HandPanel";
+export {
+  repairHandOrder,
+  buildGroups,
+  sortHandIds,
+  reorderIds,
+  reorderGroups,
+} from "./board/handLayout";
 export type { EffectResult, PlayerPrompt, ChoiceMap } from "./effects/types";

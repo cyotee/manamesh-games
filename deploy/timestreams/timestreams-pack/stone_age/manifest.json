@@ -24,6 +24,7 @@
         "scoreValue": 2,
         "tags": [
           "score:perform-other",
+          "perform:optional",
           "perform:target-filter:any",
           "decider:target-owner",
           "target:scope:today",

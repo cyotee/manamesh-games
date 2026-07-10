@@ -288,6 +288,7 @@
         "scoreValue": 1,
         "tags": [
           "score:move",
+          "move:optional",
           "move:target:invention",
           "move-source:today",
           "move-destination:top-future"

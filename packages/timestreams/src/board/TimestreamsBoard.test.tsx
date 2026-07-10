@@ -176,7 +176,7 @@ describe("TimestreamsBoard — baseline & lifecycle (plan Phase 0.5 / 5.A)", () 
     G.timeline.stone.stack.push(inv.id);
     const html = renderToStaticMarkup(<TimestreamsBoard {...makeBoardProps({ G })} />);
     expect(html).toContain("The Wheel");
-    expect(html).toContain("Slots: 1");
+    expect(html).toContain("Capacity: 6");
   });
 
   it("shows Slow Time as era action (not a scoring slot) and +2 slots", () => {
@@ -201,7 +201,7 @@ describe("TimestreamsBoard — baseline & lifecycle (plan Phase 0.5 / 5.A)", () 
     G.config = { ...G.config, scoringSlots: 6 } as any;
     const html = renderToStaticMarkup(<TimestreamsBoard {...makeBoardProps({ G })} />);
     expect(html).toContain('data-scoring-slots="8"');
-    expect(html).toContain("Slots: 1 / 8");
+    expect(html).toContain("Capacity: 8");
     expect(html).toContain("base 6");
     expect(html).toContain("+2 Slow Time");
     expect(html).toContain("On era (actions)");
@@ -441,6 +441,33 @@ describe("TimestreamsBoard — prompts (plan L3 / 1.A.1)", () => {
   });
 });
 
+describe("TimestreamsBoard — hand layout controls", () => {
+  it("renders group/sort controls and stack badge when grouped", () => {
+    const fire0 = makeCard({
+      id: "fire#0",
+      name: "Fire",
+      ownerId: "0",
+      cardType: "invention",
+      scoreValue: 2,
+    });
+    const fire1 = makeCard({
+      id: "fire#1",
+      name: "Fire",
+      ownerId: "0",
+      cardType: "invention",
+      scoreValue: 2,
+    });
+    const G = makePlayState({ currentDay: 1 });
+    G.players["0"].hand = [fire0, fire1];
+    const html = renderToStaticMarkup(
+      <TimestreamsBoard {...makeBoardProps({ G, playerID: "0" })} />,
+    );
+    expect(html).toContain('data-testid="hand-layout-controls"');
+    expect(html).toContain('data-testid="hand-group-toggle"');
+    expect(html).toContain('data-testid="hand-sort-key"');
+  });
+});
+
 describe("TimestreamsBoard — scoring / game over display (plan 5.D)", () => {
   it("shows iterative scoring walk banner and ack control", () => {
     const G = makePlayState({
@@ -459,6 +486,7 @@ describe("TimestreamsBoard — scoring / game over display (plan 5.D)", () => {
           "stone · slot 1 · Fire · P0 +3 (running 3; totals finalize after all cards)",
         erasCompleted: [],
         provisionalScores: { "0": 3, "1": 0 },
+        bonusPoints: { "0": 0, "1": 0 },
         activeEraId: "stone",
         eraSlotTotal: 6,
         remainingSlots: 5,
@@ -484,7 +512,10 @@ describe("TimestreamsBoard — scoring / game over display (plan 5.D)", () => {
     expect(html).toContain("OK — next card");
     expect(html).toContain("stone · slot 1");
     expect(html).toContain('data-scoring-current="true"');
-    expect(html).toContain("pending");
+    expect(html).toContain('data-testid="score-inventory"');
+    expect(html).toContain('data-testid="score-total-0"');
+    expect(html).toContain("Score pile");
+    expect(html).toContain("Bonus points");
     expect(html).toContain("totals finalize after all cards");
   });
 
