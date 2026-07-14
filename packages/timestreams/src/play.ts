@@ -9,6 +9,10 @@ import {
   hasActiveDeckOp,
 } from "./crypto";
 import { dayFirstPlayer } from "./homeEra";
+import {
+  fireModernEraBegin,
+  applyModernEraBeginRecover,
+} from "./effects/eraAbilities";
 import { registerCard } from "./effects/state";
 import { clearRestOfToday } from "./effects/modifiers";
 import { fireEvent, registerStaticTriggers } from "./effects/triggers";
@@ -58,6 +62,10 @@ function isEventSourcedPrompt(front: PlayerPrompt): boolean {
   if (front.id.includes(":crop-swap:")) return true;
   if (front.reason === "retaliate:discard") return true;
   if (front.reason === "crop-swap") return true;
+  if (front.reason === "react:era-begin") return true;
+  if (front.reason === "era-stone-cancel") return true;
+  if (front.id.includes("era-begin-recover")) return true;
+  if (front.id.includes(":era-stone-cancel:")) return true;
   return false;
 }
 
@@ -170,6 +178,21 @@ function applyEventPromptAnswer(
       actorPlayerId: actor,
     });
     installEventPrompts(G, nested.prompts, nested.log, actor);
+    return true;
+  }
+
+  // Era-Modern begin: recover from discard
+  if (
+    front.reason === "react:era-begin" ||
+    front.id.includes("era-begin-recover")
+  ) {
+    applyModernEraBeginRecover(G, front.deciderId, value);
+    logPlay(
+      G,
+      none
+        ? `  ↳ Era-Modern: declined recover`
+        : `  ↳ Era-Modern: recovered ${cardLabel(G, pick)} to hand`,
+    );
     return true;
   }
 
@@ -850,6 +873,19 @@ export function endDay(G: TimestreamsState): void {
         dealPlaintextHands(G, G.currentDay);
       } catch (err2) {
         console.error("[endDay] plain deal also failed", err2);
+      }
+    }
+
+    // Era-Modern: at the beginning of Modern Day, optional recover from discard
+    if (rulesOn(G) && eraForDay(G.currentDay) === "modern") {
+      try {
+        const { prompts, log } = fireModernEraBegin(G);
+        for (const line of log) logPlay(G, `  · ${line}`);
+        if (prompts.length) {
+          installEventPrompts(G, prompts, [], G.dayFirstPlayer || "0");
+        }
+      } catch (err) {
+        console.error("[endDay] era-modern begin failed", err);
       }
     }
 

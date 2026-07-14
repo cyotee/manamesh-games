@@ -44,7 +44,11 @@ describe('choice executor', () => {
 
   it('Diplomacy: chosen opponent decides; option-b lets the acting player draw 2', () => {
     const G = makeState({ players: ['0', '1'], currentDay: 2 });
-    G.encryptedDecks['0'] = [{}, {}] as any;
+    // layers > 0 → cooperative decrypt queue (not plain materialize)
+    G.encryptedDecks['0'] = [
+      { ciphertext: 'opaque-0', layers: 1 },
+      { ciphertext: 'opaque-1', layers: 1 },
+    ] as any;
     const dip = makeCard({
       id: 'medieval-diplomacy#0', ownerId: '0',
       tags: ['play:choice', 'target:choose:opponent', 'decider:chosen-opponent',
@@ -62,7 +66,11 @@ describe('choice executor', () => {
 
   it('High-powered Laser: option-a draws 2', () => {
     const G = makeState({ players: ['0'], currentDay: 6 });
-    G.encryptedDecks['0'] = [{}, {}, {}] as any;
+    G.encryptedDecks['0'] = [
+      { ciphertext: 'opaque-0', layers: 1 },
+      { ciphertext: 'opaque-1', layers: 1 },
+      { ciphertext: 'opaque-2', layers: 1 },
+    ] as any;
     const laser = makeCard({
       id: 'future-tech-high-powered-laser#0',
       ownerId: '0',

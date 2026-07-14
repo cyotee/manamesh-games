@@ -8,6 +8,11 @@ import {
   hasOptionalDiscardRedirect,
   adjacentRedirectOptions,
 } from '../react';
+import {
+  getEraStoneCancelOffer,
+  resolveEraStoneCancelChoice,
+  eraStoneCancelPrompt,
+} from '../eraAbilities';
 import { getCard } from '../state';
 import { done, needs, type Executor } from '../types';
 import { playOnce } from '../playOnce';
@@ -48,6 +53,23 @@ export const discardExecutor: Executor = ({ G, playerId, card, choices }) => {
   const log: string[] = [];
   for (const id of picks) {
     if (!options.includes(id)) continue;
+
+    // Era-Stone cancel before any redirect/protect chain
+    {
+      const offer = getEraStoneCancelOffer(G, id, 'discard', card.id);
+      if (offer) {
+        const ans = choices[offer.promptId];
+        if (ans === undefined) {
+          return needs(eraStoneCancelPrompt(offer));
+        }
+        if (resolveEraStoneCancelChoice(G, offer, ans)) {
+          log.push(
+            `${card.id}: discard of ${id} cancelled (era-stone once-per-game)`,
+          );
+          continue;
+        }
+      }
+    }
 
     const targetCard = getCard(G, id);
 

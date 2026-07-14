@@ -94,6 +94,7 @@ import {
   type FreeToolId,
 } from "./freeTools";
 import { debugSeedBoard, type DebugSeedBoardArgs } from "./debugSeed";
+import { applyDebugE2EAct, type DebugE2EAct } from "./debugE2E";
 
 // =============================================================================
 // Game Definition
@@ -169,6 +170,28 @@ const setRulesEnabledMoveDef = {
   debugSeedBoard: {
     move: ({ G }: { G: TimestreamsState }, args: DebugSeedBoardArgs = {}) => {
       if (!debugSeedBoard(G, args)) return INVALID_MOVE;
+    },
+    ...CONCURRENT,
+  },
+  /**
+   * Multi-seat e2e driver (score choices as P1, dual-ack, force scoring, …).
+   * Only when config.debugSeed === true.
+   */
+  debugE2EAct: {
+    move: (
+      {
+        G,
+        events,
+      }: {
+        G: TimestreamsState;
+        events?: { endPhase?: () => void };
+      },
+      act: DebugE2EAct,
+    ) => {
+      const r = applyDebugE2EAct(G, act, {
+        endPhase: () => events?.endPhase?.(),
+      });
+      if (!r.ok) return INVALID_MOVE;
     },
     ...CONCURRENT,
   },

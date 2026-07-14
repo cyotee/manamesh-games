@@ -174,10 +174,91 @@ export function shouldCancelMove(G: any, cardId: string, actorPlayerId?: string)
   return false;
 }
 
+/**
+ * Cloth-style protectors in the same era that claim a mandatory redirect when
+ * another of the owner's inventions would leave the era.
+ * PRD §3.13: defending owner chooses among multiple Cloths.
+ */
+export function findClothMoveRedirectClaimants(
+  G: any,
+  targetCardId: string,
+): string[] {
+  const target = getCard(G, targetCardId);
+  const loc = locateCard(G, targetCardId);
+  if (!target || !loc) return [];
+  // Cloth only protects *other* inventions (target:exclude-self)
+  const claimants: string[] = [];
+  for (const cid of G.timeline?.[loc.era]?.stack ?? []) {
+    if (cid === targetCardId) continue;
+    const c = getCard(G, cid);
+    if (!c) continue;
+    if (!hasTag(c, 'react:move')) continue;
+    if (!hasTag(c, 'protect:target:own-inventions')) continue;
+    if (c.ownerId !== target.ownerId) continue;
+    if (hasTag(c, 'protect:scope:same-era') || hasTag(c, 'trigger:move-out-of-era')) {
+      // same-era already by stack scan
+    }
+    const to = tagValue(c, 'redirect:target-to');
+    if (to !== 'self' && !hasTag(c, 'redirect:target-to:self')) continue;
+    // Optional redirects are separate (Thought Police)
+    if (hasTag(c, 'redirect:optional') || isOptionalFor(c, 'redirect')) continue;
+    claimants.push(cid);
+  }
+  return claimants;
+}
+
+/**
+ * Resolve Cloth redirect for an out-of-era move.
+ * @param chosenClothId when multiple Cloths, owner-selected id
+ */
+export function applyClothMoveRedirect(
+  G: any,
+  targetCardId: string,
+  actorPlayerId: string,
+  chosenClothId?: string | null,
+): ReactDecision {
+  const claimants = findClothMoveRedirectClaimants(G, targetCardId);
+  if (claimants.length === 0) return { cancelled: false };
+
+  let clothId: string | undefined;
+  if (chosenClothId && claimants.includes(chosenClothId)) {
+    clothId = chosenClothId;
+  } else if (claimants.length === 1) {
+    clothId = claimants[0];
+  } else {
+    // Multiple claimants and no choice yet — caller must prompt
+    return {
+      cancelled: false,
+      log: 'react:multi-cloth-needs-choice',
+      redirectTo: null,
+    };
+  }
+
+  const cloth = getCard(G, clothId!);
+  if (!cloth) return { cancelled: false };
+
+  // Redirect effect onto Cloth
+  if (isProtected(G, clothId!, 'move', actorPlayerId)) {
+    return {
+      cancelled: true,
+      redirectTo: clothId,
+      log: hasTag(cloth, 'redirect:on-immovable:fizzle')
+        ? 'react:redirect-on-immovable-fizzle'
+        : 'react:redirect-fizzle',
+    };
+  }
+  return {
+    cancelled: false,
+    redirectTo: clothId,
+    log: `react:cloth-redirect:${targetCardId}->${clothId}`,
+  };
+}
+
 export function checkReactForMove(
   G: any,
   targetCardId: string,
-  actorPlayerId: string
+  actorPlayerId: string,
+  opts?: { chosenClothId?: string; outOfEra?: boolean },
 ): ReactDecision {
   const decision: ReactDecision = { cancelled: false };
 
@@ -185,6 +266,22 @@ export function checkReactForMove(
     decision.cancelled = true;
     decision.log = 'react:cancel';
     return decision;
+  }
+
+  // Cloth protectors: only for out-of-era moves of a peer invention
+  if (opts?.outOfEra !== false) {
+    const cloths = findClothMoveRedirectClaimants(G, targetCardId);
+    if (cloths.length > 0) {
+      // When outOfEra is explicitly false, skip; when undefined, only apply if caller wants
+      if (opts?.outOfEra === true) {
+        return applyClothMoveRedirect(
+          G,
+          targetCardId,
+          actorPlayerId,
+          opts?.chosenClothId,
+        );
+      }
+    }
   }
 
   // Basic redirect support for moves (e.g. Cloth self, Thought Police adjacent)

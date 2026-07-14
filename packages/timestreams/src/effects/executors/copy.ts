@@ -80,11 +80,12 @@ export const copyExecutor: Executor = ({ G, playerId, card, choices }) => {
   else delete G.cards[card.id];
 
   if (nested.prompts.length) {
-    // Point UI labels at the *copied* card so option-a/b, etc. reuse that
-    // card's tags (High-powered Laser → "Draw 2 cards" / "Discard 1…").
+    // Always label from the *copied* card (not the copier). Nested choice
+    // may set labelCardId to the synthetic/copier id — overwrite so UI reads
+    // High-powered Laser tags for option-a/b labels.
     const prompts = nested.prompts.map((p) => ({
       ...p,
-      labelCardId: p.labelCardId ?? target.id,
+      labelCardId: target.id,
     }));
     return {
       ok: true,

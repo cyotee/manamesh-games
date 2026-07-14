@@ -7,9 +7,25 @@ import { getCard, getPendingTriggers } from "./effects/state";
 import { hasTag, tagNumber, tagValue, isOptionalFor } from "./effects/tags";
 import { resolveCardScoreEffectsFull } from "./effects/executors/score";
 import { fireEvent } from "./effects/triggers";
-import { locateCard, erasForScope, candidateTargets } from "./effects/targets";
+import {
+  locateCard,
+  erasForScope,
+  candidateTargets,
+  cardAtOffset,
+} from "./effects/targets";
 import type { PlayerPrompt } from "./effects/types";
 import { hasUsedFirstScore } from "./effects/conditions";
+import { tryStealBonusPoints } from "./effects/react";
+import {
+  getEraFutureSlotPrompt,
+  applyEraFutureSlotChoice,
+  findEraCardForPlayer,
+  playerWithHomeEra,
+  getEraStoneCancelOffer,
+  eraStoneCancelPrompt,
+  scoreMutationCancelledByEraStone,
+} from "./effects/eraAbilities";
+import { registerCard } from "./effects/state";
 import { pushActivityLog } from "./crypto";
 import {
   computeScoringSlotsForEra,
@@ -34,6 +50,17 @@ export function leftNeighborId(G: TimestreamsState, playerId: string): string {
   const i = order.indexOf(playerId);
   if (i < 0 || order.length < 2) return order.find((p) => p !== playerId) ?? playerId;
   return order[(i - 1 + order.length) % order.length];
+}
+
+/**
+ * Register era-future only when already in the Future player's possession.
+ * Do not invent a synthetic card — that hijacked every future scoring walk.
+ */
+function ensureEraFutureCard(G: TimestreamsState): void {
+  const ownerId = playerWithHomeEra(G, "future");
+  if (!ownerId) return;
+  const card = findEraCardForPlayer(G, ownerId, "era-future");
+  if (card) registerCard(G, card);
 }
 
 /**
@@ -92,20 +119,35 @@ export function collectScoreInteractivePrompts(G: TimestreamsState): PlayerPromp
       }
 
       // --- score:choice (option-a / option-b, e.g. Quantum Computing) ---
-      if (
-        hasTag(card, "score:choice") &&
-        ((card.tags || []).some((t) => t.startsWith("option-a:")) ||
-          (card.tags || []).some((t) => t.startsWith("option-b:")))
-      ) {
-        prompts.push({
-          id: `${card.id}:score-choice`,
-          deciderId: card.ownerId,
-          kind: "choose-option",
-          options: ["option-a", "option-b"],
-          min: 1,
-          max: 1,
-          reason: "score:choice",
-        });
+      if (hasTag(card, "score:choice")) {
+        const hasAB =
+          (card.tags || []).some((t) => t.startsWith("option-a:")) ||
+          (card.tags || []).some((t) => t.startsWith("option-b:"));
+        if (hasAB) {
+          prompts.push({
+            id: `${card.id}:score-choice`,
+            deciderId: card.ownerId,
+            kind: "choose-option",
+            options: ["option-a", "option-b"],
+            min: 1,
+            max: 1,
+            reason: "score:choice",
+          });
+        } else if (
+          (card.tags || []).some((t) => t.startsWith("score:add-scoring-slots"))
+        ) {
+          // Era-Future: yes/no add slots
+          prompts.push({
+            id: `${card.id}:score-choice`,
+            deciderId: card.ownerId,
+            kind: "choose-option",
+            options: ["yes", "no"],
+            min: 1,
+            max: 1,
+            reason: "era-future-slots",
+            labelCardId: card.id,
+          });
+        }
       }
 
       // --- score:swap (Virtual Reality, Telescope): choose two inventions ---
@@ -269,6 +311,33 @@ function syncProvisionalDisplay(G: TimestreamsState): void {
   G.scores = { ...totals };
 }
 
+/**
+ * Era-medieval (and similar) steal:bonus-points cards live in hand or as free
+ * assets keyed by id. Prefer cards registered in G.cards owned by a player.
+ */
+function findBonusStealSources(G: TimestreamsState): { id: string; ownerId: string }[] {
+  const out: { id: string; ownerId: string }[] = [];
+  const seen = new Set<string>();
+  for (const pid of G.playerOrder) {
+    for (const c of G.players[pid]?.hand ?? []) {
+      if (hasTag(c, "steal:bonus-points") && !seen.has(c.id)) {
+        seen.add(c.id);
+        out.push({ id: c.id, ownerId: c.ownerId || pid });
+      }
+    }
+  }
+  if (G.cards) {
+    for (const c of Object.values(G.cards)) {
+      if (!c || seen.has(c.id)) continue;
+      if (hasTag(c, "steal:bonus-points")) {
+        seen.add(c.id);
+        out.push({ id: c.id, ownerId: c.ownerId || "0" });
+      }
+    }
+  }
+  return out;
+}
+
 function addBonus(
   G: TimestreamsState,
   pid: string,
@@ -276,6 +345,33 @@ function addBonus(
   meta?: { sourceCardId?: string; sourceName?: string; note?: string },
 ): void {
   if (!amount) return;
+
+  // Positive bonuses may be stolen once-per-game by era-medieval (PRD).
+  if (amount > 0) {
+    for (const src of findBonusStealSources(G)) {
+      if (src.ownerId === pid) continue; // don't steal from self
+      const r = tryStealBonusPoints(G, src.id, pid, amount);
+      if (r.stolen > 0) {
+        const b = ensureBonusPoints(G);
+        b[src.ownerId] = (b[src.ownerId] ?? 0) + r.stolen;
+        // suppress original: do not credit pid
+        if (!G.bonusLedger) G.bonusLedger = [];
+        G.bonusLedger.push({
+          playerId: src.ownerId,
+          amount: r.stolen,
+          sourceCardId: src.id,
+          sourceName: meta?.sourceName,
+          note: `stolen from P${pid} (${meta?.note || "bonus"})`,
+        });
+        logScore(
+          G,
+          `  · era steal: P${src.ownerId} takes +${r.stolen} bonus from P${pid} via ${src.id}`,
+        );
+        return;
+      }
+    }
+  }
+
   const b = ensureBonusPoints(G);
   b[pid] = (b[pid] ?? 0) + amount;
   if (!G.bonusLedger) G.bonusLedger = [];
@@ -741,7 +837,110 @@ export function collectScoreAbilityPrompts(
     }
   }
 
+  // --- score:discard optional yes/no (Guillotine, LN, …) ---
+  if (hasTag(card, "score:discard")) {
+    const optional = hasTag(card, "discard:optional");
+    if (optional) {
+      const dKey = `${cardId}:score-discard`;
+      if (choices[dKey] === undefined) {
+        prompts.push({
+          id: dKey,
+          deciderId: card.ownerId,
+          kind: "choose-option",
+          options: ["yes", "no"],
+          min: 1,
+          max: 1,
+          reason: "score:discard-optional",
+          labelCardId: cardId,
+        });
+        return prompts;
+      }
+    }
+    // After yes (or mandatory): era-stone cancel for each predicted stone target
+    const declined =
+      optional &&
+      (choices[`${cardId}:score-discard`] === "no" ||
+        choices[`${cardId}:score-discard`] === "skip");
+    if (!declined) {
+      const targets = predictScoreDiscardTargets(G, card);
+      for (const tid of targets) {
+        const offer = getEraStoneCancelOffer(G, tid, "discard", cardId);
+        if (offer && choices[offer.promptId] === undefined) {
+          prompts.push(eraStoneCancelPrompt(offer));
+          return prompts; // one at a time
+        }
+      }
+    }
+  }
+
+  // --- score:move era-stone cancel when target is a stone invention ---
+  if (hasTag(card, "score:move")) {
+    const optional = hasTag(card, "move:optional") || isOptionalFor(card, "move");
+    const declined =
+      optional &&
+      (choices[`${cardId}:score-move`] === "no" ||
+        choices[`${cardId}:score-move`] === "skip");
+    if (!declined) {
+      const tid = predictScoreMoveTarget(G, card, choices);
+      if (tid) {
+        const offer = getEraStoneCancelOffer(G, tid, "move", cardId);
+        if (offer && choices[offer.promptId] === undefined) {
+          prompts.push(eraStoneCancelPrompt(offer));
+        }
+      }
+    }
+  }
+
   return prompts;
+}
+
+/** Predict discard targets for score:discard (for era-stone prompts). */
+function predictScoreDiscardTargets(
+  G: TimestreamsState,
+  card: NonNullable<ReturnType<typeof getCard>>,
+): string[] {
+  if (hasTag(card, "discard:target:bottom-of-era")) {
+    const scope = tagValue(card, "discard:scope") || "current-era";
+    const eras = erasForScope(G, scope === "current-era" ? "current-era" : scope, card.id);
+    const era = eras[0] || (G.scoringActiveEra as EraId) || "stone";
+    const stack = G.timeline[era]?.stack ?? [];
+    const bottom = stack[stack.length - 1];
+    return bottom ? [bottom] : [];
+  }
+  const offsetTag = (card.tags || []).find((t) =>
+    t.startsWith("discard:target:offset-below:"),
+  );
+  if (offsetTag || hasTag(card, "discard:target:offset-below:1")) {
+    const off = offsetTag
+      ? parseInt(offsetTag.split(":").pop() || "1", 10)
+      : 1;
+    const tid = cardAtOffset(G, card.id, Number.isNaN(off) ? 1 : off);
+    return tid ? [tid] : [];
+  }
+  return [];
+}
+
+function predictScoreMoveTarget(
+  G: TimestreamsState,
+  card: NonNullable<ReturnType<typeof getCard>>,
+  choices: Record<string, string | string[]>,
+): string | null {
+  const mt = tagValue(card, "move:target") || "any-card";
+  if (mt === "self") return card.id;
+  const offsetBelow = (card.tags || []).find((t) =>
+    t.startsWith("move:target:offset-below:"),
+  );
+  if (offsetBelow || hasTag(card, "move:target:offset-below:1")) {
+    const off = offsetBelow
+      ? parseInt(offsetBelow.split(":").pop() || "1", 10)
+      : 1;
+    return cardAtOffset(G, card.id, Number.isNaN(off) ? 1 : off);
+  }
+  const raw = choices[`${card.id}:score-move-target`];
+  if (raw !== undefined) {
+    return Array.isArray(raw) ? raw[0] : raw;
+  }
+  return null;
 }
 
 function emptyAcks(G: TimestreamsState): Record<string, boolean> {
@@ -895,6 +1094,21 @@ function applyScoreForStep(
     for (const did of full.discardIds) {
       // Do not discard cards already claimed to a pile
       if (isInAnyScorePile(G, did)) continue;
+      if (
+        scoreMutationCancelledByEraStone(
+          G,
+          did,
+          "discard",
+          c.id,
+          choices,
+        )
+      ) {
+        logScore(
+          G,
+          `  · discard of ${cardLabel(G, did)} cancelled (era-stone once-per-game)`,
+        );
+        continue;
+      }
       discardFromPlay(G, did, owner || c.ownerId || "0");
       logScore(G, `  · discard ${cardLabel(G, did)} from play`);
     }
@@ -1066,9 +1280,23 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
           }
           // Apply delayed discards/steals lightly
           for (const did of full.discardIds) {
-            if (!isInAnyScorePile(G, did)) {
-              discardFromPlay(G, did, target.ownerId || "0");
+            if (isInAnyScorePile(G, did)) continue;
+            if (
+              scoreMutationCancelledByEraStone(
+                G,
+                did,
+                "discard",
+                target.id,
+                G.scoreChoices || {},
+              )
+            ) {
+              logScore(
+                G,
+                `  · delayed discard of ${cardLabel(G, did)} cancelled (era-stone)`,
+              );
+              continue;
             }
+            discardFromPlay(G, did, target.ownerId || "0");
           }
           for (const sid of full.stealIds) {
             if (!isInAnyScorePile(G, sid)) {
@@ -1226,6 +1454,26 @@ function discoverNextStep(G: TimestreamsState): ScoringStep | null {
       walk.slotsUsedInEra = 0;
       walk.eraActionsPhase = false;
       G.scoringActiveEra = eraId;
+
+      // Era-Future: optional +2 scoring slots before any future inventions score
+      if (eraId === "future") {
+        ensureEraFutureCard(G);
+        const futPrompt = getEraFutureSlotPrompt(G);
+        if (futPrompt) {
+          // Pause on a synthetic step so the UI collects the yes/no choice first
+          return {
+            eraId,
+            slotIndex: -2,
+            cardId: futPrompt.labelCardId || "era-future",
+            kind: "era-action",
+          };
+        }
+        // Already answered (or no card) — apply slot change before resync
+        for (const line of applyEraFutureSlotChoice(G, "future")) {
+          logScore(G, `  · ${line}`);
+        }
+      }
+
       resyncWalkSlots(G, eraId);
     } else {
       resyncWalkSlots(G, eraId);
@@ -1850,6 +2098,17 @@ export function resolveScoring(
     }
     for (const did of full.discardIds) {
       if (isInAnyScorePile(G, did)) continue;
+      if (
+        scoreMutationCancelledByEraStone(
+          G,
+          did,
+          "discard",
+          c.id,
+          G.scoreChoices || {},
+        )
+      ) {
+        continue;
+      }
       discardFromPlay(G, did, owner || "0");
     }
     for (const [pid, n] of Object.entries(full.other)) {
@@ -1880,6 +2139,11 @@ export function resolveScoring(
     const era = G.timeline[eraId];
     if (!era) continue;
     G.scoringActiveEra = eraId;
+    // Era-Future: optional +2 slots before any inventions score in future
+    if (eraId === "future") {
+      ensureEraFutureCard(G);
+      applyEraFutureSlotChoice(G, "future");
+    }
     const computedSlots = computeScoringSlotsForEra(G, eraId, G.scoreChoices || {});
     let remainingSlots = computedSlots;
     let slotsUsed = 0;

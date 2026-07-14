@@ -39,8 +39,13 @@ describe('recover executor', () => {
     putInHand(G, '0', ww);
     putInHand(G, '0', makeCard({ id: 'payment#0', ownerId: '0' }));
     G.players['0'].discard.push(makeCard({ id: 'buried#0', ownerId: '0' }));
+    // Sequential: recover pick first (optional may skip — cost only after confirm)
     const first = resolvePlayEffect(G, '0', 'medieval-water-wheel#0');
-    expect(first.prompts.map(p => p.id).sort()).toEqual(['medieval-water-wheel#0:recover', 'medieval-water-wheel#0:recover-cost']);
+    expect(first.prompts.map(p => p.id)).toEqual(['medieval-water-wheel#0:recover']);
+    const second = resolvePlayEffect(G, '0', 'medieval-water-wheel#0', {
+      'medieval-water-wheel#0:recover': 'buried#0',
+    });
+    expect(second.prompts.map(p => p.id)).toEqual(['medieval-water-wheel#0:recover-cost']);
     resolvePlayEffect(G, '0', 'medieval-water-wheel#0', {
       'medieval-water-wheel#0:recover': 'buried#0',
       'medieval-water-wheel#0:recover-cost': 'payment#0',

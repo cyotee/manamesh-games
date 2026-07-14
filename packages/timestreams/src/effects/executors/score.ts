@@ -21,6 +21,7 @@ import {
 } from '../../scoringSlots';
 import { swapPositions } from './swap';
 import { fireEvent } from '../triggers';
+import { scoreMutationCancelledByEraStone } from '../eraAbilities';
 
 export type ScoreEffectResult = {
   extra: number;
@@ -398,6 +399,8 @@ export function resolveCardScoreEffectsFull(
       }
 
       for (const tid of targetIds) {
+        // Era-Stone cancel is applied at discard time (scoring apply), not here —
+        // still record id so interactive walk can prompt; apply filters cancels.
         out.discardIds.push(tid);
         out.log.push(`${card.id}: score-discard ${tid}`);
       }
@@ -541,37 +544,52 @@ export function resolveCardScoreEffectsFull(
       }
 
       if (destEra) {
-        moveToEra(G, tid, destEra, destPos);
-        out.log.push(`${card.id}: moved ${tid} to ${destEra} (${destPos})`);
-        const moveEv = fireEvent(G, {
-          type: 'move',
-          cardId: tid,
-          eraId: destEra,
-          actorPlayerId: card.ownerId,
-        });
-        out.log.push(...moveEv.log);
-        if (moveEv.prompts.length) {
-          G.pendingPrompts = [
-            ...(G.pendingPrompts || []),
-            ...moveEv.prompts,
-          ] as any;
-        }
+        // Era-Stone may cancel move of a Stone Age invention (score phase)
         if (
-          hasTag(card, 'score:delayed') ||
-          hasTag(card, 'delayed:trigger:after-destination-era-scored')
+          scoreMutationCancelledByEraStone(
+            G,
+            tid,
+            'move',
+            card.id,
+            choices as Record<string, string | string[]>,
+          )
         ) {
-          // Pottery: source keeps delayed: tags; target is the moved card to re-score
-          if (!G.pendingTriggers) G.pendingTriggers = [];
-          G.pendingTriggers.push({
-            sourceCardId: card.id,
-            targetCardId: tid,
-            ownerId: getCard(G, tid)?.ownerId || card.ownerId,
-            event: 'era-scored',
-            eraAnchor: destEra,
-            limit: 'once',
-            spent: false,
-            delayedRescore: true,
-          } as any);
+          out.log.push(
+            `${card.id}: score-move of ${tid} cancelled (era-stone once-per-game)`,
+          );
+        } else {
+          moveToEra(G, tid, destEra, destPos);
+          out.log.push(`${card.id}: moved ${tid} to ${destEra} (${destPos})`);
+          const moveEv = fireEvent(G, {
+            type: 'move',
+            cardId: tid,
+            eraId: destEra,
+            actorPlayerId: card.ownerId,
+          });
+          out.log.push(...moveEv.log);
+          if (moveEv.prompts.length) {
+            G.pendingPrompts = [
+              ...(G.pendingPrompts || []),
+              ...moveEv.prompts,
+            ] as any;
+          }
+          if (
+            hasTag(card, 'score:delayed') ||
+            hasTag(card, 'delayed:trigger:after-destination-era-scored')
+          ) {
+            // Pottery: source keeps delayed: tags; target is the moved card to re-score
+            if (!G.pendingTriggers) G.pendingTriggers = [];
+            G.pendingTriggers.push({
+              sourceCardId: card.id,
+              targetCardId: tid,
+              ownerId: getCard(G, tid)?.ownerId || card.ownerId,
+              event: 'era-scored',
+              eraAnchor: destEra,
+              limit: 'once',
+              spent: false,
+              delayedRescore: true,
+            } as any);
+          }
         }
       } else if (tid) {
         out.log.push(`${card.id}: score-move ${tid} needs destination era`);

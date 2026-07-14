@@ -113,12 +113,16 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
   );
 
   // Playwright / e2e harness: window.__tsE2E on the primary seat (P0) when debugSeed.
+  // Use latestGRef so getters stay live across concurrent moves without waiting for effect deps.
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!G.config?.debugSeed || playerID !== '0') return;
+    const readG = () => latestGRef.current;
     (window as any).__tsE2E = {
       playerID,
-      phase: G.phase,
+      get phase() {
+        return readG().phase;
+      },
       ctxPhase: ctx.phase,
       rulesEnabled: G.config?.rulesEnabled !== false,
       seed: (args: any) => moves?.debugSeedBoard?.(args),
@@ -135,23 +139,51 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       submitReact: (id: string, value: any) => moves?.submitReact?.(id, value),
       submitPlayChoice: (id: string, value: any) =>
         moves?.submitPlayChoice?.(id, value),
-      getG: () => G,
-      getStack: (era: string) => G.timeline?.[era as EraId]?.stack ?? [],
-      getHand: (pid: string) => G.players?.[pid]?.hand?.map((c) => c.id) ?? [],
+      /** Multi-seat / scoring driver (forceScoring, ackAll, scoreChoice as P1, …). */
+      debugAct: (act: any) => moves?.debugE2EAct?.(act),
+      getG: () => readG(),
+      getStack: (era: string) => readG().timeline?.[era as EraId]?.stack ?? [],
+      getHand: (pid: string) =>
+        readG().players?.[pid]?.hand?.map((c) => c.id) ?? [],
       getDiscard: (pid: string) =>
-        G.players?.[pid]?.discard?.map((c) => c.id) ?? [],
+        readG().players?.[pid]?.discard?.map((c) => c.id) ?? [],
       getScorePile: (pid: string) =>
-        G.players?.[pid]?.scorePile?.map((c) => c.id) ?? [],
-      getScores: () => G.scores,
-      getPrompts: () => G.pendingPrompts ?? [],
-      getAttachments: () => G.attachments ?? {},
+        readG().players?.[pid]?.scorePile?.map((c) => c.id) ?? [],
+      getScores: () => readG().scores ?? {},
+      getBonusPoints: () => readG().bonusPoints ?? {},
+      getBonusLedger: () => readG().bonusLedger ?? [],
+      getScoringWalk: () => {
+        const w = readG().scoringWalk;
+        return w
+          ? {
+              stepPhase: w.stepPhase,
+              currentCardId: w.currentCardId,
+              acks: w.acks,
+              stepIndex: w.stepIndex,
+              stepsLen: w.steps?.length ?? 0,
+            }
+          : null;
+      },
+      getPrompts: () => readG().pendingPrompts ?? [],
+      getAttachments: () => readG().attachments ?? {},
+      getPhase: () => readG().phase,
     };
+    // Do not delete __tsE2E on every G change — only when this seat unmounts.
+    // Deleting mid-update races Playwright getters (forceScoring / getPhase).
     return () => {
-      if ((window as any).__tsE2E?.playerID === playerID) {
+      /* keep window.__tsE2E until seat unmounts (empty deps cleanup below) */
+    };
+  }, [G, ctx.phase, moves, playerID]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (playerID !== "0") return;
+    return () => {
+      if ((window as any).__tsE2E?.playerID === "0") {
         delete (window as any).__tsE2E;
       }
     };
-  }, [G, ctx.phase, moves, playerID]);
+  }, [playerID]);
   /** Free-tool multi-select (rules-off). */
   const [freeSelected, setFreeSelected] = React.useState<string[]>([]);
   const [freeEraTarget, setFreeEraTarget] = React.useState<EraId>('stone');

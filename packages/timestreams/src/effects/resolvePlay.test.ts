@@ -3,10 +3,19 @@ import { describe, it, expect } from 'vitest';
 import { resolvePlayEffect } from './resolvePlay';
 import { makeCard, makeState, putInHand } from './testFixtures';
 
+/** Opaque encrypted top cards (layers > 0) force cooperative decrypt, not plain materialize. */
+function encryptedStub(n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    ciphertext: `opaque-${i}`,
+    layers: 1,
+  })) as any[];
+}
+
 describe('resolvePlayEffect + draw executor', () => {
   it('play:draw:N queues N sequential cooperative draws', () => {
     const G = makeState({ players: ['0', '1'] });
-    G.encryptedDecks['0'] = [{}, {}, {}] as any; // 3 encrypted cards (opaque)
+    // layers > 0 → enqueue decrypt request (layers 0 is plain-instant path)
+    G.encryptedDecks['0'] = encryptedStub(3);
     const card = makeCard({ id: 'stone-age-fermented-fruit#0', ownerId: '0', tags: ['play:draw:2'] });
     putInHand(G, '0', card);
     const res = resolvePlayEffect(G, '0', 'stone-age-fermented-fruit#0');
@@ -21,9 +30,9 @@ describe('resolvePlayEffect + draw executor', () => {
 
   it('opponents-draw:1 queues draws for all other players', () => {
     const G = makeState({ players: ['0', '1', '2'] });
-    G.encryptedDecks['1'] = [{}] as any;
-    G.encryptedDecks['2'] = [{}] as any;
-    G.encryptedDecks['0'] = [{}, {}, {}] as any;
+    G.encryptedDecks['1'] = encryptedStub(1);
+    G.encryptedDecks['2'] = encryptedStub(1);
+    G.encryptedDecks['0'] = encryptedStub(3);
     const wg = makeCard({ id: 'modern-world-government#0', ownerId: '0', tags: ['play:draw:3', 'draw:to:self', 'opponents-draw:1'] });
     putInHand(G, '0', wg);
     resolvePlayEffect(G, '0', 'modern-world-government#0');

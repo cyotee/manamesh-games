@@ -109,20 +109,19 @@ describe("copyExecutor (Biotechnology)", () => {
     // Labels re-read Laser tags via labelCardId (not Biotechnology)
     expect(p.labelCardId).toBe(laser.id);
 
-    // Resolve option-a (draw 2) through the nested copy path
+    // Resolve option-a (draw 2) through the nested copy path.
+    // layers > 0 → cooperative decrypt queue (not plain instant materialize).
     G.encryptedDecks["0"] = [
-      { ciphertext: "a", layers: 0 },
-      { ciphertext: "b", layers: 0 },
-      { ciphertext: "c", layers: 0 },
+      { ciphertext: "opaque-a", layers: 1 },
+      { ciphertext: "opaque-b", layers: 1 },
+      { ciphertext: "opaque-c", layers: 1 },
     ];
-    G.cards!["a"] = makeCard({ id: "a", ownerId: "0" });
-    G.cards!["b"] = makeCard({ id: "b", ownerId: "0" });
-    G.cards!["c"] = makeCard({ id: "c", ownerId: "0" });
     playInvention(G, ctxFor("0"), "0", bio.id, {
       [`${bio.id}:copy-target`]: laser.id,
       [`${bio.id}:option`]: "option-a",
     });
     expect(G.pendingPrompts ?? []).toEqual([]);
     expect(G.pendingDealRemaining?.["0"]).toBe(2);
+    expect(G.pendingDecryptRequests.some((r) => r.deckOwnerId === "0")).toBe(true);
   });
 });

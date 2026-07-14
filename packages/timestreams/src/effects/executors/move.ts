@@ -4,7 +4,17 @@ import { erasForScope, candidateTargets, locateCard } from '../targets';
 import { moveWithinEra, moveToEra, isMoveBlocked, attachTo } from '../boardOps';
 import { getAttachments } from '../state';
 import { isMoveDirectionPrevented } from '../modifiers';
-import { checkReactForMove } from '../react';
+import {
+  checkReactForMove,
+  findClothMoveRedirectClaimants,
+  applyClothMoveRedirect,
+} from '../react';
+import {
+  getEraStoneCancelOffer,
+  resolveEraStoneCancelChoice,
+  eraStoneCancelPrompt,
+} from '../eraAbilities';
+import { getCard } from '../state';
 import { done, needs, type Executor, type ExecCtx } from '../types';
 import { playOnce } from '../playOnce';
 
@@ -170,7 +180,24 @@ export const moveExecutor: Executor = (ctx) => {
   const blocked = isMoveBlocked(G, moving, playerId);
   if (blocked) return done([`${card.id}: move of ${moving} fizzles (${blocked})`]);
 
-  const react = checkReactForMove(G, moving, playerId);
+  // Era-Stone: once-per-game cancel when a Stone Age invention would be moved
+  {
+    const offer = getEraStoneCancelOffer(G, moving, 'move', card.id);
+    if (offer) {
+      const ans = choices[offer.promptId];
+      if (ans === undefined) {
+        return needs(eraStoneCancelPrompt(offer));
+      }
+      if (resolveEraStoneCancelChoice(G, offer, ans)) {
+        return done([
+          `${card.id}: move of ${moving} cancelled (era-stone once-per-game)`,
+        ]);
+      }
+    }
+  }
+
+  // Within-era reacts only (Cloth is out-of-era — handled after dest known)
+  const react = checkReactForMove(G, moving, playerId, { outOfEra: false });
   if (react.cancelled) {
     return done([`${card.id}: move of ${moving} fizzles (react:cancel)`]);
   }
@@ -179,7 +206,7 @@ export const moveExecutor: Executor = (ctx) => {
     effectiveMoving = react.redirectTo;
   }
 
-  // Relative move within era (amount + direction)
+  // Relative move within era (amount + direction) — Cloth does not apply
   const amount = tagNumber(card, 'move:amount');
   if (amount !== undefined) {
     const dir = tagValue(card, 'move:direction') ?? 'up';
@@ -266,9 +293,66 @@ export const moveExecutor: Executor = (ctx) => {
   const dest = destTag ? parseDestination(ctx, destTag, effectiveMoving) : null;
   if (!dest) return done([`${card.id}: move fizzles (no destination)`]);
 
-  if (dest.era !== from.era && isMoveDirectionPrevented(G, from.era, dest.era)) {
+  // Re-locate after possible self-redirect
+  const fromLive = locateCard(G, effectiveMoving) ?? from;
+
+  if (dest.era !== fromLive.era && isMoveDirectionPrevented(G, fromLive.era, dest.era)) {
     return done([`${card.id}: move of ${effectiveMoving} to ${dest.era} fizzles (prevented direction)`]);
   }
+
+  // Cloth: out-of-era move of a peer invention must redirect to Cloth (multi = owner chooses)
+  if (dest.era !== fromLive.era) {
+    const cloths = findClothMoveRedirectClaimants(G, effectiveMoving);
+    if (cloths.length > 0) {
+      const clothKey = `${card.id}:cloth-absorb:${effectiveMoving}`;
+      let chosen: string | undefined;
+      if (cloths.length === 1) {
+        chosen = cloths[0];
+      } else if (choices[clothKey] !== undefined) {
+        const raw = choices[clothKey];
+        chosen = Array.isArray(raw) ? raw[0] : raw;
+      } else {
+        const owner =
+          getCard(G, cloths[0])?.ownerId || fromLive.era || playerId;
+        return needs({
+          id: clothKey,
+          deciderId: String(owner),
+          kind: 'choose-card',
+          options: cloths,
+          min: 1,
+          max: 1,
+          reason: 'redirect:multi-cloth',
+          labelCardId: cloths[0],
+        });
+      }
+      const clothReact = applyClothMoveRedirect(
+        G,
+        effectiveMoving,
+        playerId,
+        chosen,
+      );
+      if (clothReact.cancelled) {
+        return done([
+          `${card.id}: move of ${effectiveMoving} fizzles (${clothReact.log || 'cloth-redirect'})`,
+        ]);
+      }
+      if (clothReact.redirectTo) {
+        effectiveMoving = clothReact.redirectTo;
+      }
+    } else {
+      // Target itself may still have redirect tags
+      const outReact = checkReactForMove(G, effectiveMoving, playerId, {
+        outOfEra: true,
+      });
+      if (outReact.cancelled) {
+        return done([
+          `${card.id}: move of ${effectiveMoving} fizzles (${outReact.log || 'react'})`,
+        ]);
+      }
+      if (outReact.redirectTo) effectiveMoving = outReact.redirectTo;
+    }
+  }
+
   const logs = playOnce(
     G,
     card.id,

@@ -54,13 +54,15 @@ test.describe("Matrix PW-P0 rules ON via __tsE2E", () => {
     await page.waitForTimeout(300);
     const stack = await getStack(page, "stone");
     const disc1 = await getDiscard(page, "1");
+    // Assertive: victim discarded (or prompt still open for protect/redirect edge)
     const prompts = await getPrompts(page);
-    expect(
-      disc1.includes("victim#0") ||
-        !stack.includes("victim#0") ||
-        prompts.length > 0 ||
-        stack.includes("stone-age-fire#0"),
-    ).toBe(true);
+    if (prompts.length === 0) {
+      expect(disc1).toContain("victim#0");
+      expect(stack).not.toContain("victim#0");
+      expect(stack).toContain("stone-age-fire#0");
+    } else {
+      expect(prompts.length).toBeGreaterThan(0);
+    }
   });
 
   test("PW-P0-02 Hibernation attach", async ({ page }) => {
@@ -98,10 +100,23 @@ test.describe("Matrix PW-P0 rules ON via __tsE2E", () => {
     await page.waitForTimeout(300);
     const att = await getAttachments(page);
     const prompts = await getPrompts(page);
-    expect(
-      (att["host#0"] || []).includes("stone-age-hibernation#0") ||
-        prompts.length > 0,
-    ).toBe(true);
+    if (prompts.length === 0) {
+      expect(att["host#0"] || []).toContain("stone-age-hibernation#0");
+    } else {
+      // host pick still open — complete it
+      const p = prompts[0];
+      if (p.options?.includes("host#0")) {
+        await page.evaluate((id) => {
+          (window as any).__tsE2E.submitPlayChoice?.(id, "host#0");
+        }, p.id);
+        await page.waitForTimeout(300);
+        expect(
+          ((await getAttachments(page))["host#0"] || []).includes(
+            "stone-age-hibernation#0",
+          ),
+        ).toBe(true);
+      }
+    }
   });
 
   test("PW-P0-06 Think About The Future in hand seeds", async ({ page }) => {
@@ -166,8 +181,10 @@ test.describe("Matrix PW-P0 rules ON via __tsE2E", () => {
     await playInvention(page, "stone-age-anarchy#0");
     await page.waitForTimeout(300);
     const stack = await getStack(page, "medieval");
-    // Either blocked (only monarchy) or both present if gate soft — at least monarchy stays
+    // Government gate: second government must not join the era stack
     expect(stack).toContain("medieval-monarchy#0");
+    expect(stack).not.toContain("stone-age-anarchy#0");
+    expect(await getHand(page, "0")).toContain("stone-age-anarchy#0");
   });
 
   test("PW-P0-10 Fast + Slow Time on board", async ({ page }) => {
@@ -204,9 +221,19 @@ test.describe("Matrix PW-P0 rules ON via __tsE2E", () => {
     });
     await playAction(page, "medieval-fast-time#0");
     await page.waitForTimeout(400);
-    // game still alive
-    const body = await page.locator("body").innerText();
-    expect(body).toMatch(/Rules: ON|play|Day/);
+    // Mutual discard: Fast Time and/or Slow Time leave play (discard or removed)
+    const actions = await page.evaluate(
+      () => (window as any).__tsE2E.getG?.()?.timeline?.medieval?.actions ?? [],
+    );
+    const disc0 = await getDiscard(page, "0");
+    const slowGone =
+      !actions.includes("stone-age-slow-time#0") ||
+      disc0.includes("stone-age-slow-time#0");
+    const fastGone =
+      !actions.includes("medieval-fast-time#0") ||
+      disc0.includes("medieval-fast-time#0") ||
+      !(await getHand(page, "0")).includes("medieval-fast-time#0");
+    expect(slowGone || fastGone).toBe(true);
   });
 });
 

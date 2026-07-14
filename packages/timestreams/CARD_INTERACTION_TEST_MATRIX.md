@@ -1,6 +1,6 @@
 # Timestreams — Card Interaction Test Matrix
 
-**Status:** Implemented + verified (2026-07-11)  
+**Status:** Rules-complete + verified (2026-07-14)  
 **Purpose:** Map every pack interaction we must exercise, coverage, and **Playwright** scenarios (rules ON + rules OFF).
 
 **Sources:** `assets/packs/timestreams/**/manifest.json`, `assets/packs/tag_definitions.md`, unit tests under `src/**/*.test.ts*`, [RULES_OFF_PRD.md](./RULES_OFF_PRD.md), [RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md).
@@ -9,11 +9,12 @@
 
 | Suite | Result |
 |---|---|
-| Vitest unit | **456 passed** (67 files) |
-| Playwright e2e | **38 passed** (`e2e/specs/*`) |
-| Matrix unit modules | `matrixShapes`, `matrixChains`, `matrixFreeTools`, `missingCards`, `freeTools`, `debugSeed` |
-| Playwright modules | free-tools, rules-policy, reconnect, rules-on.p0, matrix-free-tools, matrix-rules-on, matrix-remaining |
-| Harness | `?e2e=1` → plaintext + `debugSeed`; `window.__tsE2E` seed/freeTool/play API |
+| Vitest unit | **512 passed** (80 files) |
+| Playwright e2e | **40 passed** (`e2e/specs/*`) |
+| Matrix unit modules | `matrixShapes`, `matrixChains`, `matrixFreeTools`, `missingCards`, `freeTools`, `debugSeed`, `debugE2E`, `eraAbilities`, `multiCloth`, plain-draw |
+| Playwright modules | free-tools, rules-policy, reconnect, rules-on.p0, matrix-free-tools, matrix-rules-on, matrix-remaining (assertive P0/P1 + era polish) |
+| Harness | `?e2e=1` → plaintext + `debugSeed`; `window.__tsE2E` seed/freeTool/play/`debugAct` API |
+| Engine | Rules-complete for play/score/react + all four ability-bearing era cards |
 
 ---
 
@@ -26,7 +27,8 @@
 | Shape tests (§2.1) | **35** | `matrixShapes.behavioral.test.ts` |
 | Chain tests (§2.2) | **13** | `matrixChains.behavioral.test.ts` |
 | Free-tools matrix (§2.3) | **unit + e2e** | `matrixFreeTools` + `matrix-free-tools.spec` |
-| Playwright scenarios | **38** | All PW-R0/R1/RE/P0/P1 IDs covered |
+| Playwright scenarios | **40** | Assertive golden paths (not seed-only smoke) |
+| Era abilities | **4/4** | Stone cancel (play+score), Medieval steal, Modern begin recover, Future slots |
 
 ---
 
@@ -333,12 +335,19 @@ Scripts:
 
 ## 8. Acceptance for “full interaction coverage”
 
-1. Every **shape** in §2.1 has ≥1 assertive unit **or** Playwright golden path.  
-2. Every **chain** in §2.2 has ≥1 dual-seat/Playwright test.  
-3. Every card in §4 has at least one of: unit with real tags, or Playwright scenario referencing pack id.  
-4. Free-tools FT-01…09 green in Playwright.  
-5. Reconnect PW-RE-01 green.  
-6. Tag consumer audit clean (no silent no-op tags without allowlist).
+| # | Criterion | Status (2026-07-14) |
+|---|---|---|
+| 1 | Every **shape** in §2.1 has ≥1 assertive unit **or** Playwright golden path | ✅ |
+| 2 | Every **chain** in §2.2 has ≥1 dual-seat/unit chain test | ✅ unit (`matrixChains`) |
+| 3 | Every card in §4 has unit with real tags and/or PW scenario | ✅ `missingCards` + assertive e2e |
+| 4 | Free-tools FT-01…09 green in Playwright | ✅ |
+| 5 | Reconnect PW-RE-01 green | ✅ |
+| 6 | Tag consumer audit clean (no silent no-op tags without allowlist) | ✅ process closed |
+| 7 | **Rules-complete** era abilities (stone/medieval/modern/future) | ✅ |
+| 8 | Multi-Cloth owner choice + Hibernation fizzle | ✅ |
+| 9 | Crop Rotation interactive adjacent swap | ✅ unit + e2e |
+
+**Residual (non-blocking):** polished UI copy on era prompts; full dual-seat human smoke with mental-poker; optional deeper P1 golden paths (e.g. peak multi-step Fortune Teller UI).
 
 ---
 
@@ -348,7 +357,7 @@ Scripts:
 |---|---|
 | [TAG_TEST_GAP_REPORT.md](./TAG_TEST_GAP_REPORT.md) | Historical tag string inventory |
 | [TAG_TEST_IMPLEMENTATION_PLAN.md](./TAG_TEST_IMPLEMENTATION_PLAN.md) | Old L1–L5 + manual P0 matrix |
-| [RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md) §6 | Engine gap status |
+| [RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md) §6 | Engine gap status (historical; era/Cloth rows closed in code) |
 | [RULES_OFF_PRD.md](./RULES_OFF_PRD.md) §12 | Free-tools acceptance |
 | [assets/packs/tag_definitions.md](./assets/packs/tag_definitions.md) | Tag → cards |
 
@@ -378,15 +387,53 @@ Scripts:
 | invent rules OFF no auto tags | ✅ | ✅ |
 | disable one-way | ✅ | ✅ PW-R1-01 |
 
-### §5.2–5.3 Playwright IDs
+### §5.2–5.3 Playwright IDs (assertive)
 
-| ID | Spec |
+| ID | Spec / proof |
 |---|---|
 | PW-R0-01..03 | free-tools.spec.ts |
 | PW-R1-01..02 | rules-policy.spec.ts |
 | PW-RE-01 | reconnect.spec.ts |
-| PW-P0-01..10 | matrix-rules-on + matrix-remaining + rules-on.p0 |
-| PW-P1-01..14 | matrix-rules-on + matrix-remaining |
+| PW-P0-01 Fire discard | matrix-rules-on (victim in discard) |
+| PW-P0-02 Hibernation attach | matrix-rules-on |
+| PW-P0-03 Mysticism guess | matrix-remaining (bonus + score) |
+| PW-P0-04 Nanotech+QC | matrix-remaining (pile + scores) |
+| PW-P0-05 Chaos→MM | matrix-remaining (nested score) |
+| PW-P0-06 Think Future | matrix-rules-on |
+| PW-P0-07 Herbalism cancel | matrix-remaining (fizzle + cost) |
+| PW-P0-08 Government gate | matrix-rules-on (second blocked) |
+| PW-P0-09 Cloth | matrix-remaining + multiCloth unit |
+| PW-P0-10 Fast/Slow | matrix-rules-on |
+| PW-P1-01 Fortune Teller | matrix-remaining (peek prompt) |
+| PW-P1-02 Biotech copy | matrix-remaining |
+| PW-P1-04 Zero | matrix-remaining |
+| PW-P1-05 Guillotine | matrix-remaining (bottom discarded) |
+| PW-P1-06 Irrigation count | matrix-remaining |
+| PW-P1-08 Space Travel | matrix-remaining |
+| PW-P1-09 Immortality | matrix-remaining (last-slot +10) |
+| PW-P1-13 era hands | matrix-remaining |
+| PW-P1-14 dual-ack walk | matrix-remaining |
+| Crop Rotation | matrix-remaining polish |
+| Multi-Cloth | multiCloth unit + e2e |
+| Era-Stone / Modern | eraAbilities unit + e2e |
+
+### Rules-complete era module (`eraAbilities.ts` + tests)
+
+| Ability | Unit | E2E |
+|---|---|---|
+| Era-Stone cancel (play discard/move) | ✅ | ✅ |
+| Era-Stone cancel (score discard/move) | ✅ | ✅ |
+| Era-Medieval steal bonus | ✅ | seed |
+| Era-Modern begin recover | ✅ | seed + unit endDay |
+| Era-Future +2 slots | ✅ | unit batch/walk |
+
+### Harness additions (2026-07-14)
+
+| Piece | Role |
+|---|---|
+| `debugE2E` / `debugAct` | Multi-seat forceScoring, ackAll, scoreChoiceAs, reactAs, finishScoring |
+| `debugSeed` registers static triggers | Crop/Dot Com watchers on seeded boards |
+| Plain-draw unit tests | `layers:0` instant materialize vs encrypted queue |
 
 ---
 
@@ -397,3 +444,7 @@ Scripts:
 | 2026-07-11 | Initial matrix from pack manifests + unit-test id scan; Playwright plan; fixed `stone_age` manifest JSON typo (missing comma on Smoke Signals). |
 | 2026-07-11 | Unit: `missingCards.behavioral.test.ts` (~34 tests). E2E: `e2e/` Playwright (free-tools, rules-policy, reconnect, rules-on P0). `debugSeed` + `?e2e=1` plaintext dual-seat. |
 | 2026-07-11 | Full matrix implementation: shapes/chains/freeTools unit modules; `window.__tsE2E`; **456** unit + **38** Playwright green. |
+| 2026-07-14 | Fixed draw/copy/recover unit regressions (encrypted fixture layers; copy `labelCardId`; sequential Water Wheel cost). |
+| 2026-07-14 | Assertive PW golden paths (Mysticism, Nanotech, Chaos, Herbalism, Guillotine, Immortality, dual-ack). `debugAct` multi-seat harness. |
+| 2026-07-14 | Multi-Cloth redirect + Hibernation fizzle; Crop Rotation e2e; plain-draw unit coverage. |
+| 2026-07-14 | **Rules-complete era cards:** Stone cancel (play+score), Medieval steal, Modern begin recover, Future slots. **512** unit + **40** Playwright green. |

@@ -6,6 +6,7 @@
 import type { EraId, TimestreamsCard, TimestreamsState } from "./types";
 import { ERA_ORDER } from "./types";
 import { registerCard } from "./effects/state";
+import { registerStaticTriggers } from "./effects/triggers";
 import { pushActivityLog } from "./crypto";
 import { initManualScoring } from "./freeTools";
 
@@ -80,6 +81,7 @@ export function debugSeedBoard(
     G.pendingPlayEffect = undefined;
     G.pendingActionResolve = undefined;
     G.scoringWalk = undefined;
+    G.pendingTriggers = [];
     G.manualProcessed = {};
     G.manualBonus = {};
     G.manualSlotCap = {};
@@ -117,6 +119,12 @@ export function debugSeedBoard(
       const card = toCard(spec, spec.ownerId ?? "0");
       registerCard(G, card);
       G.timeline[e].stack.push(card.id);
+      // Standing triggers (Crop Rotation, Dot Com, …) so e2e seeds behave like play
+      try {
+        registerStaticTriggers(G, card);
+      } catch {
+        /* ignore seed trigger registration errors */
+      }
     }
   }
 
@@ -128,6 +136,11 @@ export function debugSeedBoard(
       const card = toCard(spec, spec.ownerId ?? "0");
       registerCard(G, card);
       G.timeline[e].actions!.push(card.id);
+      try {
+        registerStaticTriggers(G, card);
+      } catch {
+        /* ignore */
+      }
     }
   }
 

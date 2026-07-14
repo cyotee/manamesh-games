@@ -633,7 +633,7 @@ describe("matrix §2.1 shapes", () => {
     expect(G.phase).toBe("gameOver");
   });
 
-  it("score-discard: medieval-guillotine", () => {
+  it("score-discard: medieval-guillotine discards bottom of era", () => {
     const G = makeState({ players: ["0"], currentDay: 2 });
     G.players["0"].homeEra = "medieval";
     putInEra(
@@ -651,10 +651,20 @@ describe("matrix §2.1 shapes", () => {
           "discard:scope:current-era",
         ],
       }),
+      makeCard({ id: "mid#0", ownerId: "0", scoreValue: 3 }),
       makeCard({ id: "bottom#0", ownerId: "0", scoreValue: 2 }),
     );
     resolveScoring(G, { "medieval-guillotine#0:score-discard": "yes" });
     expect(G.phase).toBe("gameOver");
+    // Bottom of era discarded (not piled)
+    expect(G.players["0"].discard.some((c) => c.id === "bottom#0")).toBe(true);
+    expect(G.players["0"].scorePile.some((c) => c.id === "bottom#0")).toBe(
+      false,
+    );
+    // Guillotine itself banks printed value
+    expect(G.players["0"].scorePile.some((c) => c.id === "medieval-guillotine#0")).toBe(
+      true,
+    );
   });
 
   it("score-move: stone-age-pottery", () => {
