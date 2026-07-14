@@ -11,9 +11,11 @@ import { playTagIsCovered, PLAY_ALLOWLIST } from "./playTagRegistry";
 
 const PACKS = join(__dirname, "..", "..", "assets", "packs", "timestreams");
 
-/** Tag prefixes the M2 play pipeline consumes. */
+/** Tag prefixes the play + score + react pipelines consume. */
 const HANDLED_PREFIXES = [
   "play:",
+  "score:",
+  "react:",
   "move:",
   "move-source:",
   "move-destination:",
@@ -43,16 +45,11 @@ const HANDLED_PREFIXES = [
   "extra-turn:",
   "cost:",
   "condition:",
+  "additional:",
   "peek:",
   "to-hand:",
   "return:",
   "return-order:",
-];
-
-/** Score/react-phase families and named M2 deferrals (PRD: M3 + crypto-deck effects). */
-const DEFERRED_PREFIXES = [
-  "score:",
-  "react:",
   "penalty:",
   "bonus-points:",
   "count:",
@@ -65,7 +62,6 @@ const DEFERRED_PREFIXES = [
   "delayed:",
   "suppress:",
   "steal:",
-  "retaliate:",
   "redirect:",
   "replace:",
   "guess:",
@@ -73,8 +69,17 @@ const DEFERRED_PREFIXES = [
   "slots:",
   "limit:",
   "mutual-discard:",
-  "additional:",
   "extend:",
+];
+
+/**
+ * Families handled by score/react pipelines (post gap-closure Phases 1–5).
+ * Kept as "known" prefixes so unknown tags still fail CI.
+ * Prefer behavioral tests over this soft gate.
+ */
+const DEFERRED_PREFIXES = [
+  // Still partially interactive / era-card polish — not silent no-ops for core packs
+  "retaliate:",
 ];
 
 function allTags(): Set<string> {

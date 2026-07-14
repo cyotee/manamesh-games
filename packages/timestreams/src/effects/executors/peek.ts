@@ -1,17 +1,23 @@
 /**
  * play:peek — Fortune Teller style multi-step (idempotent across resubmissions).
  *
+ * Mental-poker: top-N must be decrypted before choose prompts (startPeekReveal).
+ * Plain / resolved decks: rewrite point ciphertexts → card ids for readable UI.
+ *
  * Steps (as choices accumulate):
  *  1) peek-own-hand   — optional card from top N own deck → hand
  *  2) choose-opponent  — if target:choose:opponent
  *  3) peek-opp-discard — discard 1 of top M opponent deck
- *
- * Each step records completion on G._effectMarks so re-resolve does not double-apply.
  */
 import { hasTag, tagNumber } from "../tags";
 import { done, needs, type ChoiceMap, type Executor, type EffectResult } from "../types";
-import { getCard } from "../state";
+import { getCard, registerCard } from "../state";
 import type { TimestreamsCard, TimestreamsState } from "../../types";
+import {
+  startPeekReveal,
+  resolveCardIdFromPoint,
+  looksLikeSecpPointHex,
+} from "../../crypto";
 
 type Enc = { ciphertext: string; layers: number };
 
@@ -32,7 +38,7 @@ function putOnTop(deck: Enc[], cards: Enc[]): void {
 function asCard(G: TimestreamsState, id: string, ownerId: string): TimestreamsCard {
   const existing = getCard(G, id);
   if (existing) return { ...existing, ownerId };
-  return {
+  const card: TimestreamsCard = {
     id,
     name: id,
     ownerId,
@@ -43,12 +49,59 @@ function asCard(G: TimestreamsState, id: string, ownerId: string): TimestreamsCa
     hasReact: false,
     tags: [],
   };
+  registerCard(G, card);
+  return card;
 }
 
 function choiceStr(choices: ChoiceMap, key: string): string | undefined {
   if (choices[key] === undefined) return undefined;
   const raw = choices[key];
   return Array.isArray(raw) ? raw[0] : raw;
+}
+
+/** Resolve deck top entries to plain card ids when possible (display + logic). */
+function normalizeTopPlain(
+  G: TimestreamsState,
+  deck: Enc[],
+  n: number,
+  ownerId: string,
+): string[] {
+  const count = Math.min(n, deck.length);
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const raw = deck[i].ciphertext;
+    let id = raw;
+    if (looksLikeSecpPointHex(raw)) {
+      const resolved = resolveCardIdFromPoint(G, raw);
+      if (resolved) {
+        id = resolved;
+        deck[i] = { ciphertext: resolved, layers: 0 };
+      }
+    } else if ((deck[i].layers ?? 0) === 0) {
+      id = raw;
+    }
+    asCard(G, id, ownerId);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function topNeedsDecrypt(deck: Enc[], n: number): boolean {
+  const count = Math.min(n, deck.length);
+  for (let i = 0; i < count; i++) {
+    if ((deck[i].layers ?? 0) > 0) return true;
+  }
+  return false;
+}
+
+function isPeekDecrypting(G: TimestreamsState, sourceCardId: string): boolean {
+  const op = G.activeDeckOp;
+  return !!(
+    op &&
+    op.kind === "peek-deck" &&
+    op.sourceCardId === sourceCardId &&
+    op.phase === "decrypt"
+  );
 }
 
 export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectResult => {
@@ -62,10 +115,35 @@ export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectRe
   const ownMark = `${card.id}:own-peek-done`;
   const oppMark = `${card.id}:opp-peek-done`;
 
+  // Hold while cooperative peek decrypt is in flight
+  if (isPeekDecrypting(G, card.id)) {
+    return done([
+      ...log,
+      `${card.id}: decrypting peek (${G.activeDeckOp?.decryptDone ?? 0}/${G.activeDeckOp?.decryptTotal ?? "?"})`,
+    ]);
+  }
+
   // ---------- Own deck ----------
   if (ownN > 0 && !m[ownMark]) {
     const deck = G.encryptedDecks[playerId] ?? (G.encryptedDecks[playerId] = []);
-    const peekedIds = deck.slice(0, Math.min(ownN, deck.length)).map((c) => c.ciphertext);
+
+    // Mental-poker: peel top N before offering choices
+    if (topNeedsDecrypt(deck, ownN)) {
+      const handKey = `${card.id}:peek-own-hand`;
+      if (choices[handKey] === undefined) {
+        startPeekReveal(G, playerId, card.id, ownN, {
+          allowNone: mayToHand,
+          reason: "peek:own-to-hand",
+          deciderId: playerId,
+        });
+        return done([
+          ...log,
+          `${card.id}: started peek decrypt of top ${ownN}`,
+        ]);
+      }
+    }
+
+    const peekedIds = normalizeTopPlain(G, deck, ownN, playerId);
 
     if (peekedIds.length === 0) {
       log.push(`${card.id}: own peek empty`);
@@ -73,6 +151,7 @@ export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectRe
     } else {
       const handKey = `${card.id}:peek-own-hand`;
       if (mayToHand && choices[handKey] === undefined) {
+        // Ensure prompt options are human-resolvable card ids
         return needs({
           id: handKey,
           deciderId: playerId,
@@ -99,10 +178,8 @@ export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectRe
       if (taken) {
         const full = asCard(G, taken.ciphertext, playerId);
         G.players[playerId].hand.push(full);
-        if (!G.cards) G.cards = {};
-        G.cards[full.id] = full;
         if (G.cardVisibility) G.cardVisibility[full.id] = "owner-known";
-        log.push(`${card.id}: peek own -> ${full.id} to hand`);
+        log.push(`${card.id}: peek own -> ${full.name || full.id} to hand`);
       } else {
         log.push(`${card.id}: peek own -> took none`);
       }
@@ -110,6 +187,9 @@ export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectRe
       putOnTop(deck, rest);
       log.push(`${card.id}: returned ${rest.length} to top of own deck`);
       m[ownMark] = true;
+      if (G.activeDeckOp?.kind === "peek-deck" && G.activeDeckOp.sourceCardId === card.id) {
+        G.activeDeckOp = null;
+      }
     }
   }
 
@@ -146,7 +226,23 @@ export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectRe
     }
 
     const oppDeck = G.encryptedDecks[oppId] ?? (G.encryptedDecks[oppId] = []);
-    const peekedIds = oppDeck.slice(0, Math.min(oppN, oppDeck.length)).map((c) => c.ciphertext);
+
+    if (topNeedsDecrypt(oppDeck, oppN)) {
+      const discardKey = `${card.id}:peek-opp-discard`;
+      if (choices[discardKey] === undefined) {
+        startPeekReveal(G, oppId, card.id, oppN, {
+          allowNone: false,
+          reason: "discard:opponent-deck-card",
+          deciderId: playerId,
+        });
+        return done([
+          ...log,
+          `${card.id}: started opponent peek decrypt (P${oppId})`,
+        ]);
+      }
+    }
+
+    const peekedIds = normalizeTopPlain(G, oppDeck, oppN, oppId);
     if (peekedIds.length === 0) {
       m[oppMark] = true;
       return done([...log, `${card.id}: opponent deck empty`]);
@@ -174,14 +270,17 @@ export const peekExecutor: Executor = ({ G, playerId, card, choices }): EffectRe
     if (discarded) {
       const full = asCard(G, discarded.ciphertext, oppId);
       G.players[oppId].discard.push(full);
-      if (!G.cards) G.cards = {};
-      G.cards[full.id] = full;
-      log.push(`${card.id}: discarded ${full.id} from P${oppId} deck`);
+      log.push(
+        `${card.id}: discarded ${full.name || full.id} from P${oppId} deck`,
+      );
     }
 
     putOnTop(oppDeck, rest);
     log.push(`${card.id}: returned ${rest.length} to top of P${oppId} deck`);
     m[oppMark] = true;
+    if (G.activeDeckOp?.kind === "peek-deck" && G.activeDeckOp.sourceCardId === card.id) {
+      G.activeDeckOp = null;
+    }
   }
 
   // Clear marks when fully done so a future card with same id instance is fine

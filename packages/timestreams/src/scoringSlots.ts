@@ -119,7 +119,11 @@ export function computeScoringSlotsForEra(
   _choices: Record<string, string | string[]> = {},
 ): number {
   const base = G.config?.scoringSlots ?? 6;
-  if (G.config?.rulesEnabled === false) return base;
+  if (G.config?.rulesEnabled === false) {
+    // Prefer manual capacity when set (free:score-slot-cap).
+    const manual = G.manualSlotCap?.[eraId as EraId];
+    return Math.max(1, manual ?? base);
+  }
 
   let delta = 0;
   const era = G.timeline[eraId as keyof typeof G.timeline];

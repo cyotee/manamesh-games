@@ -33,7 +33,12 @@ export { createPlaceholderDeck, createCardFromManifest, createDeckFromPack, time
 export { resolveDeck, resolveDeckFromPack, resolveDecksFromPack as resolveDecksForPlayers, getDeckSizeFromPack, materializeHomeEraDecks } from "./deckResolver";
 export { loadPackCatalogFromHttp, DEFAULT_PACK_BASE_URL, ERA_TO_SET } from "./packCatalog";
 export type { PackCatalog, PackCardEntry, PackCatalogLoadResult } from "./packCatalog";
-export { composeCardText, hasReactTrigger } from "./types";
+export {
+  composeCardText,
+  hasReactTrigger,
+  formatCardCaption,
+  displaySubtypes,
+} from "./types";
 export { resolvePlayEffect } from "./effects/resolvePlay";
 export { canPlayCard } from "./effects/gates";
 export { fireEvent, registerStaticTriggers } from "./effects/triggers";
@@ -63,3 +68,16 @@ export {
   reorderGroups,
 } from "./board/handLayout";
 export type { EffectResult, PlayerPrompt, ChoiceMap } from "./effects/types";
+export {
+  applyFreeTool,
+  canUseFreeTools,
+  canPlayerUseFreeTool,
+  disableRulesEngine,
+  initManualScoring,
+  finalizeManualScores,
+  previewEraCleanup,
+  findCardAnywhere,
+} from "./freeTools";
+export type { FreeToolId, FreeToolArgs, EraCleanupMode } from "./freeTools";
+export { debugSeedBoard, canDebugSeed } from "./debugSeed";
+export type { DebugSeedBoardArgs, SeedCardSpec } from "./debugSeed";

@@ -3,6 +3,13 @@ import { effectiveScoreValue, discardFromPlay, moveToEra, isDiscardBlocked, isMo
 import { getCard } from '../state';
 import { erasForScope, candidateTargets, cardAtOffset, locateCard } from '../targets';
 import { shouldCancelScoreEffects, isProtected } from '../react';
+import {
+  evaluateConditions,
+  evaluateAdditionalConditions,
+  hasAttachmentScoreSuppress,
+  hasUsedFirstScore,
+  markFirstScoreUsed,
+} from '../conditions';
 import { done, type Executor } from '../types';
 import type { TimestreamsState, EraId } from '../../types';
 import { ERA_ORDER } from '../../types';
@@ -13,6 +20,7 @@ import {
   adjustEraScoringSlots,
 } from '../../scoringSlots';
 import { swapPositions } from './swap';
+import { fireEvent } from '../triggers';
 
 export type ScoreEffectResult = {
   extra: number;
@@ -47,6 +55,13 @@ function mergeNestedScore(out: ScoreEffectResult, nested: ScoreEffectResult): vo
 
 function nextInventionId(G: TimestreamsState, cardId: string): string | null {
   return cardAtOffset(G, cardId, 1);
+}
+
+/** Stable name key for duplicate counting (strip instance #N). */
+function baseNameKey(c: { name?: string; id?: string }): string {
+  if (c.name) return c.name;
+  const id = c.id || '';
+  return id.includes('#') ? id.slice(0, id.indexOf('#')) : id;
 }
 
 function deckOfCard(cardId: string): string {
@@ -114,6 +129,20 @@ export function resolveCardScoreEffectsFull(
     return Array.isArray(v) ? v[0] : v;
   };
 
+  // Hibernation-style attach: suppress score *effects* on host (printed value still banks later).
+  if (hasAttachmentScoreSuppress(G, card.id)) {
+    out.log.push(`${card.id}: score effects suppressed (attachment)`);
+    return out;
+  }
+
+  const condCtx = {
+    G,
+    card,
+    eraId,
+    slotIndex: _slotIndex,
+    choices,
+  };
+
   // --- bonus points ---
   const isBonusCopy = hasTag(card, 'bonus-points:copy');
   if (hasTag(card, 'score:bonus-points') || isBonusCopy) {
@@ -146,29 +175,22 @@ export function resolveCardScoreEffectsFull(
           amt = valType === 'current' ? effectiveScoreValue(G, targetId) : (tcard.scoreValue || 0);
         }
       }
-      if (hasTag(card, 'bonus-points:additional')) {
-        amt += tagNumber(card, 'bonus-points:additional') || 0;
+      // bonus-points:additional:N (+ optional additional:condition:*)
+      const addN = tagNumber(card, 'bonus-points:additional');
+      if (addN !== undefined && addN !== 0) {
+        if (
+          evaluateAdditionalConditions({
+            ...condCtx,
+            targetCardId: targetId,
+          })
+        ) {
+          amt += addN;
+        }
       }
     } else {
       amt = tagNumber(card, 'bonus-points:amount') || 0;
-      // condition:scored-in-era:future etc.
-      if (hasTag(card, 'condition:scored-in-era:future') && eraId !== 'future') {
+      if (!evaluateConditions(condCtx)) {
         amt = 0;
-      }
-      if (hasTag(card, 'condition:in-era:future') && eraId !== 'future') {
-        amt = 0;
-      }
-      if (hasTag(card, 'condition:attached-to-first-invention-of-era')) {
-        const loc = locateCard(G, card.id);
-        // attachments: check if this card is attached to first invention
-        const host = Object.entries(G.attachments || {}).find(([, list]) => list.includes(card.id))?.[0];
-        if (host) {
-          const hloc = locateCard(G, host);
-          if (!hloc || hloc.index !== 0) amt = 0;
-        } else if (!loc || loc.index !== 0) {
-          // if scored as itself on first slot
-          if (!loc || loc.index !== 0) amt = 0;
-        }
       }
     }
     out.extra += amt;
@@ -187,7 +209,42 @@ export function resolveCardScoreEffectsFull(
     const perPlayerOwn =
       ownInventions && hasTag(card, 'score:to:all-players');
 
+    const collectCandidates = (): string[] => {
+      const all: string[] = [];
+      for (const e of eras) {
+        const eraState = G.timeline[e];
+        if (!eraState) continue;
+        let candidates = eraState.stack;
+        if (onlyInScoringSlot) {
+          const cap = computeScoringSlotsForEra(G, e, choices);
+          candidates = scoringSlotCardIds(eraState, cap);
+        }
+        all.push(...candidates);
+      }
+      return all;
+    };
+
     const countForOwner = (ownerFilter: string | null): number => {
+      // Multiplicity: each of your inventions that shares a name with another invention in scope
+      if (hasTag(card, 'count:duplicates:own-inventions')) {
+        const all = collectCandidates()
+          .map((cid) => getCard(G, cid))
+          .filter((c): c is NonNullable<typeof c> => !!c && c.cardType === 'invention');
+        const nameCounts = new Map<string, number>();
+        for (const c of all) {
+          const n = (c.name || baseNameKey(c)).toLowerCase();
+          nameCounts.set(n, (nameCounts.get(n) || 0) + 1);
+        }
+        const owner = ownerFilter ?? card.ownerId;
+        let matches = 0;
+        for (const c of all) {
+          if (c.ownerId !== owner) continue;
+          const n = (c.name || baseNameKey(c)).toLowerCase();
+          if ((nameCounts.get(n) || 0) >= 2) matches++;
+        }
+        return matches;
+      }
+
       let matches = 0;
       for (const e of eras) {
         const eraState = G.timeline[e];
@@ -270,21 +327,80 @@ export function resolveCardScoreEffectsFull(
   // --- discard ---
   if (hasTag(card, 'score:discard')) {
     const scope = tagValue(card, 'discard:scope') || tagValue(card, 'target:scope') || 'current-era';
-    let targetId: string | null = null;
-    if (hasTag(card, 'discard:target:bottom-of-era')) {
-      const eras = erasForScope(G, scope === 'current-era' ? 'current-era' : scope, card.id);
-      const era = eras[0] || eraForDay(G.currentDay);
-      const stack = G.timeline[era]?.stack ?? [];
-      targetId = stack[stack.length - 1] || null;
-    } else {
-      const eras = erasForScope(G, scope, card.id);
-      const cands = candidateTargets(G, { kind: 'invention', eras, excludeCardId: card.id });
-      targetId = choiceStr(`${card.id}:score-target`) || cands[0] || null;
-    }
     const optional = hasTag(card, 'discard:optional');
-    if (targetId && (!optional || choiceStr(`${card.id}:score-discard`) !== 'no')) {
-      out.discardIds.push(targetId);
-      out.log.push(`${card.id}: score-discard ${targetId}`);
+    const declined =
+      optional &&
+      (choiceStr(`${card.id}:score-discard`) === 'no' ||
+        choiceStr(`${card.id}:score-discard`) === 'skip');
+
+    if (!declined) {
+      const offsetTag = (card.tags || []).find((t: string) =>
+        t.startsWith('discard:target:offset-below:'),
+      );
+      let targetIds: string[] = [];
+
+      if (offsetTag || hasTag(card, 'discard:target:offset-below:1')) {
+        const off = offsetTag
+          ? parseInt(offsetTag.split(':').pop() || '1', 10)
+          : 1;
+        const tid = cardAtOffset(G, card.id, Number.isNaN(off) ? 1 : off);
+        if (tid) targetIds = [tid];
+      } else if (hasTag(card, 'discard:target:bottom-of-era')) {
+        const eras = erasForScope(G, scope === 'current-era' ? 'current-era' : scope, card.id);
+        const era = eras[0] || eraForDay(G.currentDay);
+        const stack = G.timeline[era]?.stack ?? [];
+        const bottom = stack[stack.length - 1] || null;
+        if (bottom) targetIds = [bottom];
+      } else {
+        const eras = erasForScope(G, scope, card.id);
+        let kind: 'invention' | 'any' = 'invention';
+        let subtypes: string[] | undefined;
+        if (hasTag(card, 'discard:target:art') || tagValue(card, 'discard:target') === 'art') {
+          subtypes = ['art'];
+          kind = 'invention';
+        } else if (hasTag(card, 'discard:target:any-card')) {
+          kind = 'any';
+        }
+        let cands = candidateTargets(G, {
+          kind,
+          eras,
+          subtypes,
+          excludeCardId: card.id,
+        });
+        const count = tagNumber(card, 'discard:count') ?? 1;
+        const needsSelf = hasTag(card, 'cost:discard-self');
+        const chosen = choiceStr(`${card.id}:score-target`);
+        const multiRaw = choices[`${card.id}:score-discard-targets`];
+        if (Array.isArray(multiRaw) && multiRaw.length) {
+          targetIds = multiRaw.filter((id) => cands.includes(id)).slice(0, count);
+        } else if (chosen && cands.includes(chosen)) {
+          targetIds = [chosen];
+        } else if (cands.length >= 1 && !optional) {
+          // Deterministic batch fallback: first candidate (interactive walks should
+          // supply score-target; tests and auto-score use top-of-list).
+          targetIds = cands.slice(0, count);
+        }
+        if (needsSelf && targetIds.length && !declined) {
+          // cost:discard-self — also discard this card when effect fires
+          if (!targetIds.includes(card.id)) targetIds = [card.id, ...targetIds];
+        } else if (needsSelf && count >= 1 && targetIds.length >= count) {
+          if (!targetIds.includes(card.id)) targetIds = [card.id, ...targetIds].slice(0, count + 1);
+        }
+        // Tactical Nukes: discard self + up to N others when paid
+        if (needsSelf && optional && choiceStr(`${card.id}:score-discard`) === 'yes') {
+          const others = Array.isArray(multiRaw)
+            ? multiRaw.filter((id) => id !== card.id && cands.includes(id)).slice(0, count)
+            : chosen && chosen !== card.id
+              ? [chosen]
+              : [];
+          targetIds = [card.id, ...others];
+        }
+      }
+
+      for (const tid of targetIds) {
+        out.discardIds.push(tid);
+        out.log.push(`${card.id}: score-discard ${tid}`);
+      }
     }
   }
 
@@ -307,6 +423,24 @@ export function resolveCardScoreEffectsFull(
       }
       if (ok && swapPositions(G, aId, bId)) {
         out.log.push(`${card.id}: score-swapped ${aId} <-> ${bId}`);
+        // International Diplomacy etc.: each swapped card may retaliate if moved by opponent
+        for (const mid of [aId, bId]) {
+          const mc = getCard(G, mid);
+          if (!mc) continue;
+          const nested = fireEvent(G, {
+            type: 'move',
+            cardId: mid,
+            eraId: locateCard(G, mid)?.era ?? null,
+            actorPlayerId: card.ownerId,
+          });
+          out.log.push(...nested.log);
+          if (nested.prompts.length) {
+            G.pendingPrompts = [
+              ...(G.pendingPrompts || []),
+              ...nested.prompts,
+            ] as any;
+          }
+        }
       } else if (ok) {
         out.log.push(`${card.id}: score-swap fizzles (locate failed)`);
       }
@@ -325,7 +459,10 @@ export function resolveCardScoreEffectsFull(
   }
 
   // --- move (pottery / shipbuilding style) ---
-  if (hasTag(card, 'score:move')) {
+  // Space Travel: condition:first-score gates move (and bonus already gated above)
+  const firstScoreBlocksMove =
+    hasTag(card, 'condition:first-score') && hasUsedFirstScore(G, card.id);
+  if (hasTag(card, 'score:move') && !firstScoreBlocksMove) {
     const optional = hasTag(card, 'move:optional') || isOptionalFor(card, 'move');
     const destSpec = tagValue(card, 'move-destination') || 'any-future-era';
     // Scoring "today" is the era being walked when present
@@ -335,6 +472,7 @@ export function resolveCardScoreEffectsFull(
 
     // Resolve move target
     let tid: string | null = null;
+    const mt = tagValue(card, 'move:target') || 'any-card';
     const offsetBelow = (card.tags || []).find((t: string) =>
       t.startsWith('move:target:offset-below:'),
     );
@@ -343,10 +481,12 @@ export function resolveCardScoreEffectsFull(
         ? parseInt(offsetBelow.split(':').pop() || '1', 10)
         : 1;
       tid = cardAtOffset(G, card.id, Number.isNaN(off) ? 1 : off);
+    } else if (mt === 'self') {
+      // Space Travel etc. — only moves itself
+      tid = card.id;
     } else {
       const scopeSrc = tagValue(card, 'move-source') || 'today';
       const eras = erasForScope(G, scopeSrc, card.id);
-      const mt = tagValue(card, 'move:target') || 'any-card';
       const kind =
         mt === 'invention' || mt === 'any-invention' ? 'invention' : 'any';
       const cands = candidateTargets(G, {
@@ -403,18 +543,34 @@ export function resolveCardScoreEffectsFull(
       if (destEra) {
         moveToEra(G, tid, destEra, destPos);
         out.log.push(`${card.id}: moved ${tid} to ${destEra} (${destPos})`);
+        const moveEv = fireEvent(G, {
+          type: 'move',
+          cardId: tid,
+          eraId: destEra,
+          actorPlayerId: card.ownerId,
+        });
+        out.log.push(...moveEv.log);
+        if (moveEv.prompts.length) {
+          G.pendingPrompts = [
+            ...(G.pendingPrompts || []),
+            ...moveEv.prompts,
+          ] as any;
+        }
         if (
           hasTag(card, 'score:delayed') ||
           hasTag(card, 'delayed:trigger:after-destination-era-scored')
         ) {
+          // Pottery: source keeps delayed: tags; target is the moved card to re-score
           if (!G.pendingTriggers) G.pendingTriggers = [];
           G.pendingTriggers.push({
-            sourceCardId: tid,
+            sourceCardId: card.id,
+            targetCardId: tid,
             ownerId: getCard(G, tid)?.ownerId || card.ownerId,
             event: 'era-scored',
             eraAnchor: destEra,
             limit: 'once',
             spent: false,
+            delayedRescore: true,
           } as any);
         }
       } else if (tid) {
@@ -610,76 +766,128 @@ export function resolveCardScoreEffectsFull(
     }
   }
 
-  // --- penalty next inventor ---
+  // --- penalty next inventor (+ optional printed-value refund, Digital Secretary) ---
   if (hasTag(card, 'score:penalty:next-inventor')) {
     const amt = tagNumber(card, 'penalty:amount') || 0;
     const nextId = nextInventionId(G, card.id);
     if (nextId) {
-      const owner = getCard(G, nextId)?.ownerId;
-      if (owner) out.other[owner] = (out.other[owner] || 0) - Math.abs(amt);
+      const next = getCard(G, nextId);
+      const owner = next?.ownerId;
+      if (owner) {
+        out.other[owner] = (out.other[owner] || 0) - Math.abs(amt);
+        // bonus-points:to:next-inventor + printed-value:their-invention
+        if (
+          hasTag(card, 'bonus-points:to:next-inventor') ||
+          hasTag(card, 'bonus-points:printed-value:their-invention')
+        ) {
+          const printed = next?.scoreValue ?? 0;
+          out.other[owner] = (out.other[owner] || 0) + printed;
+          out.log.push(
+            `${card.id}: next-inventor penalty ${-Math.abs(amt)} + refund printed ${printed}`,
+          );
+        }
+      }
     }
   }
 
   // --- generic / targeted penalty (Cave Paintings: optional art in today) ---
+  // Deforestation: score:penalty + penalty:per + count:own-inventions + score:to:all-players
   if (hasTag(card, 'score:penalty') && !hasTag(card, 'score:penalty:next-inventor')) {
-    const amt = Math.abs(tagNumber(card, 'penalty:amount') || 0);
-    const optional = hasTag(card, 'penalty:optional') || isOptionalFor(card, 'penalty');
-    const toOwner = hasTag(card, 'penalty:to:target-owner');
-    const artOnly = hasTag(card, 'penalty:target:art');
-    const scope = tagValue(card, 'target:scope') || 'today';
-    const eras = erasForScope(G, scope, card.id);
-    let cands = candidateTargets(G, {
-      kind: 'invention',
-      eras,
-      excludeCardId: hasTag(card, 'target:exclude-self') ? card.id : undefined,
-    });
-    if (artOnly) {
-      cands = cands.filter((cid) => {
-        const c = getCard(G, cid);
-        return !!c && (c.subtypes || []).includes('art');
+    const perTag = tagNumber(card, 'penalty:per');
+    if (perTag !== undefined && hasTag(card, 'count:own-inventions')) {
+      const cscope = tagValue(card, 'count:scope') || 'this-era';
+      const eras = erasForScope(G, cscope, card.id);
+      for (const pid of G.playerOrder) {
+        let n = 0;
+        for (const e of eras) {
+          for (const cid of G.timeline[e]?.stack ?? []) {
+            const cc = getCard(G, cid);
+            if (cc && cc.cardType === 'invention' && cc.ownerId === pid) n++;
+          }
+        }
+        const pts = -Math.abs(perTag) * n;
+        if (pts) {
+          out.other[pid] = (out.other[pid] || 0) + pts;
+          out.log.push(`${card.id}: penalty-per for P${pid} ${pts}`);
+        }
+      }
+    } else {
+      const amt = Math.abs(tagNumber(card, 'penalty:amount') || 0);
+      const optional = hasTag(card, 'penalty:optional') || isOptionalFor(card, 'penalty');
+      const toOwner = hasTag(card, 'penalty:to:target-owner');
+      const artOnly = hasTag(card, 'penalty:target:art');
+      const scope = tagValue(card, 'target:scope') || 'today';
+      const eras = erasForScope(G, scope, card.id);
+      let cands = candidateTargets(G, {
+        kind: 'invention',
+        eras,
+        excludeCardId: hasTag(card, 'target:exclude-self') ? card.id : undefined,
       });
-    }
-    const tid = choiceStr(`${card.id}:score-penalty-target`) || null;
-    if (optional && (tid === '' || tid === 'none' || tid === undefined || tid === null)) {
-      // declined or no choice yet — no penalty
-      if (tid === undefined && cands.length === 0) {
-        /* no targets */
-      } else if (tid === undefined) {
-        out.log.push(`${card.id}: penalty awaiting target choice`);
-      } else {
-        out.log.push(`${card.id}: penalty declined`);
+      if (artOnly) {
+        cands = cands.filter((cid) => {
+          const c = getCard(G, cid);
+          return !!c && (c.subtypes || []).includes('art');
+        });
       }
-    } else if (tid && cands.includes(tid) && toOwner) {
-      const victim = getCard(G, tid)?.ownerId;
-      if (victim) {
-        out.other[victim] = (out.other[victim] || 0) - amt;
-        out.log.push(`${card.id}: penalty -${amt} to owner of ${tid}`);
+      const tid = choiceStr(`${card.id}:score-penalty-target`) || null;
+      if (optional && (tid === '' || tid === 'none' || tid === undefined || tid === null)) {
+        if (tid === undefined && cands.length === 0) {
+          /* no targets */
+        } else if (tid === undefined) {
+          out.log.push(`${card.id}: penalty awaiting target choice`);
+        } else {
+          out.log.push(`${card.id}: penalty declined`);
+        }
+      } else if (tid && cands.includes(tid) && toOwner) {
+        const victim = getCard(G, tid)?.ownerId;
+        if (victim) {
+          out.other[victim] = (out.other[victim] || 0) - amt;
+          out.log.push(`${card.id}: penalty -${amt} to owner of ${tid}`);
+        }
+      } else if (!optional && !toOwner) {
+        out.extra -= amt;
+        out.log.push(`${card.id}: self penalty -${amt}`);
+      } else if (!optional && toOwner && cands.length === 1) {
+        const victim = getCard(G, cands[0])?.ownerId;
+        if (victim) out.other[victim] = (out.other[victim] || 0) - amt;
       }
-    } else if (!optional && !toOwner) {
-      out.extra -= amt;
-      out.log.push(`${card.id}: self penalty -${amt}`);
-    } else if (!optional && toOwner && cands.length === 1) {
-      const victim = getCard(G, cands[0])?.ownerId;
-      if (victim) out.other[victim] = (out.other[victim] || 0) - amt;
     }
   }
 
   // --- score:choice option-a / option-b (slot ±N via tags) ---
-  // Each resolution **increments the era counter**. No per-card "already applied"
-  // lock — two Quantum Computings (or any two effects) stack; re-processing adds again.
+  // Also: score:choice + score:add-scoring-slots:N without option-a/b (Era-Future)
   if (hasTag(card, 'score:choice') && !hasTag(card, 'score:perform-other')) {
     const ch = choiceStr(`${card.id}:score-choice`);
+    const hasOptions =
+      (card.tags || []).some((t: string) => t.startsWith('option-a:')) ||
+      (card.tags || []).some((t: string) => t.startsWith('option-b:'));
     if (ch) {
       out.log.push(`${card.id}: score-choice ${ch}`);
-      const delta = slotDeltaFromScoreChoice(card, ch);
-      if (delta) {
-        const adj = adjustEraScoringSlots(
-          G,
-          eraId as EraId,
-          delta,
-          `${delta > 0 ? '+' : ''}${delta} scoring slot(s) in ${eraId}`,
-        );
-        if (adj) out.log.push(`${card.id}: ${adj.note}`);
+      if (hasOptions) {
+        const delta = slotDeltaFromScoreChoice(card, ch);
+        if (delta) {
+          const adj = adjustEraScoringSlots(
+            G,
+            eraId as EraId,
+            delta,
+            `${delta > 0 ? '+' : ''}${delta} scoring slot(s) in ${eraId}`,
+          );
+          if (adj) out.log.push(`${card.id}: ${adj.note}`);
+        }
+      } else if (
+        (ch === 'yes' || ch === 'option-a' || ch === 'add') &&
+        tagsWithPrefix(card, 'score:add-scoring-slots').length
+      ) {
+        const n = tagNumber(card, 'score:add-scoring-slots') || 0;
+        if (n) {
+          const adj = adjustEraScoringSlots(
+            G,
+            eraId as EraId,
+            n,
+            `+${n} scoring slot(s) in ${eraId}`,
+          );
+          if (adj) out.log.push(`${card.id}: ${adj.note}`);
+        }
       }
     } else {
       out.log.push(`${card.id}: score-choice not answered (no slot change)`);
@@ -694,13 +902,14 @@ export function resolveCardScoreEffectsFull(
     isProtected(G, card.id, 'score-effects') ||
     hasTag(card, 'protect:score-effects')
   ) {
+    // Zero ability extras; keep discard/move already applied? Prefer wipe extras only.
     out.extra = 0;
     out.log.push(`${card.id}: score effects cancelled/protected`);
   }
 
-  // cancel:target-filter:unscored — only cancel effects on cards not yet scored
-  if (hasTag(card, 'cancel:target-filter:unscored') && hasTag(card, 'score:choice')) {
-    // handled via suppress choice path in perform-other
+  // Mark first-score after a successful resolution of a first-score card
+  if (hasTag(card, 'condition:first-score') && !hasUsedFirstScore(G, card.id)) {
+    markFirstScoreUsed(G, card.id);
   }
 
   return out;

@@ -50,7 +50,11 @@ describe('play-phase triggers', () => {
 
   it('Taxes rewards its discarder', () => {
     const G = makeState({ players: ['0', '1'] });
-    G.encryptedDecks['1'] = [{}, {}] as any;
+    // Encrypted tops so draws queue cooperative peels (not instant plain materialize)
+    G.encryptedDecks['1'] = [
+      { ciphertext: '04aabb', layers: 2 },
+      { ciphertext: '04ccdd', layers: 2 },
+    ] as any;
     const taxes = makeCard({
       id: 'medieval-taxes#0', ownerId: '0', scoreValue: 6,
       tags: ['ongoing:trigger:discarded-from-play', 'trigger:target:self', 'draw:2', 'draw:to:discarder'],
@@ -65,7 +69,7 @@ describe('play-phase triggers', () => {
 
   it('Television sets skip flag and draws for the next inventor', () => {
     const G = makeState({ players: ['0', '1'], currentDay: 5 });
-    G.encryptedDecks['1'] = [{}] as any;
+    G.encryptedDecks['1'] = [{ ciphertext: '04eeff', layers: 2 }] as any;
     const tv = makeCard({
       id: 'modern-television#0', ownerId: '0',
       tags: ['play:delayed-trigger', 'trigger:next-invention-played', 'trigger:limit:once', 'skip-turn:target:triggering-player', 'draw:1', 'draw:to:triggering-player'],

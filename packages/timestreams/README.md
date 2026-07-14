@@ -82,8 +82,23 @@ python3 scripts/tag_test_gap_report.py   # stamp gap report counts
 **Day-to-day testing is local** (not Vercel redeploy). Two tabs → Host / Join.
 
 Tag / rules progress:
+- [CARD_INTERACTION_TEST_MATRIX.md](./CARD_INTERACTION_TEST_MATRIX.md) — **card × interaction shapes, coverage holes, Playwright scenarios**  
 - [TAG_TEST_GAP_REPORT.md](./TAG_TEST_GAP_REPORT.md) — coverage inventory  
 - [TAG_TEST_IMPLEMENTATION_PLAN.md](./TAG_TEST_IMPLEMENTATION_PLAN.md) — plan (engine **and** board UI tests)
+
+### Tests
+
+```bash
+# Unit (vitest)
+yarn workspace @manamesh/timestreams test
+
+# Playwright e2e (needs frontend on :3000, or start it first)
+yarn workspace @manamesh/frontend dev   # terminal 1
+yarn workspace @manamesh/timestreams test:e2e:install  # once
+yarn workspace @manamesh/timestreams test:e2e          # terminal 2
+```
+
+E2E uses `?e2e=1` (plaintext + `debugSeed` dual-seat). Specs live in `e2e/specs/`.
 
 ### Menu options
 

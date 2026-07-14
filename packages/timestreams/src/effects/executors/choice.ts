@@ -56,12 +56,12 @@ export function describeChoiceOption(
   }
 
   if (branch.includes('discard:target')) {
-    parts.push('Discard the chosen invention');
+    parts.push('Discard that invention from play');
   }
 
   const handN = branchNumber(branch, 'discard:hand');
   if (handN !== undefined) {
-    parts.push(`Discard ${handN} card${handN === 1 ? '' : 's'} from hand`);
+    parts.push(`Discard ${handN} card${handN === 1 ? '' : 's'} from your hand`);
   }
 
   // In-play discard: option-b:discard:1 + discard:target:any-card + discard:scope:…
@@ -136,25 +136,30 @@ export const choiceExecutor: Executor = (ctx: ExecCtx) => {
     }
     targetCardId = Array.isArray(chosen) ? chosen[0] : chosen;
     if (tagValue(card, 'decider') === 'target-owner') {
-      deciderId = requireCard(G, targetCardId).ownerId;
+      // Always string-compare with boardgame playerIDs ("0", "1", …).
+      deciderId = String(requireCard(G, targetCardId).ownerId);
     }
   }
 
   // 2. Option selection (with forced fallback).
   let option = choices[`${card.id}:option`] as string | undefined;
   const forced = (card.tags ?? []).find(t => t.startsWith('forced:'));
-  if (forced === 'forced:option-a:if-hand-under-3' && G.players[deciderId].hand.length < 3) {
+  const deciderHand = G.players[deciderId]?.hand ?? [];
+  if (forced === 'forced:option-a:if-hand-under-3' && deciderHand.length < 3) {
     option = 'option-a';
   }
   if (option === undefined) {
     return needs({
       id: `${card.id}:option`,
-      deciderId,
+      deciderId: String(deciderId),
       kind: 'choose-option',
       options: ['option-a', 'option-b'],
       min: 1,
       max: 1,
       reason: 'play:choice',
+      // Target invention for “YOUR invention …” copy — option *labels* come from
+      // the played card via playedCardIdFromPromptId (see TimestreamsBoard).
+      labelCardId: targetCardId || card.id,
     });
   }
 

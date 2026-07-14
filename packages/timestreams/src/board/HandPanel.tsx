@@ -4,9 +4,9 @@
  */
 
 import React from "react";
-import type { TimestreamsCard } from "../types";
+import type { TimestreamsCard, TimestreamsState } from "../types";
+import { formatCardCaption } from "../types";
 import { canPlayCard } from "../effects/gates";
-import type { TimestreamsState } from "../types";
 import {
   repairHandOrder,
   ensureContiguousGroups,
@@ -36,6 +36,9 @@ export interface HandPanelProps {
   onPlayAction: (cardId: string) => void;
   onPass: () => void;
   onCardHover: (card: TimestreamsCard | null) => void;
+  /** Rules-off free tool selection */
+  freeSelectedIds?: string[];
+  onFreeSelect?: (cardId: string) => void;
 }
 
 function handSignature(hand: TimestreamsCard[]): string {
@@ -56,6 +59,8 @@ export const HandPanel: React.FC<HandPanelProps> = ({
   onPlayAction,
   onPass,
   onCardHover,
+  freeSelectedIds,
+  onFreeSelect,
 }) => {
   const prefsInit = React.useMemo(() => loadHandPrefs(playerID), [playerID]);
   const [groupEnabled, setGroupEnabled] = React.useState(prefsInit.group);
@@ -213,20 +218,25 @@ export const HandPanel: React.FC<HandPanelProps> = ({
     },
   ) => {
     const count = opts.count ?? 1;
+    const freeSel = !!freeSelectedIds?.includes(card.id);
     return (
       <div
         key={`${card.id}-${opts.index}`}
         data-testid={opts.testId || `hand-card-${card.id}`}
         data-card-id={card.id}
         data-group-count={count}
+        data-free-selected={freeSel ? "true" : "false"}
         draggable
         onDragStart={onDragStartCard(opts.index)}
         onDragOver={onDragOver}
         onDrop={onDropAt(opts.index)}
         onDragEnd={onDragEnd}
+        onClick={() => onFreeSelect?.(card.id)}
         style={{
           border:
-            dragIndex === opts.index
+            freeSel
+              ? "2px solid #38bdf8"
+              : dragIndex === opts.index
               ? "2px solid #eab308"
               : "1px solid #64748b",
           padding: 6,
@@ -294,8 +304,7 @@ export const HandPanel: React.FC<HandPanelProps> = ({
         ) : null}
         <div style={{ fontWeight: 600 }}>{card.name || card.id}</div>
         <div style={{ color: "#94a3b8", fontSize: 10 }}>
-          {card.cardType}
-          {typeof card.scoreValue === "number" ? ` · ${card.scoreValue}` : ""}
+          {formatCardCaption(card)}
         </div>
         {renderPlayButtons(card)}
       </div>

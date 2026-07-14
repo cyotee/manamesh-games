@@ -1,16 +1,21 @@
 import type { EraId } from '../../types';
 import { hasTag, tagValue, tagNumber, isOptionalFor } from '../tags';
 import { erasForScope, candidateTargets, locateCard } from '../targets';
-import { moveWithinEra, moveToEra, isMoveBlocked } from '../boardOps';
+import { moveWithinEra, moveToEra, isMoveBlocked, attachTo } from '../boardOps';
+import { getAttachments } from '../state';
 import { isMoveDirectionPrevented } from '../modifiers';
 import { checkReactForMove } from '../react';
 import { done, needs, type Executor, type ExecCtx } from '../types';
 import { playOnce } from '../playOnce';
 
-interface Destination { era: EraId; position: 'top' | 'bottom'; }
+interface Destination { era: EraId; position: 'top' | 'bottom' | number; }
 
-function parseDestination(ctx: ExecCtx, dest: string): Destination | null {
-  const { G, card } = ctx;
+function parseDestination(
+  ctx: ExecCtx,
+  dest: string,
+  movingId?: string,
+): Destination | null {
+  const { G, card, choices } = ctx;
   const at = (scope: string) => erasForScope(G, scope, card.id)[0];
   switch (dest) {
     case 'top-today': return { era: at('today'), position: 'top' };
@@ -20,8 +25,24 @@ function parseDestination(ctx: ExecCtx, dest: string): Destination | null {
       return era ? { era, position: 'bottom' } : null;
     }
     case 'top-of-era': {
-      const era = locateCard(G, card.id)?.era;
+      const era = locateCard(G, movingId || card.id)?.era;
       return era ? { era, position: 'top' } : null;
+    }
+    case 'any-position-same-era': {
+      // Internet: any position in the same era as the target
+      const loc = movingId ? locateCard(G, movingId) : null;
+      if (!loc) return null;
+      const posKey = `${card.id}:move-position-index`;
+      const raw = choices[posKey];
+      if (raw === undefined) {
+        // Signal caller to prompt — return null with special handling
+        return null;
+      }
+      const idx = parseInt(Array.isArray(raw) ? raw[0] : raw, 10);
+      return {
+        era: loc.era,
+        position: Number.isNaN(idx) ? 'bottom' : idx,
+      } as Destination;
     }
     default: return null;
   }
@@ -53,7 +74,24 @@ function pickSource(ctx: ExecCtx): { options: string[]; deterministic?: string; 
   const target = tagValue(card, 'move:target');
   if (target === 'self') return { options: [], deterministic: card.id };
   const scope = tagValue(card, 'move:scope') ?? 'today';
-  const kind = target === 'action' ? 'action' : target === 'any-card' ? 'any' : 'invention';
+  // Advertising: re-host action attachments
+  if (target === 'action') {
+    const eras = erasForScope(G, scope, card.id);
+    const options: string[] = [];
+    const attachments = getAttachments(G);
+    for (const e of eras) {
+      for (const invId of G.timeline[e]?.stack ?? []) {
+        for (const actId of attachments[invId] ?? []) {
+          if (actId !== card.id) options.push(actId);
+        }
+      }
+      for (const actId of G.timeline[e]?.actions ?? []) {
+        if (actId !== card.id) options.push(actId);
+      }
+    }
+    return { options };
+  }
+  const kind = target === 'any-card' ? 'any' : 'invention';
   const exclude = hasTag(card, 'target:exclude-self') || target !== 'any-card' ? card.id : undefined;
   return { options: candidateTargets(G, { kind, eras: erasForScope(G, scope, card.id), excludeCardId: exclude }) };
 }
@@ -170,7 +208,62 @@ export const moveExecutor: Executor = (ctx) => {
   }
 
   const destTag = tagValue(card, 'move-destination');
-  const dest = destTag ? parseDestination(ctx, destTag) : null;
+
+  // Advertising: re-attach action to a different invention in the same era
+  if (destTag === 'different-invention') {
+    const hostKey = `${card.id}:move-new-host`;
+    const hostChoice = choices[hostKey];
+    const fromHost = Object.entries(getAttachments(G)).find(([, list]) =>
+      list.includes(effectiveMoving),
+    )?.[0];
+    const era = from.era;
+    const hosts = G.timeline[era].stack.filter((id) => id !== fromHost);
+    if (hostChoice === undefined) {
+      if (hosts.length === 0) return done([`${card.id}: re-host fizzles (no host)`]);
+      return needs({
+        id: hostKey,
+        deciderId: playerId,
+        kind: 'choose-card',
+        options: hosts,
+        min: 1,
+        max: 1,
+        reason: 'move-destination:different-invention',
+      });
+    }
+    const newHost = Array.isArray(hostChoice) ? hostChoice[0] : hostChoice;
+    if (!hosts.includes(newHost)) return done([`${card.id}: re-host fizzles (bad host)`]);
+    // Detach from old host
+    for (const [h, list] of Object.entries(getAttachments(G))) {
+      const i = list.indexOf(effectiveMoving);
+      if (i >= 0) list.splice(i, 1);
+    }
+    // Remove from era.actions if present
+    const acts = G.timeline[era].actions ?? [];
+    const ai = acts.indexOf(effectiveMoving);
+    if (ai >= 0) acts.splice(ai, 1);
+    attachTo(G, effectiveMoving, newHost);
+    return done([`${card.id}: re-hosted ${effectiveMoving} onto ${newHost}`]);
+  }
+
+  // Internet: choose index within same era
+  if (destTag === 'any-position-same-era') {
+    const posKey = `${card.id}:move-position-index`;
+    if (choices[posKey] === undefined) {
+      const stack = G.timeline[from.era].stack;
+      const options = stack.map((_, i) => String(i));
+      return needs({
+        id: posKey,
+        deciderId: playerId,
+        kind: 'choose-option',
+        options: options.length ? options : ['0'],
+        min: 1,
+        max: 1,
+        reason: 'move-destination:any-position-same-era',
+      });
+    }
+  }
+
+  const dest = destTag ? parseDestination(ctx, destTag, effectiveMoving) : null;
   if (!dest) return done([`${card.id}: move fizzles (no destination)`]);
 
   if (dest.era !== from.era && isMoveDirectionPrevented(G, from.era, dest.era)) {

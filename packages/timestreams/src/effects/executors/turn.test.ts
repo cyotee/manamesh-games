@@ -42,7 +42,7 @@ describe('turn executor', () => {
     expect(getTurnFlags(G, '0').allowNextInventionEra).toBe('yesterday-or-tomorrow');
   });
 
-  it('Semiconductor pay-self: opponents discard 2 (whole hand if fewer)', () => {
+  it('Semiconductor pay-self: opponents choose discards (whole hand if fewer)', () => {
     const G = makeState({ players: ['0', '1', '2'], currentDay: 5 });
     const semi = makeCard({
       id: 'modern-semiconductor#0', ownerId: '0',
@@ -51,9 +51,19 @@ describe('turn executor', () => {
     putInEra(G, 'modern', semi);
     putInHand(G, '1', makeCard({ id: 'x#0', ownerId: '1' }), makeCard({ id: 'y#0', ownerId: '1' }), makeCard({ id: 'z#0', ownerId: '1' }));
     putInHand(G, '2', makeCard({ id: 'w#0', ownerId: '2' }));
-    resolvePlayEffect(G, '0', 'modern-semiconductor#0', { 'modern-semiconductor#0:pay-self': 'yes' });
-    expect(G.timeline.modern.stack).toEqual([]);           // paid itself
-    expect(G.players['1'].hand).toHaveLength(1);           // discarded 2 of 3
-    expect(G.players['2'].hand).toHaveLength(0);           // whole hand
+    // First answer: pay self → prompt P1 to pick 2 cards
+    const p1 = resolvePlayEffect(G, '0', 'modern-semiconductor#0', {
+      'modern-semiconductor#0:pay-self': 'yes',
+    });
+    expect(G.timeline.modern.stack).toEqual([]);
+    expect(p1.prompts[0]?.deciderId).toBe('1');
+    expect(p1.prompts[0]?.min).toBe(2);
+    // P1 picks; P2 has 1 card → whole hand auto
+    resolvePlayEffect(G, '0', 'modern-semiconductor#0', {
+      'modern-semiconductor#0:pay-self': 'yes',
+      'modern-semiconductor#0:opp-discard-1': ['x#0', 'y#0'],
+    });
+    expect(G.players['1'].hand.map((c) => c.id)).toEqual(['z#0']);
+    expect(G.players['2'].hand).toHaveLength(0);
   });
 });

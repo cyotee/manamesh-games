@@ -24,6 +24,43 @@ function fortuneTeller() {
 }
 
 describe("peekExecutor (Fortune Teller)", () => {
+  it("normalizes plain deck tops to card ids with names for prompts", () => {
+    const G = makeState({ players: ["0", "1"], currentDay: 2 });
+    G.phase = "play";
+    G.encryptedDecks["0"] = [
+      { ciphertext: "stone-age-fire#0", layers: 0 },
+      { ciphertext: "stone-age-cloth#0", layers: 0 },
+      { ciphertext: "stone-age-wheel#0", layers: 0 },
+    ];
+    G.cards = {
+      "stone-age-fire#0": makeCard({
+        id: "stone-age-fire#0",
+        name: "Fire",
+        ownerId: "0",
+      }),
+      "stone-age-cloth#0": makeCard({
+        id: "stone-age-cloth#0",
+        name: "Cloth",
+        ownerId: "0",
+      }),
+      "stone-age-wheel#0": makeCard({
+        id: "stone-age-wheel#0",
+        name: "The Wheel",
+        ownerId: "0",
+      }),
+    };
+    const ft = fortuneTeller();
+    putInHand(G, "0", ft);
+    playAction(G, ctxFor("0"), "0", ft.id);
+    const opts = G.pendingPrompts?.[0]?.options ?? [];
+    expect(opts).toContain("stone-age-fire#0");
+    expect(opts).toContain("__none__");
+    // Not opaque hashes
+    expect(opts.every((o) => o === "__none__" || !/^[0-9a-f]{20,}$/i.test(o))).toBe(
+      true,
+    );
+  });
+
   it("multi-step: own hand pick → opponent → discard from opp deck", () => {
     const G = makeState({ players: ["0", "1"], currentDay: 2 });
     G.phase = "play";

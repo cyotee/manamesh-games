@@ -1,5 +1,8 @@
 # Timestreams Tag / Rules Engine Implementation Plan
 
+> **Superseded for correctness work (2026-07-10).**  
+> Phases below were marked complete against smoke-level DoD. Outstanding silent no-ops and condition bugs are tracked in **[RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md)** with execution plan **[RULES_ENGINE_GAP_CLOSURE_PLAN.md](./RULES_ENGINE_GAP_CLOSURE_PLAN.md)**.
+
 **Started:** 2026-07-08  
 **Gap report:** [TAG_TEST_GAP_REPORT.md](./TAG_TEST_GAP_REPORT.md)  
 **Goal:** Every pack tag either (1) has a behavioral test **including board/UI where the player interacts**, or (2) is explicitly deferred with a tracked reason — no silent no-ops in play, and no “state updated but the board didn’t show it.”

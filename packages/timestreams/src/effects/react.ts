@@ -34,7 +34,7 @@ export function isProtected(
 
   const protectTag = `protect:${mutationType === 'score-effects' ? 'score-effects' : mutationType}`;
 
-  // Direct protect on the card
+  // Direct protect on the card (must be protect:self + protect:move|discard|…)
   if (hasTag(target, 'protect:self') && hasTag(target, protectTag)) {
     const sourceOnly = hasTag(target, 'protect:source:opponent');
     if (!sourceOnly || (actorPlayerId && actorPlayerId !== target.ownerId)) {
@@ -42,26 +42,19 @@ export function isProtected(
     }
   }
 
-  // Attached protectors (e.g. Hibernation)
+  // Attached protectors (e.g. Hibernation move/discard; score suppress is separate)
   const attachments = G.attachments?.[targetCardId] || [];
   for (const attId of attachments) {
     const att = G.cards?.[attId];
-    if (att && hasTag(att, 'protect:target:attached') && hasTag(att, protectTag)) {
+    if (!att) continue;
+    if (hasTag(att, 'protect:target:attached') && hasTag(att, protectTag)) {
       return true;
     }
   }
 
-  // Scope-based protects (e.g. Chainmail, same-era)
-  // Full scope checks (same-era, own-inventions, attached, etc.)
-  if (hasTag(target, 'protect:scope:same-era')) {
-    // simplistic scope: for now treat as additional layer if tag present
-    // (full would compare eras of source/target)
-    if (mutationType === 'move' || mutationType === 'discard') return true;
-  }
-  if (hasTag(target, 'protect:target:own-inventions') && mutationType === 'move') {
-    // simplistic
-    return true;
-  }
+  // Note: protect:scope:same-era / protect:target:own-inventions on Cloth/Chainmail
+  // describe protecting *other* cards via react/redirect — they must NOT self-protect
+  // the reactor. Those paths go through checkReactForMove / cancel reactors.
 
   return false;
 }
@@ -195,9 +188,10 @@ export function checkReactForMove(
   }
 
   // Basic redirect support for moves (e.g. Cloth self, Thought Police adjacent)
+  // Use tagValue(prefix) — tags are redirect:target-to:self, not exact redirect:target-to
   const card = G.cards?.[targetCardId];
-  if (card && hasTag(card, 'react:move') && hasTag(card, 'redirect:target-to')) {
-    const targetTo = tagValue(card, 'redirect:target-to');
+  const targetTo = card ? tagValue(card, 'redirect:target-to') : undefined;
+  if (card && hasTag(card, 'react:move') && targetTo) {
     // redirect:decider:owner — owner may choose; default self when no choice provided
     if (targetTo === 'self' || hasTag(card, 'redirect:target-filter:any')) {
       decision.redirectTo = targetCardId;

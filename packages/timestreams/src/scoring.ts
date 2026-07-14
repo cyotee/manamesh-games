@@ -9,11 +9,13 @@ import { resolveCardScoreEffectsFull } from "./effects/executors/score";
 import { fireEvent } from "./effects/triggers";
 import { locateCard, erasForScope, candidateTargets } from "./effects/targets";
 import type { PlayerPrompt } from "./effects/types";
+import { hasUsedFirstScore } from "./effects/conditions";
 import { pushActivityLog } from "./crypto";
 import {
   computeScoringSlotsForEra,
   scoringSlotModifierNotes,
 } from "./scoringSlots";
+import { initManualScoring } from "./freeTools";
 
 export { computeScoringSlotsForEra, scoringSlotModifierNotes } from "./scoringSlots";
 
@@ -580,7 +582,14 @@ export function collectScoreAbilityPrompts(
         tagValue(card, "target:scope") ||
         tagValue(card, "copy:scope") ||
         "today";
-      const eras = erasForScope(G, tscope, card.id);
+      let eras = erasForScope(G, tscope, card.id);
+      // Fallback when card was moved / era empty: still allow choosing
+      if (!eras.length && G.scoringActiveEra) {
+        eras = [G.scoringActiveEra as EraId];
+      }
+      if (!eras.length) {
+        eras = [...ERA_ORDER];
+      }
       const kind = tgtSpec === "invention" ? "invention" : "any";
       const options = candidateTargets(G, {
         kind,
@@ -607,10 +616,15 @@ export function collectScoreAbilityPrompts(
   }
 
   if (hasTag(card, "score:move")) {
-    // Fixed offset targets (Shipbuilding) need no target prompt
+    // Space Travel: first-score already used → no move prompts on re-score
+    const firstScoreDone =
+      hasTag(card, "condition:first-score") && hasUsedFirstScore(G, cardId);
+    if (!firstScoreDone) {
+    // Fixed offset targets (Shipbuilding) / self (Space Travel) need no target prompt
     const fixedOffset =
       hasTag(card, "move:target:offset-below:1") ||
       (card.tags || []).some((t) => t.startsWith("move:target:offset-below:"));
+    const selfMove = tagValue(card, "move:target") === "self";
     const optional =
       hasTag(card, "move:optional") || isOptionalFor(card, "move");
     const destSpec = tagValue(card, "move-destination") || "any-future-era";
@@ -638,7 +652,7 @@ export function collectScoreAbilityPrompts(
       if (ans === "no" || ans === "skip") return prompts;
     }
 
-    if (!fixedOffset) {
+    if (!fixedOffset && !selfMove) {
       const scopeSrc = tagValue(card, "move-source") || "today";
       const eras = erasForScope(G, scopeSrc, card.id);
       const mt = tagValue(card, "move:target") || "any-card";
@@ -668,6 +682,7 @@ export function collectScoreAbilityPrompts(
     }
 
     // top-future (Cybertechnology): fixed destination — no era picker
+    // top-next-era (Space Travel): fixed dest from self — no era picker
     if (destSpec === "any-future-era") {
       const i = ERA_ORDER.indexOf(scoreToday);
       const futureEras = ERA_ORDER.slice(i + 1);
@@ -685,6 +700,7 @@ export function collectScoreAbilityPrompts(
         });
       }
     }
+    } // end !firstScoreDone
   }
 
   // --- Cave Paintings: optional art penalty target ---
@@ -994,40 +1010,99 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
   });
 
   // Delayed triggers (Pottery etc.)
+  // sourceCardId = card that registered the delay (has delayed: tags)
+  // targetCardId = moved card to re-score (optional; defaults to source for legacy)
   for (const trigger of getPendingTriggers(G)) {
     if (trigger.spent) continue;
     if (
-      (trigger.event === "era-scored" || trigger.event === "delayed:era-scored") &&
+      (trigger.event === "era-scored" ||
+        trigger.event === "delayed:era-scored") &&
       (trigger.eraAnchor === null || trigger.eraAnchor === finishedEra)
     ) {
-      const source = getCard(G, trigger.sourceCardId);
-      if (!source) continue;
-      const stillInPlay = !!locateCard(G, trigger.sourceCardId);
+      const registrar = getCard(G, trigger.sourceCardId);
+      if (!registrar) continue;
+      const rescoreId = trigger.targetCardId || trigger.sourceCardId;
+      const stillInPlay = !!locateCard(G, rescoreId);
       const needsInPlay =
-        hasTag(source, "delayed:condition:still-in-play") ||
-        (source.tags || []).some((t) => t.includes("still-in-play"));
+        hasTag(registrar, "delayed:condition:still-in-play") ||
+        (registrar.tags || []).some((t) => t.includes("still-in-play"));
       if (needsInPlay && !stillInPlay) {
         if (trigger.limit === "once") trigger.spent = true;
         continue;
       }
-      if (hasTag(source, "score:bonus-points") || hasTag(source, "score:delayed")) {
-        const amt =
-          tagNumber(source, "bonus-points:amount") ||
-          effectiveScoreValue(G, source.id) ||
-          0;
-        const o = source.ownerId;
-        if (o) {
-          addBonus(G, o, amt, {
-            sourceCardId: source.id,
-            sourceName: source.name,
-            note: "delayed era-scored bonus",
-          });
+
+      const target = getCard(G, rescoreId);
+      if (target && stillInPlay) {
+        // Re-run score ability (in-addition-to-slot-scoring allows second run)
+        const alreadyProcessed = processedInEra(G, finishedEra).includes(rescoreId);
+        const inAddition =
+          hasTag(registrar, "delayed:in-addition-to-slot-scoring") ||
+          hasTag(registrar, "score:delayed");
+        if (!alreadyProcessed || inAddition) {
+          const full = resolveCardScoreEffectsFull(
+            G,
+            target,
+            finishedEra,
+            -1,
+            G.scoreChoices || {},
+          );
+          for (const [pid, n] of Object.entries(full.other)) {
+            if (n)
+              addBonus(G, pid, n, {
+                sourceCardId: target.id,
+                sourceName: target.name,
+                note: "delayed rescore ability",
+              });
+          }
+          if (full.extra && target.ownerId) {
+            addBonus(G, target.ownerId, full.extra, {
+              sourceCardId: target.id,
+              sourceName: target.name,
+              note: "delayed rescore bonus",
+            });
+          }
+          for (const line of full.log) {
+            logScore(G, `  · delayed: ${line}`);
+          }
+          // Apply delayed discards/steals lightly
+          for (const did of full.discardIds) {
+            if (!isInAnyScorePile(G, did)) {
+              discardFromPlay(G, did, target.ownerId || "0");
+            }
+          }
+          for (const sid of full.stealIds) {
+            if (!isInAnyScorePile(G, sid)) {
+              const stealer = target.ownerId;
+              if (stealer) pushToScorePile(G, stealer, sid);
+            }
+          }
+          logScore(
+            G,
+            `  · delayed rescore of ${cardLabel(G, rescoreId)} after ${finishedEra}`,
+          );
         }
-      }
-      // Score even if not in a scoring slot — claim into inventor's pile
-      if (hasTag(source, "delayed:even-non-scoring") && stillInPlay) {
-        const o = source.ownerId;
-        if (o) pushToScorePile(G, o, trigger.sourceCardId);
+
+        // Score even if not in a scoring slot — claim into inventor's pile
+        if (
+          (hasTag(registrar, "delayed:even-non-scoring") ||
+            hasTag(registrar, "score:delayed")) &&
+          stillInPlay &&
+          !isInAnyScorePile(G, rescoreId)
+        ) {
+          const o = target.ownerId;
+          if (o) {
+            // Remove from stack if still there so cleanup doesn't double-handle
+            const loc = locateCard(G, rescoreId);
+            if (loc && loc.zone !== "actions") {
+              G.timeline[loc.era].stack.splice(loc.index, 1);
+            }
+            pushToScorePile(G, o, rescoreId);
+            logScore(
+              G,
+              `  · delayed bank ${cardLabel(G, rescoreId)} → P${o} pile`,
+            );
+          }
+        }
       }
       if (trigger.limit === "once") trigger.spent = true;
     }
@@ -1362,9 +1437,9 @@ export function beginScoringPhase(G: TimestreamsState): boolean {
   }
 
   if (G.config?.rulesEnabled === false) {
-    pushActivityLog(G, "Scoring (rules engine OFF — structural only)", "system");
-    resolveScoringSimple(G);
-    return true;
+    // Manual scoring desk — players use free tools; no auto finalize.
+    initManualScoring(G);
+    return false; // stay in scoring phase
   }
 
   logScore(G, "════ Scoring phase started (Stone → Future) ════");
@@ -1445,20 +1520,26 @@ export function submitScoreChoice(
   );
 
   // When selecting a perform/steal target, wipe that target's prior answers so
-  // nested Pottery/Nanotech prompts re-fire. Slot increments happen only when
-  // the score effect resolves (adjustEraScoringSlots) — not here.
+  // nested abilities re-fire (e.g. Mass Marketing bonus-copy after it already
+  // scored as its own slot earlier this era).
   //
-  // Exception: closing a perform cycle (NT0→NT1→NT0). The outer card already
-  // answered its score-target; clearing it would re-open infinite prompts.
+  // Exception — closing a *perform-other cycle* only (NT0→NT1→NT0): if the
+  // target is itself a perform-other card that already answered its own
+  // score-target, do not clear (would re-open infinite prompts). Mass Marketing
+  // / Pottery / etc. use score-target for ability targets, NOT perform-other,
+  // so they must always be cleared and re-prompted.
   if (
     (front.reason === "score:perform-other" ||
       front.reason === "score:steal-perform") &&
     picks[0]
   ) {
     const targetId = picks[0];
-    const closingCycle =
+    const targetCard = getCard(G, targetId);
+    const closingPerformCycle =
+      !!targetCard &&
+      hasTag(targetCard, "score:perform-other") &&
       G.scoreChoices?.[`${targetId}:score-target`] !== undefined;
-    if (!closingCycle) {
+    if (!closingPerformCycle) {
       clearScoreChoicesForCard(G, targetId);
     }
     // re-store the parent target choice (cleared if parent id === pick — rare)
@@ -1552,39 +1633,88 @@ export function ackScoreStep(
 ): boolean | "INVALID_MOVE" {
   const walk = G.scoringWalk;
   if (!walk || G.phase !== "scoring") return "INVALID_MOVE";
-  if (!G.playerOrder.includes(playerId)) return "INVALID_MOVE";
-
-  // Recover stuck walk: choice phase with no pending prompts (Next button gone).
-  // Apply current step if needed, then continue as dual-ack.
-  if (
-    walk.stepPhase === "choice" &&
-    !(G.pendingPrompts && G.pendingPrompts.length > 0)
-  ) {
-    const step = walk.steps[walk.stepIndex];
-    G.pendingPrompts = [];
-    walk.stepPhase = "ack";
-    walk.acks = emptyAcks(G);
-    if (step && !processedInEra(G, step.eraId).includes(step.cardId)) {
-      try {
-        walk.lastSummary = applyScoreForStep(G, step, G.scoreChoices || {});
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        walk.lastSummary = `Error applying ${step.cardId}: ${msg}`;
-      }
-    }
-    // Fall through so this click also counts as this player's ack.
+  // Coerce — boardgame.io / dual-seat sometimes pass numeric seat ids
+  const pid = String(playerId);
+  if (!G.playerOrder.map(String).includes(pid)) return "INVALID_MOVE";
+  // Ensure ack map has keys for every seat (stale walks / partial saves)
+  if (!walk.acks) walk.acks = emptyAcks(G);
+  for (const p of G.playerOrder) {
+    if (walk.acks[p] === undefined) walk.acks[p] = false;
   }
 
-  if (walk.stepPhase !== "ack") return "INVALID_MOVE";
-  // Already acked (duplicate concurrent click)
-  if (walk.acks[playerId]) return false;
+  // Lagging client still showing OK while the walk is already on a choice:
+  // do NOT advance or force-apply — re-surface prompts for the current card.
+  if (walk.stepPhase === "choice") {
+    const step = walk.steps[walk.stepIndex];
+    if (step) {
+      // Prefer re-collecting prompts (handles empty pendingPrompts desync).
+      let pending: PlayerPrompt[] = [];
+      try {
+        pending = collectInteractivePromptsForCard(G, step.cardId).filter(
+          (p) => G.scoreChoices?.[p.id] === undefined,
+        );
+      } catch {
+        pending = [];
+      }
+      if (pending.length > 0) {
+        G.pendingPrompts = pending as any;
+        walk.lastSummary = `Choices for ${cardLabel(G, step.cardId)} (${step.eraId})`;
+        // Soft no-op: stale OK clicks must not skip the chooser
+        return false;
+      }
+      // Truly no prompts — convert to ack and count this click
+      G.pendingPrompts = [];
+      walk.stepPhase = "ack";
+      walk.acks = emptyAcks(G);
+      if (!processedInEra(G, step.eraId).includes(step.cardId)) {
+        try {
+          walk.lastSummary = applyScoreForStep(G, step, G.scoreChoices || {});
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          walk.lastSummary = `Error applying ${step.cardId}: ${msg}`;
+        }
+      }
+      // Fall through so this click also counts as this player's ack.
+    } else {
+      return false;
+    }
+  }
 
-  walk.acks[playerId] = true;
-  if (!G.playerOrder.every((pid) => walk.acks[pid])) {
+  if (walk.stepPhase !== "ack") return false; // soft: never INVALID on race
+  // Already acked (duplicate concurrent click / lagging double-OK)
+  // Check both coerced and raw keys (legacy walks)
+  if (walk.acks[pid] || walk.acks[playerId]) return false;
+
+  walk.acks[pid] = true;
+  if (playerId !== pid) walk.acks[playerId] = true;
+  if (!G.playerOrder.every((p) => walk.acks[p] || walk.acks[String(p)])) {
     return false;
   }
 
   const step = walk.steps[walk.stepIndex];
+  // Guard: do not advance if this step still has unanswered choices
+  if (step) {
+    try {
+      const still = collectInteractivePromptsForCard(G, step.cardId).filter(
+        (p) => G.scoreChoices?.[p.id] === undefined,
+      );
+      if (still.length > 0) {
+        // Someone raced into dual-ack while choices remain — reopen choice phase
+        walk.acks = emptyAcks(G);
+        walk.stepPhase = "choice";
+        G.pendingPrompts = still as any;
+        walk.lastSummary = `Choices for ${cardLabel(G, step.cardId)} (${step.eraId})`;
+        logScore(
+          G,
+          `  ⏳ Re-opened choices (acks arrived early): ${still.map((p) => p.reason || p.id).join(", ")}`,
+        );
+        return false;
+      }
+    } catch {
+      /* continue advance */
+    }
+  }
+
   if (step && !walk.processedCardIds.includes(step.cardId)) {
     walk.processedCardIds.push(step.cardId);
   }
@@ -1803,31 +1933,58 @@ export function resolveScoring(
           trigger.event === "delayed:era-scored") &&
         (trigger.eraAnchor === null || trigger.eraAnchor === eraId)
       ) {
-        const source = getCard(G, trigger.sourceCardId);
-        if (!source) continue;
-        const stillInPlay = !!locateCard(G, trigger.sourceCardId);
+        const registrar = getCard(G, trigger.sourceCardId);
+        if (!registrar) continue;
+        const rescoreId = trigger.targetCardId || trigger.sourceCardId;
+        const stillInPlay = !!locateCard(G, rescoreId);
         const needsInPlay =
-          hasTag(source, "delayed:condition:still-in-play") ||
-          (source.tags || []).some((t) => t.includes("still-in-play"));
+          hasTag(registrar, "delayed:condition:still-in-play") ||
+          (registrar.tags || []).some((t) => t.includes("still-in-play"));
         if (needsInPlay && !stillInPlay) {
           if (trigger.limit === "once") trigger.spent = true;
           continue;
         }
-        if (hasTag(source, "score:bonus-points") || hasTag(source, "score:delayed")) {
-          const amt =
-            tagNumber(source, "bonus-points:amount") ||
-            effectiveScoreValue(G, source.id) ||
-            0;
-          if (source.ownerId) {
-            addBonus(G, source.ownerId, amt, {
-              sourceCardId: source.id,
-              sourceName: source.name,
-              note: "delayed era-scored bonus",
-            });
+        const target = getCard(G, rescoreId);
+        if (target && stillInPlay) {
+          const alreadyProcessed = processedHere().includes(rescoreId);
+          const inAddition =
+            hasTag(registrar, "delayed:in-addition-to-slot-scoring") ||
+            hasTag(registrar, "score:delayed");
+          if (!alreadyProcessed || inAddition) {
+            const full = resolveCardScoreEffectsFull(
+              G,
+              target,
+              eraId,
+              -1,
+              G.scoreChoices || {},
+            );
+            for (const [pid, n] of Object.entries(full.other)) {
+              if (n)
+                addBonus(G, pid, n, {
+                  sourceCardId: target.id,
+                  sourceName: target.name,
+                  note: "delayed rescore ability",
+                });
+            }
+            if (full.extra && target.ownerId) {
+              addBonus(G, target.ownerId, full.extra, {
+                sourceCardId: target.id,
+                sourceName: target.name,
+                note: "delayed rescore bonus",
+              });
+            }
           }
-        }
-        if (hasTag(source, "delayed:even-non-scoring") && stillInPlay) {
-          if (source.ownerId) pushToScorePile(G, source.ownerId, trigger.sourceCardId);
+          if (
+            (hasTag(registrar, "delayed:even-non-scoring") ||
+              hasTag(registrar, "score:delayed")) &&
+            !isInAnyScorePile(G, rescoreId)
+          ) {
+            const loc = locateCard(G, rescoreId);
+            if (loc && loc.zone !== "actions") {
+              G.timeline[loc.era].stack.splice(loc.index, 1);
+            }
+            if (target.ownerId) pushToScorePile(G, target.ownerId, rescoreId);
+          }
         }
         if (trigger.limit === "once") trigger.spent = true;
       }

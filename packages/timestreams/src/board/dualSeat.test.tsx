@@ -153,4 +153,83 @@ describe("dual-seat board (5.B)", () => {
     expect(html).toContain("rules-prompt");
     expect(html).toContain("Copy play ability");
   });
+
+  it("Surgical Strike: target-owner seat sees option panel; actor sees waiting", () => {
+    const ss = makeCard({
+      id: "modern-surgical-strike#0",
+      name: "Surgical Strike",
+      ownerId: "0",
+      cardType: "action",
+      tags: [
+        "play:choice",
+        "option-a:discard:target",
+        "option-b:discard:hand:3",
+      ],
+    });
+    const victim = makeCard({
+      id: "victim#0",
+      name: "Victim Invention",
+      ownerId: "1",
+      cardType: "invention",
+    });
+    const G = makePlayState({
+      currentDay: 5,
+      cards: { [ss.id]: ss, [victim.id]: victim },
+      pendingPlayEffect: {
+        cardId: ss.id,
+        actorPlayerId: "0",
+        kind: "action",
+        choices: { [`${ss.id}:choose-target`]: victim.id },
+      },
+      pendingPrompts: [
+        {
+          id: `${ss.id}:option`,
+          deciderId: "1",
+          kind: "choose-option",
+          options: ["option-a", "option-b"],
+          min: 1,
+          max: 1,
+          reason: "play:choice",
+          labelCardId: victim.id,
+        },
+      ],
+    });
+
+    // Actor (current player) — waiting only
+    const p0 = renderToStaticMarkup(
+      <TimestreamsBoard
+        {...makeBoardProps({
+          G,
+          playerID: "0",
+          ctx: { currentPlayer: "0", phase: "play" },
+        })}
+      />,
+    );
+    expect(p0).toContain('data-testid="rules-prompt"');
+    expect(p0).toContain("prompt-waiting");
+    expect(p0).toContain("Waiting for P1");
+    expect(p0).not.toContain("confirm-prompt");
+    expect(p0).not.toContain("Discard that invention from play");
+
+    // Target owner (off-turn) — must see actionable choice panel + labels from SS tags
+    const p1 = renderToStaticMarkup(
+      <TimestreamsBoard
+        {...makeBoardProps({
+          G,
+          playerID: "1",
+          ctx: { currentPlayer: "0", phase: "play" },
+        })}
+      />,
+    );
+    expect(p1).toContain('data-testid="rules-prompt"');
+    expect(p1).toContain("play-choice-attention");
+    expect(p1).toContain("confirm-prompt");
+    expect(p1).toContain("prompt-option-option-a");
+    expect(p1).toContain("prompt-option-option-b");
+    expect(p1).toContain("Discard that invention from play");
+    expect(p1).toMatch(/Discard 3 cards from (your )?hand/);
+    expect(p1).toMatch(/YOUR invention/);
+    expect(p1).toContain("Victim Invention");
+    expect(p1).not.toContain("prompt-waiting");
+  });
 });

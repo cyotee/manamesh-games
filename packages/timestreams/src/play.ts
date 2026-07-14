@@ -14,9 +14,11 @@ import { clearRestOfToday } from "./effects/modifiers";
 import { fireEvent, registerStaticTriggers } from "./effects/triggers";
 import { canPlayCard } from "./effects/gates";
 import { resolvePlayEffect } from "./effects/resolvePlay";
-import type { ChoiceMap, EffectResult } from "./effects/types";
+import type { ChoiceMap, EffectResult, PlayerPrompt } from "./effects/types";
 import { hasTag, tagValue } from "./effects/tags";
 import { erasForScope, locateCard } from "./effects/targets";
+import { discardFromPlay } from "./effects/boardOps";
+import { swapPositions } from "./effects/executors/swap";
 import { resolveMutualDiscardPairs } from "./effects/executors/mutualDiscard";
 import {
   openHandReactWindowForAction,
@@ -30,8 +32,10 @@ import {
   pushEffectLogs,
 } from "./activityLogHelpers";
 import {
+  hasPlayOnce,
   isPlayEffectsComplete,
   markPlayEffectsComplete,
+  playOnce,
   resetPlayEffectGates,
 } from "./effects/playOnce";
 
@@ -49,6 +53,129 @@ function isDeckSearchOpen(G: TimestreamsState, cardId: string): boolean {
   return op.phase === "decrypt" || op.phase === "choose";
 }
 
+/** True for standing-trigger / react prompts (not invent play-effect prompts). */
+function isEventSourcedPrompt(front: PlayerPrompt): boolean {
+  if (front.id.includes(":crop-swap:")) return true;
+  if (front.reason === "retaliate:discard") return true;
+  if (front.reason === "crop-swap") return true;
+  return false;
+}
+
+/** Install react/trigger prompts (Crop Rotation, ID retaliate, Crusades, …). */
+function installEventPrompts(
+  G: TimestreamsState,
+  prompts: PlayerPrompt[],
+  log: string[],
+  fallbackActor: string,
+): void {
+  if (log.length) pushEffectLogs(G, log);
+  if (!prompts.length) return;
+  G.pendingPrompts = [...(G.pendingPrompts || []), ...prompts] as any;
+  // Prefer first prompt's decider; keep pendingPlayEffect for submitPlayChoice.
+  const front = G.pendingPrompts[0];
+  if (front) {
+    G.pendingPlayEffect = {
+      cardId: front.labelCardId || front.id.split(":")[0],
+      actorPlayerId: front.deciderId || fallbackActor,
+      kind: G.pendingPlayEffect?.kind || "action",
+      choices: { ...(G.pendingPlayEffect?.choices || {}) },
+    };
+  }
+}
+
+/**
+ * After invent play effects fully settle, fire invention-played so Crop Rotation,
+ * Waylay, Dot Com, Television, etc. see the post-effect board.
+ * Deferred (not at place-time) so finishPlayResolve cannot wipe their prompts.
+ */
+function fireInventionPlayedAfterEffects(
+  G: TimestreamsState,
+  playerId: string,
+  cardId: string,
+): void {
+  if (hasPlayOnce(G, cardId, "invention-played-event")) return;
+  if (isDeckSearchOpen(G, cardId)) return;
+  // Only fire once invent play-effect prompts for this card are gone.
+  const inventPrompts = (G.pendingPrompts || []).filter(
+    (p) => !isEventSourcedPrompt(p as PlayerPrompt) && p.id.startsWith(`${cardId}:`),
+  );
+  if (inventPrompts.length > 0) return;
+
+  playOnce(G, cardId, "invention-played-event", () => {
+    const era =
+      locateCard(G, cardId)?.era ?? eraForDay(G.currentDay);
+    try {
+      // Static triggers for this card were registered at place-time; only fire
+      // the event so *other* standing watchers (Crop, Waylay, Dot Com, …) react.
+      const ev = fireEvent(G, {
+        type: "invention-played",
+        cardId,
+        eraId: era,
+        actorPlayerId: playerId,
+      });
+      installEventPrompts(G, ev.prompts, ev.log, playerId);
+      return ev.log.length ? ev.log : [`${cardId}: invention-played`];
+    } catch (err) {
+      console.error("[playInvention] rules engine error (triggers)", err);
+      return [];
+    }
+  });
+}
+
+/**
+ * Apply answers for event-sourced prompts that are not play-effect re-resolves.
+ */
+function applyEventPromptAnswer(
+  G: TimestreamsState,
+  front: PlayerPrompt,
+  value: string | string[],
+): boolean {
+  const pick = Array.isArray(value) ? value[0] : value;
+  const none = !pick || pick === "" || pick === "__none__";
+
+  // Crop Rotation: `${sourceId}:crop-swap:${triggerId}`
+  if (
+    front.id.includes(":crop-swap:") ||
+    front.reason === "crop-swap"
+  ) {
+    const sourceId =
+      front.labelCardId ||
+      front.id.split(":crop-swap:")[0] ||
+      front.id.split(":")[0];
+    if (none) {
+      logPlay(G, `  ↳ Crop Rotation: declined swap`);
+      return true;
+    }
+    if (swapPositions(G, sourceId, pick)) {
+      logPlay(G, `  ↳ Crop Rotation: swapped ${sourceId} ↔ ${pick}`);
+    }
+    return true;
+  }
+
+  // Crusades / International Diplomacy retaliate discard
+  if (front.reason === "retaliate:discard") {
+    if (none) {
+      logPlay(G, `  ↳ Retaliate declined`);
+      return true;
+    }
+    const actor = front.deciderId;
+    discardFromPlay(G, pick, actor);
+    logPlay(G, `  ↳ Retaliate discarded ${cardLabel(G, pick)}`);
+    // Chain discarded-from-play for Crusades / Taxes etc.
+    const locEra = locateCard(G, pick)?.era ?? null;
+    const nested = fireEvent(G, {
+      type: "discarded-from-play",
+      cardId: pick,
+      eraId: locEra,
+      actorPlayerId: actor,
+    });
+    installEventPrompts(G, nested.prompts, nested.log, actor);
+    return true;
+  }
+
+  return false;
+}
+
 /** Shared post-resolve bookkeeping for playInvention / playAction / submitPlayChoice. */
 function finishPlayResolve(
   G: TimestreamsState,
@@ -62,19 +189,26 @@ function finishPlayResolve(
   // Re-check after executors run (search pick may have advanced activeDeckOp).
   const openSearch = isDeckSearchOpen(G, cardId);
 
+  // Preserve event-sourced prompts (Crop / retaliate) when invent effects settle.
+  const preservedEvents = (G.pendingPrompts || []).filter((p) =>
+    isEventSourcedPrompt(p as PlayerPrompt),
+  );
+
   if (result.prompts.length > 0) {
-    G.pendingPrompts = result.prompts as any;
+    // Invent/action play-effect prompts take priority; keep events behind them.
+    G.pendingPrompts = [...result.prompts, ...preservedEvents] as any;
   } else if (!openSearch) {
-    // Finished (or fizzled) — clear any stale choose prompt
-    G.pendingPrompts = [];
+    G.pendingPrompts = preservedEvents as any;
   }
   // else: decrypt/choose still open — keep prompts installed by crypto
 
   const livePrompts = G.pendingPrompts || [];
+  const stillWaitingPlay =
+    result.prompts.length > 0 || openSearch;
   const stillWaiting = livePrompts.length > 0 || openSearch;
 
-  if (stillWaiting) {
-    // Keep pendingPlayEffect so submitPlayChoice can answer search pick
+  if (stillWaitingPlay) {
+    // Keep pendingPlayEffect so submitPlayChoice can answer invent/search pick
     G.pendingPlayEffect = {
       cardId,
       actorPlayerId: playerId,
@@ -82,16 +216,26 @@ function finishPlayResolve(
       choices: { ...merged },
     };
     if (G.playEffectsComplete) delete G.playEffectsComplete[cardId];
+  } else if (stillWaiting) {
+    // Only event prompts remain — bind to front event decider
+    const front = livePrompts[0];
+    G.pendingPlayEffect = {
+      cardId: (front as PlayerPrompt).labelCardId || front.id.split(":")[0],
+      actorPlayerId: front.deciderId || playerId,
+      kind: "action",
+      choices: {},
+    };
+    markPlayEffectsComplete(G, cardId);
   } else {
     stashPendingPlayEffect(G, cardId, playerId, kind, merged, []);
   }
 
   pushEffectLogs(G, result.log);
-  if (livePrompts.length > 0) {
+  if (result.prompts.length > 0) {
     if (!opts?.quietContinue) {
       logPlay(
         G,
-        `  ⏳ Waiting for play choices on ${cardLabel(G, cardId)}: ${livePrompts
+        `  ⏳ Waiting for play choices on ${cardLabel(G, cardId)}: ${result.prompts
           .map((p) => p.reason || p.id)
           .join(", ")}`,
       );
@@ -107,6 +251,10 @@ function finishPlayResolve(
   } else {
     markPlayEffectsComplete(G, cardId);
     logPlay(G, `✓ Play effects done for ${cardLabel(G, cardId)}`);
+    // Invent play effects first, then standing reacts (Crop Rotation, Waylay, …)
+    if (kind === "invention") {
+      fireInventionPlayedAfterEffects(G, playerId, cardId);
+    }
   }
   resolveMutualDiscardPairs(G, playerId);
 }
@@ -189,12 +337,26 @@ export function playInvention(
       G.pendingPlayEffect?.cardId === cardId ||
       isDeckSearchOpen(G, cardId));
 
+  // Block NEW plays while Fortune Teller / search-deck cooperative decrypt runs.
+  // Interrupting wipes pendingPlayEffect and desyncs peels (stuck mid 0–N).
+  if (
+    !resubmission &&
+    G.activeDeckOp &&
+    (G.activeDeckOp.phase === "decrypt" || G.activeDeckOp.phase === "choose") &&
+    G.activeDeckOp.sourceCardId !== cardId
+  ) {
+    return INVALID_MOVE;
+  }
+
   if (!resubmission) {
     if (!inHand || !isInvention(inHand)) return INVALID_MOVE;
     // Already on the timeline under this id — do not stack a second copy.
     if (alreadyInPlay) return INVALID_MOVE;
     if (useRules && !canPlayCard(G, playerId, cardId).ok) return INVALID_MOVE;
     removeCardFromHand(player, cardId);
+    // Seat ownership must match the inventing player for target-owner deciders
+    // (Surgical Strike option prompt, etc.).
+    inHand.ownerId = playerId;
     registerCard(G, inHand);
     resetPlayEffectGates(G, cardId);
     const era = eraForDay(G.currentDay);
@@ -205,12 +367,14 @@ export function playInvention(
       G,
       `▶ P${playerId} plays invention ${cardLabel(G, cardId)} → ${era} (top of stack)`,
     );
+    // Standing triggers for this card register on place; invention-played for
+    // *other* cards (Crop Rotation, …) fires after invent play effects settle
+    // so Organ Transplant swap prompts are not wiped by finishPlayResolve.
     if (useRules) {
       try {
         registerStaticTriggers(G, inHand);
-        fireEvent(G, { type: "invention-played", cardId, eraId: era, actorPlayerId: playerId });
       } catch (err) {
-        console.error("[playInvention] rules engine error (triggers)", err);
+        console.error("[playInvention] rules engine error (register triggers)", err);
       }
     }
   } else {
@@ -230,12 +394,20 @@ export function playInvention(
           choices[k] !== undefined &&
           JSON.stringify(prevChoices[k]) !== JSON.stringify(choices[k]),
       );
+      // Waiting on event prompts (Crop) after invent effects — do not re-resolve invent.
+      const onlyEventPrompts =
+        (G.pendingPrompts?.length ?? 0) > 0 &&
+        (G.pendingPrompts || []).every((p) =>
+          isEventSourcedPrompt(p as PlayerPrompt),
+        );
       if (
         resubmission &&
         newKeys.length === 0 &&
-        (G.pendingPrompts?.length ?? 0) > 0 &&
-        Object.keys(choices).length === 0
+        ((G.pendingPrompts?.length ?? 0) > 0 && Object.keys(choices).length === 0)
       ) {
+        return G;
+      }
+      if (onlyEventPrompts && newKeys.length === 0 && isPlayEffectsComplete(G, cardId)) {
         return G;
       }
 
@@ -245,9 +417,14 @@ export function playInvention(
       });
     } catch (err) {
       console.error("[playInvention] rules engine error (resolvePlay)", err);
-      G.pendingPrompts = [];
+      // Drop only this invent's play-effect prompts; keep event prompts if any.
+      G.pendingPrompts = (G.pendingPrompts || []).filter((p) =>
+        isEventSourcedPrompt(p as PlayerPrompt),
+      ) as any;
       delete G.pendingPlayEffect;
+      markPlayEffectsComplete(G, cardId);
       logPlay(G, `  · ERROR resolving ${cardLabel(G, cardId)} play effects`);
+      fireInventionPlayedAfterEffects(G, playerId, cardId);
     }
   } else {
     G.pendingPrompts = [];
@@ -273,6 +450,31 @@ export function submitPlayChoice(
   const front = G.pendingPrompts?.[0];
   if (!front || front.id !== promptId) return INVALID_MOVE;
   if (front.deciderId !== playerId) return INVALID_MOVE;
+
+  // Event-sourced prompts only (Crop Rotation, Crusades, ID retaliate).
+  // Do NOT treat invent play:swap (Organ Transplant) as an event — same reason
+  // string `swap:target:self` is used by both; route Organ through resolvePlayEffect.
+  if (isEventSourcedPrompt(front)) {
+    logPlay(
+      G,
+      `  ↳ P${playerId} chose [${front.reason || promptId}]: ${formatChoiceDisplay(G, value)}`,
+    );
+    applyEventPromptAnswer(G, front, value);
+    // Pop this prompt; keep any chained ones from installEventPrompts
+    G.pendingPrompts = (G.pendingPrompts || []).filter((p) => p.id !== promptId);
+    if ((G.pendingPrompts?.length ?? 0) === 0) {
+      delete G.pendingPlayEffect;
+    } else {
+      const next = G.pendingPrompts[0];
+      G.pendingPlayEffect = {
+        cardId: next.labelCardId || next.id.split(":")[0],
+        actorPlayerId: next.deciderId,
+        kind: "action",
+        choices: {},
+      };
+    }
+    return G;
+  }
 
   // Revive pendingPlayEffect for search-deck choose after decrypt (may have
   // been cleared when decrypt returned done() with no prompts).
@@ -406,6 +608,16 @@ export function playAction(
       ((G.pendingPrompts?.length ?? 0) > 0 && !(G as any).pendingActionResolve) ||
       G.pendingPlayEffect?.cardId === cardId ||
       isDeckSearchOpen(G, cardId));
+
+  if (
+    !resubmission &&
+    G.activeDeckOp &&
+    (G.activeDeckOp.phase === "decrypt" || G.activeDeckOp.phase === "choose") &&
+    G.activeDeckOp.sourceCardId !== cardId
+  ) {
+    return INVALID_MOVE;
+  }
+
   if (!resubmission) {
     if (!inHand || !isAction(inHand)) return INVALID_MOVE;
     if (alreadyPlaced) return INVALID_MOVE;
@@ -596,38 +808,65 @@ export function endDay(G: TimestreamsState): void {
   if ((G as any)._endingDay) return;
   (G as any)._endingDay = true;
 
-  if (rulesOn(G)) {
-    try {
-      clearRestOfToday(G);
-    } catch (err) {
-      console.error("[endDay] rules engine error (clearRestOfToday)", err);
+  try {
+    if (rulesOn(G)) {
+      try {
+        clearRestOfToday(G);
+      } catch (err) {
+        console.error("[endDay] rules engine error (clearRestOfToday)", err);
+      }
     }
-  }
-  if (isLastDay(G.currentDay)) {
-    logPlay(G, `Last day complete → scoring phase`);
-    G.phase = "scoring";
-    delete (G as any)._endingDay;
-    return;
-  }
+    if (isLastDay(G.currentDay)) {
+      logPlay(G, `Last day complete → scoring phase`);
+      G.phase = "scoring";
+      return;
+    }
 
-  const prev = G.currentDay;
-  G.currentDay += 1;
-  // reset pass flags
-  for (const pid of G.playerOrder) {
-    if (G.players[pid]) G.players[pid].hasPassedThisDay = false;
+    const prev = G.currentDay;
+    G.currentDay += 1;
+    // reset pass flags
+    for (const pid of G.playerOrder) {
+      if (G.players[pid]) G.players[pid].hasPassedThisDay = false;
+    }
+    // Next turn must start with this day's first player (chronological home-era rotation).
+    G.dayFirstPlayer = dayFirstPlayer(G, G.currentDay);
+    G.startOfDayPending = true;
+    logPlay(
+      G,
+      `── Day ${prev} → Day ${G.currentDay} (first player P${G.dayFirstPlayer}) ──`,
+    );
+
+    // Always deal the next day's cards. dealForDay falls back to plain materialize
+    // when decks have no encryption layers left (board cannot peel layers===0).
+    try {
+      if (G.config?.playMode === "mental-poker") {
+        dealForDay(G, G.currentDay);
+      } else {
+        dealPlaintextHands(G, G.currentDay);
+      }
+    } catch (err) {
+      console.error("[endDay] deal failed — falling back to plain deal", err);
+      try {
+        dealPlaintextHands(G, G.currentDay);
+      } catch (err2) {
+        console.error("[endDay] plain deal also failed", err2);
+      }
+    }
+
+    // Sanity log: hands should grow (or stay if decks empty).
+    for (const pid of G.playerOrder) {
+      const h = G.players[pid]?.hand?.length ?? 0;
+      const rem = G.pendingDealRemaining?.[pid] ?? 0;
+      if (rem > 0) {
+        logPlay(
+          G,
+          `  · P${pid} still decrypting day deal (${rem} left, hand=${h})`,
+        );
+      } else {
+        logPlay(G, `  · P${pid} hand size after day deal: ${h}`);
+      }
+    }
+  } finally {
+    delete (G as any)._endingDay;
   }
-  // Next turn must start with this day's first player (chronological home-era rotation).
-  G.dayFirstPlayer = dayFirstPlayer(G, G.currentDay);
-  G.startOfDayPending = true;
-  logPlay(
-    G,
-    `── Day ${prev} → Day ${G.currentDay} (first player P${G.dayFirstPlayer}) ──`,
-  );
-  if (G.config?.playMode === "mental-poker") {
-    dealForDay(G, G.currentDay);
-  } else {
-    // Append new cards for the next day (day > 1 keeps existing hand).
-    dealPlaintextHands(G, G.currentDay);
-  }
-  delete (G as any)._endingDay;
 }

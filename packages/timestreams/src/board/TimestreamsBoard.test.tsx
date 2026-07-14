@@ -51,6 +51,21 @@ describe("TimestreamsBoard — baseline & lifecycle (plan Phase 0.5 / 5.A)", () 
     expect(html).toContain('data-testid="player-hand"');
   });
 
+  it("shows discard pile control with count for the local player", () => {
+    const G = makePlayState();
+    G.players["0"].discard = [
+      makeCard({ id: "disc-a#0", name: "Fire", ownerId: "0", cardType: "invention" }),
+      makeCard({ id: "disc-b#0", name: "Big Rock", ownerId: "0", cardType: "action" }),
+    ];
+    const html = renderToStaticMarkup(
+      <TimestreamsBoard {...makeBoardProps({ G })} />,
+    );
+    expect(html).toContain('data-testid="discard-pile"');
+    expect(html).toContain('data-testid="discard-pile-toggle"');
+    expect(html).toContain("Your discard (2)");
+    expect(html).toContain("discard 2"); // status strip
+  });
+
   it("setup phase shows claim UI and disabled Ready without era", () => {
     const G = makeSetupState();
     const html = renderToStaticMarkup(
@@ -439,6 +454,57 @@ describe("TimestreamsBoard — prompts (plan L3 / 1.A.1)", () => {
     expect(html).not.toMatch(/>option-a</);
     expect(html).not.toMatch(/>option-b</);
   });
+
+  it("Surgical Strike labels use played-card tags even when labelCardId is the victim", () => {
+    const ss = makeCard({
+      id: "modern-surgical-strike#0",
+      name: "Surgical Strike",
+      ownerId: "0",
+      tags: [
+        "play:choice",
+        "option-a:discard:target",
+        "option-b:discard:hand:3",
+      ],
+    });
+    const victim = makeCard({
+      id: "victim#0",
+      name: "Pottery",
+      ownerId: "1",
+      tags: [],
+    });
+    const G = makePlayState({ currentDay: 5 });
+    G.cards = { [ss.id]: ss, [victim.id]: victim };
+    G.pendingPlayEffect = {
+      cardId: ss.id,
+      actorPlayerId: "0",
+      kind: "action",
+      choices: { [`${ss.id}:choose-target`]: victim.id },
+    };
+    G.pendingPrompts = [
+      {
+        id: `${ss.id}:option`,
+        deciderId: "1",
+        kind: "choose-option",
+        options: ["option-a", "option-b"],
+        min: 1,
+        max: 1,
+        reason: "play:choice",
+        labelCardId: victim.id,
+      } as any,
+    ];
+    const html = renderToStaticMarkup(
+      <TimestreamsBoard
+        {...makeBoardProps({
+          G,
+          playerID: "1",
+          ctx: { currentPlayer: "0", phase: "play" },
+        })}
+      />,
+    );
+    expect(html).toContain("Discard that invention from play");
+    expect(html).toMatch(/Discard 3 cards from (your )?hand/);
+    expect(html).toContain("Pottery");
+  });
 });
 
 describe("TimestreamsBoard — hand layout controls", () => {
@@ -465,6 +531,51 @@ describe("TimestreamsBoard — hand layout controls", () => {
     expect(html).toContain('data-testid="hand-layout-controls"');
     expect(html).toContain('data-testid="hand-group-toggle"');
     expect(html).toContain('data-testid="hand-sort-key"');
+  });
+
+  it("rules-off discard panel exposes → Hand recover controls", () => {
+    const disc = makeCard({
+      id: "disc#0",
+      name: "Cloth",
+      ownerId: "0",
+      cardType: "invention",
+      scoreValue: 1,
+    });
+    const G = makePlayState({ currentDay: 1 });
+    G.config = { ...G.config, rulesEnabled: false };
+    G.players["0"].discard = [disc];
+    G.cards = { [disc.id]: disc };
+    const html = renderToStaticMarkup(
+      <TimestreamsBoard
+        {...makeBoardProps({
+          G,
+          playerID: "0",
+          ctx: { currentPlayer: "0", phase: "play" },
+        })}
+      />,
+    );
+    expect(html).toContain('data-testid="discard-pile"');
+    expect(html).toContain('data-testid="discard-to-hand-disc#0"');
+    expect(html).toContain("Selected → Hand");
+    expect(html).toContain("Discard → Hand");
+    expect(html).toContain("only your discard");
+  });
+
+  it("hand card caption shows type, semantic subtypes, and score under the image", () => {
+    const anarchy = makeCard({
+      id: "stone-age-anarchy#0",
+      name: "Anarchy",
+      ownerId: "0",
+      cardType: "invention",
+      subtypes: ["anarchy", "government"],
+      scoreValue: 3,
+    });
+    const G = makePlayState({ currentDay: 1 });
+    G.players["0"].hand = [anarchy];
+    const html = renderToStaticMarkup(
+      <TimestreamsBoard {...makeBoardProps({ G, playerID: "0" })} />,
+    );
+    expect(html).toContain("Invention · Government · 3 pts");
   });
 });
 
@@ -517,6 +628,76 @@ describe("TimestreamsBoard — scoring / game over display (plan 5.D)", () => {
     expect(html).toContain("Score pile");
     expect(html).toContain("Bonus points");
     expect(html).toContain("totals finalize after all cards");
+    expect(html).toContain('data-testid="scoring-ack-floating"');
+    expect(html).toContain('data-testid="ack-score-step-floating"');
+  });
+
+  it("P1 still sees floating OK after P0 has acked (dual-ack stall fix)", () => {
+    const G = makePlayState({
+      phase: "scoring",
+      scores: { "0": 5, "1": 10 },
+      scoringWalk: {
+        steps: [
+          {
+            eraId: "renaissance",
+            slotIndex: 0,
+            cardId: "crop#0",
+            kind: "slot",
+          },
+        ],
+        stepIndex: 0,
+        stepPhase: "ack",
+        acks: { "0": true, "1": false },
+        processedCardIds: [],
+        currentCardId: "crop#0",
+        lastSummary:
+          "renaissance · slot 1 · Crop Rotation · P1 display +0 (now 10; pile+bonus)",
+        erasCompleted: ["stone", "medieval"],
+        provisionalScores: { "0": 5, "1": 10 },
+        bonusPoints: { "0": 0, "1": 3 },
+        activeEraId: "renaissance",
+        eraSlotTotal: 4,
+        remainingSlots: 3,
+        slotsUsedInEra: 1,
+        eraActionsPhase: false,
+      },
+      cards: {
+        "crop#0": makeCard({
+          id: "crop#0",
+          name: "Crop Rotation",
+          ownerId: "1",
+        }),
+      },
+    } as any);
+    const p0 = renderToStaticMarkup(
+      <TimestreamsBoard
+        {...makeBoardProps({
+          G,
+          playerID: "0",
+          ctx: { phase: "scoring", currentPlayer: "0" },
+          moves: { ackScoreStep: () => {} },
+        })}
+      />,
+    );
+    const p1 = renderToStaticMarkup(
+      <TimestreamsBoard
+        {...makeBoardProps({
+          G,
+          playerID: "1",
+          ctx: { phase: "scoring", currentPlayer: "0" },
+          moves: { ackScoreStep: () => {} },
+        })}
+      />,
+    );
+    // P0 already acked — no floating demand, inline says waiting
+    expect(p0).not.toContain('data-testid="scoring-ack-floating"');
+    expect(p0).toContain("Waiting for other player");
+    // P1 must still get a big fixed OK — this was the stall
+    expect(p1).toContain('data-testid="scoring-ack-floating"');
+    expect(p1).toContain('data-testid="ack-score-step-floating"');
+    expect(p1).toContain("you (P1) must OK");
+    expect(p1).toContain("Crop Rotation");
+    expect(p1).toContain("OK — next card");
   });
 
   it("shows scores and winner when phase is gameOver", () => {

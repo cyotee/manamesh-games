@@ -138,6 +138,91 @@ export function composeCardText(card: TimestreamsCard): string {
   return parts.join('\n\n');
 }
 
+/** First subtypes entry is the name slug (e.g. "cave-paintings"); later ones are semantic. */
+function nameSlugFromCard(card: {
+  name?: string;
+  id?: string;
+}): string {
+  if (card.name) {
+    return card.name.toLowerCase().trim().replace(/\s+/g, "-");
+  }
+  if (card.id) {
+    const base = card.id.includes("#") ? card.id.slice(0, card.id.indexOf("#")) : card.id;
+    // "stone-age-cave-paintings" → last multi-word segment is imperfect; keep full base.
+    return base.toLowerCase();
+  }
+  return "";
+}
+
+function titleizeSubtype(raw: string): string {
+  return raw
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Semantic subtypes for UI (drops the mandatory name-slug first entry when present).
+ * Example: Anarchy → ["government"]; Cave Paintings → ["art"]; Fire → [].
+ */
+export function displaySubtypes(card: {
+  name?: string;
+  id?: string;
+  subtypes?: string[];
+}): string[] {
+  const subs = card.subtypes ?? [];
+  if (subs.length === 0) return [];
+  const slug = nameSlugFromCard(card);
+  const first = (subs[0] || "").toLowerCase();
+  // Pack convention: first entry is the card name slug — omit it under the art.
+  if (
+    first &&
+    slug &&
+    (first === slug || slug.endsWith(`-${first}`) || slug === first)
+  ) {
+    return subs.slice(1);
+  }
+  return subs.slice();
+}
+
+/**
+ * Compact meta line under a card image: type · subtypes · score.
+ * e.g. "Invention · Government · 3 pts", "Action", "Invention · 2 pts"
+ */
+export function formatCardCaption(
+  card: {
+    name?: string;
+    id?: string;
+    cardType?: string;
+    subtypes?: string[];
+    scoreValue?: number | null;
+  },
+  opts?: { scoreSuffix?: boolean; eraLabel?: string },
+): string {
+  const typeRaw = card.cardType || "";
+  const typeLabel =
+    typeRaw === "action"
+      ? "Action"
+      : typeRaw === "invention"
+        ? "Invention"
+        : typeRaw
+          ? typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1)
+          : "";
+  const parts: string[] = [];
+  if (typeLabel) parts.push(typeLabel);
+  for (const s of displaySubtypes(card)) {
+    parts.push(titleizeSubtype(s));
+  }
+  if (opts?.eraLabel) parts.push(opts.eraLabel);
+  if (typeof card.scoreValue === "number") {
+    parts.push(
+      opts?.scoreSuffix === false
+        ? String(card.scoreValue)
+        : `${card.scoreValue} pts`,
+    );
+  }
+  return parts.join(" · ");
+}
+
 // =============================================================================
 // Era State
 // =============================================================================
@@ -233,10 +318,20 @@ export interface TimestreamsConfig {
   /**
    * When false, skip the rules engine (gates, play/score effects, triggers,
    * modifiers). Structural moves still work: play invention → era stack,
-   * play action → discard, pass/day advance, simple scoreValue scoring.
+   * play action → discard, pass/day advance. Free tools (manual mode) apply.
    * Use this to test P2P/UI when the rules engine is broken or in flux.
    */
   rulesEnabled: boolean;
+  /**
+   * Once true, rules cannot be re-enabled for the rest of the match
+   * (host started OFF, or mid-game disable). See RULES_OFF_PRD §2.1.
+   */
+  rulesLockedOff?: boolean;
+  /**
+   * When true, expose `debugSeedBoard` move for e2e/Playwright fixtures.
+   * Never enable in production multiplayer hosts serving untrusted clients.
+   */
+  debugSeed?: boolean;
   /** Whether to maintain a verifiable proof chain for all state transitions */
   proofChainEnabled: boolean;
 }
@@ -291,17 +386,18 @@ export interface DecryptRequest {
   /**
    * draw — materialize into hand (default).
    * search — materialize into activeDeckOp.revealed for deck-search UI.
+   * peek — materialize top-N for Fortune Teller–style peek (stay on deck as plain ids).
    */
-  purpose?: "draw" | "search";
+  purpose?: "draw" | "search" | "peek";
 }
 
 /**
- * Mid-game deck operation (search + fair reshuffle + re-encrypt).
+ * Mid-game deck operation (search + fair reshuffle + re-encrypt, or peek top-N).
  * Holds the turn until phase is done.
  */
 export interface ActiveDeckOp {
   id: string;
-  kind: "search-deck";
+  kind: "search-deck" | "peek-deck";
   sourceCardId: string;
   ownerId: string;
   phase:
@@ -312,7 +408,7 @@ export interface ActiveDeckOp {
     | "reshuffle-apply"
     | "reencrypt"
     | "done";
-  /** Total cards to peel for search */
+  /** Total cards to peel for search / peek */
   decryptTotal: number;
   decryptDone: number;
   /** Revealed card ids (order is current physical order during decrypt) */
@@ -326,6 +422,10 @@ export interface ActiveDeckOp {
   /** Index into playerOrder for sequential re-encrypt of owner's remaining deck */
   reencryptPlayerIndex: number;
   statusMessage?: string;
+  /** Peek: open hand-pick prompt when decrypt finishes (own deck). */
+  peekAllowNone?: boolean;
+  /** Peek: after reveal, which prompt reason to open. */
+  peekReason?: "peek:own-to-hand" | "discard:opponent-deck-card";
 }
 
 /** Compact activity-log line for decrypt / system notices (non-modal). */
@@ -555,6 +655,18 @@ export interface TimestreamsState {
    * currently being scored), not G.currentDay.
    */
   scoringActiveEra?: EraId | null;
+
+  // ── Rules-off manual scoring desk (RULES_OFF_PRD §6.1) ──────────────────
+  /** Running bonus/penalty ledger per player (editable by free tools). */
+  manualBonus?: Record<string, number>;
+  /** Per-era scoring capacity override (default config.scoringSlots). */
+  manualSlotCap?: Partial<Record<EraId, number>>;
+  /** Cards marked “already scored” during manual Wonky walk. */
+  manualProcessed?: Record<string, boolean>;
+  /** Shared pointer for “we’re resolving this card”. */
+  manualCurrentCardId?: string | null;
+  /** Dual-ack for free:score-ack (any seat). */
+  manualScoreAcks?: Record<string, boolean>;
 }
 
 /** One card (or era-action) to process during iterative scoring. */
@@ -622,11 +734,29 @@ export interface ActiveModifier {
 export interface PendingTrigger {
   sourceCardId: string;
   ownerId: string;
-  event: 'action-played' | 'invention-played' | 'discarded-from-play';
+  /**
+   * Event name. Extended beyond play events for delayed score (`era-scored`)
+   * and board reacts; keep string-compatible for gap-closure wiring.
+   */
+  event:
+    | 'action-played'
+    | 'invention-played'
+    | 'discarded-from-play'
+    | 'era-scored'
+    | 'delayed:era-scored'
+    | 'move'
+    | string;
   /** Era to watch; null = anywhere. Anchored eras follow PRD §3.8. */
   eraAnchor: EraId | null;
   limit: 'once' | 'ongoing';
   spent: boolean;
+  /**
+   * Card to re-score after destination era finishes (Pottery delayed).
+   * When set, `sourceCardId` is the card that *registered* the delay (has delayed: tags).
+   */
+  targetCardId?: string;
+  /** Optional metadata for delayed rescore policy. */
+  delayedRescore?: boolean;
 }
 
 /** Per-player turn-manipulation flags (extra turns, skips, Navigation). */
@@ -731,10 +861,10 @@ export interface TimestreamsDeckCardMetadata {
    * hard-coding per-card rules.
    *
    * Recommended conventions:
-   * - Verbs/actions: "move", "destroy", "draw"
-   * - Triggers: "react:move", "react:destroy"
-   * - Parameters via separate tags or key=value style when needed:
-   *     ["react:move", "target:opponent", "requires:stone-age-cloth"]
+   * - Verbs/actions: "move", "discard", "draw"
+   * - Triggers: "react:move", "react:discard"
+   * - Parameters via separate tags; cross-card gates use subtypes, never card ids:
+   *     ["play:requires-card", "requires:subtype:nanotech", "requires:scope:today-or-past"]
    *
    * Game code should centralize tag interpretation logic so that
    * adding new cards rarely requires changes to the rules engine.

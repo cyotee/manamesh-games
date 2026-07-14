@@ -9,12 +9,13 @@
 import React from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 import type { TimestreamsState, EraId, TimestreamsCard } from '../types';
-import { ERA_ORDER, composeCardText } from '../types';
+import { ERA_ORDER, composeCardText, formatCardCaption } from '../types';
 import {
   hashSeedCommit,
   peelDecryptShare,
   buildEncryptionLayer,
   buildDeckOpReencryptLayer,
+  resolveCardIdFromPoint,
 } from '../crypto';
 import { generateKeyPair } from '@manamesh/boardgameio-crypto/mental-poker';
 import { canPlayCard } from '../effects/gates';
@@ -26,7 +27,15 @@ import {
   scorePileInventory,
 } from '../scoring';
 import { effectiveScoreValue } from '../effects/boardOps';
+import { getCard as getLiveCard } from '../effects/state';
 import { HandPanel } from './HandPanel';
+import {
+  canPlayerUseFreeTool,
+  canUseFreeTools,
+  previewEraCleanup,
+  type FreeToolId,
+  type EraCleanupMode,
+} from '../freeTools';
 
 /**
  * Prompt ids are `${playedCardId}:${suffix}` (card ids never contain ':').
@@ -80,11 +89,16 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
   >({});
   const [cryptoStatus, setCryptoStatus] = React.useState<string | null>(null);
   const setupAttemptRef = React.useRef<Set<string>>(new Set());
+  /** peelKey → last attempt ms (allow retries; boardgame INVALID_MOVE does not throw). */
+  const peelAttemptAtRef = React.useRef<Map<string, number>>(new Map());
   const keyPairRef = React.useRef<{ publicKey: string; privateKey: string } | null>(null);
   const shuffleSeedRef = React.useRef<string | null>(null);
   const deckOpSeedRef = React.useRef<string | null>(null);
   const encryptBusyRef = React.useRef(false);
   const deckOpBusyRef = React.useRef(false);
+  /** Latest G for decrypt peels scheduled via setTimeout (avoid stale closure). */
+  const latestGRef = React.useRef(G);
+  latestGRef.current = G;
 
   const currentPlayer = ctx.currentPlayer;
   const isMyTurn = currentPlayer === playerID;
@@ -92,6 +106,67 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
   const activeEra = ERA_ORDER[activeEraIndex];
   const myPlayer = playerID ? G.players[playerID] : undefined;
   const myHand = myPlayer?.hand ?? [];
+  const myDiscard = myPlayer?.discard ?? [];
+  /** null = auto (open when rules-off + non-empty); boolean = user toggle. */
+  const [discardOpenPref, setDiscardOpenPref] = React.useState<boolean | null>(
+    null,
+  );
+
+  // Playwright / e2e harness: window.__tsE2E on the primary seat (P0) when debugSeed.
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!G.config?.debugSeed || playerID !== '0') return;
+    (window as any).__tsE2E = {
+      playerID,
+      phase: G.phase,
+      ctxPhase: ctx.phase,
+      rulesEnabled: G.config?.rulesEnabled !== false,
+      seed: (args: any) => moves?.debugSeedBoard?.(args),
+      freeTool: (toolId: string, args: any = {}) => moves?.freeTool?.(toolId, args),
+      setRulesEnabled: (enabled: boolean) => moves?.setRulesEnabled?.(enabled),
+      playInvention: (cardId: string, choices?: any) =>
+        moves?.playInvention?.(cardId, choices),
+      playAction: (cardId: string, choices?: any) =>
+        moves?.playAction?.(cardId, choices),
+      pass: () => moves?.pass?.(),
+      submitScoreChoice: (id: string, value: any) =>
+        moves?.submitScoreChoice?.(id, value),
+      ackScoreStep: () => moves?.ackScoreStep?.(),
+      submitReact: (id: string, value: any) => moves?.submitReact?.(id, value),
+      submitPlayChoice: (id: string, value: any) =>
+        moves?.submitPlayChoice?.(id, value),
+      getG: () => G,
+      getStack: (era: string) => G.timeline?.[era as EraId]?.stack ?? [],
+      getHand: (pid: string) => G.players?.[pid]?.hand?.map((c) => c.id) ?? [],
+      getDiscard: (pid: string) =>
+        G.players?.[pid]?.discard?.map((c) => c.id) ?? [],
+      getScorePile: (pid: string) =>
+        G.players?.[pid]?.scorePile?.map((c) => c.id) ?? [],
+      getScores: () => G.scores,
+      getPrompts: () => G.pendingPrompts ?? [],
+      getAttachments: () => G.attachments ?? {},
+    };
+    return () => {
+      if ((window as any).__tsE2E?.playerID === playerID) {
+        delete (window as any).__tsE2E;
+      }
+    };
+  }, [G, ctx.phase, moves, playerID]);
+  /** Free-tool multi-select (rules-off). */
+  const [freeSelected, setFreeSelected] = React.useState<string[]>([]);
+  const [freeEraTarget, setFreeEraTarget] = React.useState<EraId>('stone');
+  const [cleanupMode, setCleanupMode] = React.useState<EraCleanupMode>('outside-capacity');
+  const [cleanupPreviewOpen, setCleanupPreviewOpen] = React.useState(false);
+  const rulesOff = canUseFreeTools(G);
+  const freeToolsAllowed =
+    rulesOff &&
+    !!playerID &&
+    canPlayerUseFreeTool(G, playerID, currentPlayer);
+  // Rules-off: expand discard by default so → Hand is visible without a click.
+  const discardOpen =
+    discardOpenPref !== null
+      ? discardOpenPref
+      : rulesOff && myDiscard.length > 0;
   const pendingPrompts = (G as any).pendingPrompts ?? [];
   const activePrompt = pendingPrompts[0] as
     | {
@@ -106,7 +181,11 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
         labelCardId?: string;
       }
     | undefined;
-  const isMyPrompt = !!activePrompt && activePrompt.deciderId === playerID;
+  // Coerce both sides — playerIDs and engine deciderIds must match as strings.
+  const isMyPrompt =
+    !!activePrompt &&
+    playerID != null &&
+    String(activePrompt.deciderId) === String(playerID);
   const promptMin = activePrompt?.min ?? 1;
   const promptMax = activePrompt?.max ?? 1;
   const isMultiSelectPrompt = promptMax > 1;
@@ -132,6 +211,19 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       setPromptAnswers({});
     }
   }, [activePrompt?.id, activePrompt?.options?.join('|'), !activePrompt]);
+
+  // Off-turn chooser (Surgical Strike target-owner, etc.): keep the amber panel
+  // in view even if the dual-seat board is long / scrolled to timeline.
+  React.useEffect(() => {
+    if (!isMyPrompt || !activePrompt) return;
+    const id = window.setTimeout(() => {
+      const el = document.querySelector(
+        '[data-testid="rules-prompt"]',
+      ) as HTMLElement | null;
+      el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [isMyPrompt, activePrompt?.id]);
 
   const togglePromptOption = (optId: string) => {
     if (!isMultiSelectPrompt) {
@@ -380,41 +472,92 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       }
     }
 
-    // --- Automatic cooperative decrypt during play (draws + deck search) ---
+    // --- Automatic cooperative decrypt during play (draws + deck search + peek) ---
     if ((phase === 'play' || phase === 'scoring') && moves.submitDecryptionShare) {
       if (isCryptoSetupPhase) {
         /* keep setup status */
+      } else if (G.activeDeckOp?.phase === 'decrypt') {
+        setCryptoStatus(
+          G.activeDeckOp.statusMessage ||
+            `Decrypting… ${G.activeDeckOp.decryptDone}/${G.activeDeckOp.decryptTotal}`,
+        );
       } else if (!G.activeDeckOp) {
         setCryptoStatus(null);
       }
       const pending = (G.pendingDecryptRequests ?? []).filter((r) => !r.materialized);
+      const now = Date.now();
       for (const req of pending) {
-        const next = req.requiredLayers[req.currentLayer];
+        const layerIdx = req.currentLayer ?? 0;
+        const next = req.requiredLayers[layerIdx];
         if (next !== playerID) continue;
-        const peelKey = `peel:${req.id}:${req.currentLayer}:${playerID}`;
-        if (setupAttemptRef.current.has(peelKey)) continue;
-        setupAttemptRef.current.add(peelKey);
-        const card = G.encryptedDecks[req.deckOwnerId]?.[req.cardIndex];
-        if (!card || card.layers === 0) continue;
-        const kp = getKeys();
-        if (!kp) {
-          setupAttemptRef.current.delete(peelKey);
-          continue;
-        }
-        try {
-          const share = peelDecryptShare(card, kp.privateKey);
+
+        const liveCard =
+          latestGRef.current.encryptedDecks?.[req.deckOwnerId]?.[req.cardIndex];
+
+        // Already plain — any required seat can finish materialize.
+        if (liveCard && (liveCard.layers ?? 0) === 0) {
+          const plainKey = `plain-mat:${req.id}:${layerIdx}:${playerID}`;
+          const lastPlain = peelAttemptAtRef.current.get(plainKey) ?? 0;
+          if (now - lastPlain < 400) continue;
+          peelAttemptAtRef.current.set(plainKey, now);
+          const cardSnap = { ...liveCard };
           setTimeout(() => {
             try {
-              moves.submitDecryptionShare(req.id, share);
+              moves.submitDecryptionShare?.(req.id, cardSnap);
             } catch (err) {
-              console.error('[TimestreamsBoard] submitDecryptionShare failed', err);
-              setupAttemptRef.current.delete(peelKey);
+              console.error(
+                '[TimestreamsBoard] plain decrypt materialize failed',
+                err,
+              );
+              peelAttemptAtRef.current.delete(plainKey);
             }
           }, 10);
-        } catch (err) {
-          console.error('[TimestreamsBoard] decrypt peel failed', err);
-          setupAttemptRef.current.delete(peelKey);
+          break;
         }
+
+        if (!liveCard || (liveCard.layers ?? 0) === 0) continue;
+
+        // Throttle peels; always re-read card at fire time so we peel after
+        // the previous seat's layer landed (stale closure was a common stall).
+        const peelKey = `peel:${req.id}:${layerIdx}:${playerID}`;
+        const lastPeel = peelAttemptAtRef.current.get(peelKey) ?? 0;
+        if (now - lastPeel < 350) continue;
+        peelAttemptAtRef.current.set(peelKey, now);
+
+        const kp = getKeys();
+        if (!kp) {
+          peelAttemptAtRef.current.delete(peelKey);
+          setCryptoStatus('Waiting for local keys to peel decrypt layer…');
+          continue;
+        }
+
+        const reqId = req.id;
+        const ownerId = req.deckOwnerId;
+        const idx = req.cardIndex;
+        setTimeout(() => {
+          try {
+            const latest =
+              latestGRef.current.encryptedDecks?.[ownerId]?.[idx];
+            if (!latest) {
+              peelAttemptAtRef.current.delete(peelKey);
+              return;
+            }
+            if ((latest.layers ?? 0) === 0) {
+              moves.submitDecryptionShare?.(reqId, latest);
+              return;
+            }
+            const share = peelDecryptShare(latest, kp.privateKey);
+            moves.submitDecryptionShare?.(reqId, share);
+          } catch (err) {
+            console.error('[TimestreamsBoard] decrypt peel failed', err);
+            peelAttemptAtRef.current.delete(peelKey);
+            setCryptoStatus(
+              `Decrypt peel failed — retrying… ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }, 15);
         break;
       }
     }
@@ -506,8 +649,14 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
     G.playerOrder,
     G.config?.playMode,
     G.pendingDecryptRequests,
+    // Re-run when layer progress changes (partial peels).
+    G.pendingDecryptRequests?.map(
+      (r) => `${r.id}:${r.currentLayer}:${r.materialized}`,
+    ).join('|'),
     G.encryptedDecks,
     G.activeDeckOp,
+    G.activeDeckOp?.decryptDone,
+    G.activeDeckOp?.phase,
     playerID,
     moves,
     isCryptoSetupPhase,
@@ -516,26 +665,104 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
     ctx.currentPlayer,
   ]);
 
+  // Kick stalled peels every 800ms while a cooperative decrypt is waiting on us.
+  React.useEffect(() => {
+    if (!playerID || !moves?.submitDecryptionShare) return;
+    if (G.config?.playMode !== 'mental-poker') return;
+    const pending = (G.pendingDecryptRequests ?? []).filter((r) => !r.materialized);
+    const waitingOnMe = pending.some(
+      (r) => r.requiredLayers[r.currentLayer] === playerID,
+    );
+    if (!waitingOnMe && G.activeDeckOp?.phase !== 'decrypt') return;
+    const t = window.setInterval(() => {
+      // Force the main auto-driver deps by clearing throttle for our peels
+      // older than 300ms so the next render cycle can fire again.
+      const now = Date.now();
+      for (const [k, at] of peelAttemptAtRef.current) {
+        if (now - at > 300 && (k.startsWith('peel:') || k.startsWith('plain-mat:'))) {
+          peelAttemptAtRef.current.delete(k);
+        }
+      }
+      // Touch a tiny state-less path: re-run by updating crypto status when stuck
+      const req = (latestGRef.current.pendingDecryptRequests ?? []).find(
+        (r) =>
+          !r.materialized &&
+          r.requiredLayers[r.currentLayer] === playerID,
+      );
+      if (!req) return;
+      const card =
+        latestGRef.current.encryptedDecks?.[req.deckOwnerId]?.[req.cardIndex];
+      if (!card) return;
+      const kp = keyPairRef.current;
+      if (!kp && (card.layers ?? 0) > 0) return;
+      try {
+        if ((card.layers ?? 0) === 0) {
+          moves.submitDecryptionShare?.(req.id, card);
+        } else if (kp) {
+          const share = peelDecryptShare(card, kp.privateKey);
+          moves.submitDecryptionShare?.(req.id, share);
+        }
+      } catch (err) {
+        console.error('[TimestreamsBoard] peel kick failed', err);
+      }
+    }, 800);
+    return () => window.clearInterval(t);
+  }, [
+    playerID,
+    moves,
+    G.config?.playMode,
+    G.pendingDecryptRequests,
+    G.activeDeckOp?.phase,
+    G.activeDeckOp?.decryptDone,
+  ]);
+
   const showHand = teachingMode || myHand.length > 0 || isPlayPhase;
 
   const handleCardHover = (card: TimestreamsCard | null) => {
     setHoveredCard(card);
   };
 
+  const deckOpBlocking =
+    !!G.activeDeckOp &&
+    (G.activeDeckOp.phase === 'decrypt' ||
+      G.activeDeckOp.phase === 'choose' ||
+      G.activeDeckOp.phase === 'reshuffle-commit' ||
+      G.activeDeckOp.phase === 'reshuffle-reveal' ||
+      G.activeDeckOp.phase === 'reencrypt');
+
   const handlePlayInvention = (cardId: string) => {
-    // Block new plays while a rules prompt is open.
+    // Block new plays while a rules prompt or cooperative decrypt is open.
     if (activePrompt) return;
+    if (deckOpBlocking) return;
     if (isMyTurn && moves.playInvention) moves.playInvention(cardId);
   };
 
   const handlePlayAction = (cardId: string) => {
     if (activePrompt) return;
+    if (deckOpBlocking) return;
     if (isMyTurn && moves.playAction) moves.playAction(cardId);
   };
 
   const handlePass = () => {
+    if (deckOpBlocking) return;
     if (isMyTurn && moves.pass && !activePrompt) moves.pass();
   };
+
+  const toggleFreeSelect = (cardId: string) => {
+    if (!rulesOff) return;
+    setFreeSelected((prev) =>
+      prev.includes(cardId) ? prev.filter((id) => id !== cardId) : [...prev, cardId],
+    );
+  };
+
+  const runFreeTool = (toolId: FreeToolId, args: Record<string, unknown> = {}) => {
+    if (!moves?.freeTool || !freeToolsAllowed) return;
+    moves.freeTool(toolId, args);
+    setFreeSelected([]);
+  };
+
+  const primarySelected = freeSelected[0];
+  const secondSelected = freeSelected[1];
 
   const isScorePhasePrompt =
     G.phase === 'scoring' ||
@@ -583,29 +810,14 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       return;
     }
 
-    // Off-turn play-effect answers (Thought Police redirect, etc.)
-    if (
-      (activePrompt.reason === 'redirect:optional' ||
-        activePrompt.id?.endsWith(':redirect-choice') ||
-        (G.pendingPlayEffect &&
-          activePrompt.deciderId === playerID &&
-          G.pendingPlayEffect.actorPlayerId !== playerID)) &&
-      moves.submitPlayChoice
-    ) {
-      moves.submitPlayChoice(activePrompt.id, choiceValue);
-      setPromptSelection([]);
-      return;
-    }
-
-    const playedCardId = playedCardIdFromPromptId(activePrompt.id);
-
-    // Prefer submitPlayChoice whenever a play effect is in-flight — avoids
-    // re-entering playInvention/playAction (which re-ran moves/draws).
+    // Off-turn + any pending play-effect answer (Surgical Strike target-owner,
+    // Thought Police redirect, Diplomacy, etc.). Always prefer submitPlayChoice
+    // so non-current seats can resolve prompts without re-playing the card.
     if (
       moves.submitPlayChoice &&
       G.pendingPlayEffect &&
-      (G.pendingPlayEffect.cardId === playedCardId ||
-        activePrompt.deciderId === playerID)
+      playerID != null &&
+      String(activePrompt.deciderId) === String(playerID)
     ) {
       moves.submitPlayChoice(activePrompt.id, choiceValue);
       setPromptSelection([]);
@@ -615,6 +827,37 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       }));
       return;
     }
+    // Still the decider for a play prompt but pendingPlayEffect missing (edge):
+    // try submitPlayChoice alone so we never silently fall through to playAction
+    // which only the current player can call.
+    if (
+      moves.submitPlayChoice &&
+      playerID != null &&
+      String(activePrompt.deciderId) === String(playerID) &&
+      (G.phase === 'play' || ctx.phase === 'play') &&
+      !isScorePhasePrompt
+    ) {
+      moves.submitPlayChoice(activePrompt.id, choiceValue);
+      setPromptSelection([]);
+      setPromptAnswers((prev) => ({
+        ...prev,
+        [activePrompt.id]: choiceValue,
+      }));
+      return;
+    }
+
+    // Redirect without pendingPlayEffect (edge)
+    if (
+      (activePrompt.reason === 'redirect:optional' ||
+        activePrompt.id?.endsWith(':redirect-choice')) &&
+      moves.submitPlayChoice
+    ) {
+      moves.submitPlayChoice(activePrompt.id, choiceValue);
+      setPromptSelection([]);
+      return;
+    }
+
+    const playedCardId = playedCardIdFromPromptId(activePrompt.id);
 
     const choices: Record<string, string | string[]> = {
       ...promptAnswers,
@@ -896,7 +1139,9 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
         >
           <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>
             {G.phase === 'scoring' || ctx.phase === 'scoring'
-              ? 'Scoring — all eras (step by step)'
+              ? G.config?.rulesEnabled === false
+                ? 'Scoring — manual desk (rules OFF)'
+                : 'Scoring — all eras (step by step)'
               : 'Game over'}
           </div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -1025,7 +1270,22 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
           )}
 
           {G.scoringWalk && (G.phase === 'scoring' || ctx.phase === 'scoring') && (
-            <div data-testid="scoring-walk-banner" style={{ fontSize: 13 }}>
+            <div
+              data-testid="scoring-walk-banner"
+              style={{
+                fontSize: 13,
+                // Sticky so dual-ack / choice UI stays visible without scroll jump
+                position: 'sticky',
+                top: 0,
+                zIndex: 25,
+                background: '#422006',
+                margin: '0 -4px 8px',
+                padding: '10px 8px',
+                borderRadius: 8,
+                border: '1px solid #854d0e',
+                overflowAnchor: 'none',
+              }}
+            >
               <div style={{ marginBottom: 6, opacity: 0.95 }}>
                 Card {G.scoringWalk.stepIndex + 1}
                 {G.scoringWalk.activeEraId
@@ -1062,6 +1322,26 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   {G.scoringWalk.lastSummary}
                 </div>
               )}
+              {/* Inline choice notice so lagging clients see who must act */}
+              {G.scoringWalk.stepPhase === 'choice' &&
+                pendingPrompts.length > 0 &&
+                activePrompt &&
+                !isMyPrompt && (
+                  <div
+                    data-testid="scoring-choice-waiting"
+                    style={{
+                      padding: '8px 10px',
+                      background: '#1e2937',
+                      borderRadius: 6,
+                      marginBottom: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Waiting for P{activePrompt.deciderId} to choose (
+                    {activePrompt.reason || activePrompt.id})…
+                  </div>
+                )}
               {G.scoringWalk.stepPhase === 'choice' &&
                 !(G.pendingPrompts && G.pendingPrompts.length > 0) && (
                   <div
@@ -1075,7 +1355,7 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                     }}
                   >
                     Scoring is waiting for a choice but none is open. Click OK to
-                    continue.
+                    re-sync / continue.
                     <button
                       type="button"
                       data-testid="ack-score-step-recovery"
@@ -1093,12 +1373,13 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Force continue
+                      Re-sync / continue
                     </button>
                   </div>
                 )}
               {G.scoringWalk.stepPhase === 'ack' && (
                 <div
+                  data-testid="scoring-ack-inline"
                   style={{
                     display: 'flex',
                     gap: 8,
@@ -1144,6 +1425,14 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                       </span>
                     ))}
                   </span>
+                  {!moves?.ackScoreStep && (
+                    <span
+                      data-testid="ack-score-move-missing"
+                      style={{ fontSize: 11, color: '#fca5a5' }}
+                    >
+                      (ack move unavailable for this seat — check dual-seat / connection)
+                    </span>
+                  )}
                 </div>
               )}
               <div style={{ marginTop: 8, fontSize: 11, opacity: 0.75 }}>
@@ -1163,18 +1452,103 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       )}
 
       {/*
-        Mid-game rules toggle — fixed corner, out of document flow.
-        A mid-page checkbox was re-scrolled into view on every board re-render.
+        Fixed dual-ack bar — scoring OK was easy to miss/clip (dual-seat overflow,
+        long boards, activity log). Anyone who has not acked always sees this.
+      */}
+      {G.scoringWalk &&
+        (G.phase === 'scoring' || ctx.phase === 'scoring') &&
+        G.scoringWalk.stepPhase === 'ack' &&
+        playerID != null &&
+        !G.scoringWalk.acks[playerID] && (
+          <div
+            data-testid="scoring-ack-floating"
+            style={{
+              position: 'fixed',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              bottom: 16 + (Number(playerID) || 0) * 10,
+              zIndex: 95,
+              maxWidth: 'min(560px, calc(100vw - 24px))',
+              padding: '12px 16px',
+              background: 'rgba(180, 83, 9, 0.98)',
+              border: '3px solid #fbbf24',
+              borderRadius: 12,
+              color: '#fffbeb',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.65)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              alignItems: 'center',
+              overflowAnchor: 'none',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 14, textAlign: 'center' }}>
+              Scoring — you (P{playerID}) must OK to continue
+              {G.scoringWalk.currentCardId
+                ? ` · ${
+                    (
+                      G.cards?.[G.scoringWalk.currentCardId] as
+                        | TimestreamsCard
+                        | undefined
+                    )?.name || G.scoringWalk.currentCardId
+                  }`
+                : ''}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.9 }}>
+              Acks:{' '}
+              {(G.playerOrder || []).map((pid) => (
+                <span key={pid} style={{ marginRight: 8 }}>
+                  P{pid}
+                  {G.scoringWalk!.acks[pid] ? '✓' : '…'}
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              data-testid="ack-score-step-floating"
+              disabled={!moves?.ackScoreStep}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => moves?.ackScoreStep?.()}
+              style={{
+                padding: '12px 28px',
+                background: moves?.ackScoreStep ? '#eab308' : '#78716c',
+                color: '#0f172a',
+                border: 'none',
+                borderRadius: 8,
+                fontWeight: 900,
+                fontSize: 16,
+                cursor: moves?.ackScoreStep ? 'pointer' : 'not-allowed',
+                minWidth: 200,
+              }}
+            >
+              {moves?.ackScoreStep
+                ? 'OK — next card'
+                : 'OK unavailable (no move)'}
+            </button>
+            {!moves?.ackScoreStep && (
+              <div
+                data-testid="ack-score-move-missing-floating"
+                style={{ fontSize: 11, color: '#fecaca', textAlign: 'center' }}
+              >
+                This seat cannot call ackScoreStep. In dual-seat, use the other
+                panel for P{playerID}. In P2P, refresh / rejoin as P{playerID}.
+              </div>
+            )}
+          </div>
+        )}
+
+      {/*
+        Mid-game rules control — fixed corner, out of document flow.
+        One-way OFF only (cannot re-enable this match once disabled).
       */}
       <div
         data-testid="rules-midgame-toggle"
         style={{
           position: 'fixed',
           right: 12,
-          // Offset dual-seat second board so toggles don't stack exactly.
-          bottom: 12 + (Number(playerID) || 0) * 76,
+          bottom: 12 + (Number(playerID) || 0) * 96,
           zIndex: 40,
-          maxWidth: 280,
+          maxWidth: 300,
           padding: '8px 10px',
           background:
             G.config?.rulesEnabled === false
@@ -1197,13 +1571,24 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
         <button
           type="button"
           data-testid="rules-engine-toggle-btn"
-          disabled={!moves?.setRulesEnabled}
+          disabled={
+            !moves?.setRulesEnabled ||
+            G.config?.rulesEnabled === false ||
+            !!G.config?.rulesLockedOff
+          }
           tabIndex={-1}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             if (!moves?.setRulesEnabled) return;
-            // Toggle: if currently disabled (false), re-enable; else disable.
-            moves.setRulesEnabled(G.config?.rulesEnabled === false);
+            if (G.config?.rulesEnabled === false || G.config?.rulesLockedOff) return;
+            const ok = window.confirm(
+              'Disable rules engine for everyone?\n\n' +
+                'Card text will no longer resolve automatically. You will use free tools to move cards and tally scores by hand.\n\n' +
+                'You cannot re-enable the rules engine for the rest of this match.\n' +
+                'Both players will be switched to Rules OFF.',
+            );
+            if (!ok) return;
+            moves.setRulesEnabled(false);
           }}
           style={{
             display: 'flex',
@@ -1214,11 +1599,19 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
             background: 'transparent',
             border: 'none',
             color: 'inherit',
-            cursor: moves?.setRulesEnabled ? 'pointer' : 'not-allowed',
+            cursor:
+              moves?.setRulesEnabled && G.config?.rulesEnabled !== false
+                ? 'pointer'
+                : 'not-allowed',
             textAlign: 'left',
             font: 'inherit',
+            opacity: G.config?.rulesEnabled === false ? 0.85 : 1,
           }}
-          title="Toggle rules engine mid-game"
+          title={
+            G.config?.rulesEnabled === false
+              ? 'Rules engine locked OFF for this match'
+              : 'Disable rules engine for everyone (cannot re-enable)'
+          }
         >
           <span
             aria-hidden
@@ -1239,10 +1632,518 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
         </button>
         <span style={{ opacity: 0.8, fontSize: 10, lineHeight: 1.3, paddingLeft: 2 }}>
           {G.config?.rulesEnabled === false
-            ? 'Structural play only. Click to re-enable full rules.'
-            : 'Full rules. Click to disable if the engine errors.'}
+            ? 'Manual free tools. Cannot re-enable this match.'
+            : 'Full rules. Click to disable for everyone (one-way).'}
         </span>
       </div>
+
+      {/* E2E / debug seed panel — only when config.debugSeed */}
+      {G.config?.debugSeed && (
+        <div
+          data-testid="e2e-debug-panel"
+          style={{
+            marginBottom: 8,
+            padding: 8,
+            background: '#312e81',
+            border: '1px solid #818cf8',
+            borderRadius: 6,
+            fontSize: 11,
+            color: '#e0e7ff',
+          }}
+        >
+          <strong>E2E debugSeed</strong>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+            <button
+              type="button"
+              data-testid="e2e-seed-fire-discard"
+              disabled={!moves?.debugSeedBoard}
+              onClick={() => {
+                moves?.debugSeedBoard?.({
+                  phase: 'play',
+                  currentDay: 1,
+                  currentPlayerHomeEra: { '0': 'stone', '1': 'future' },
+                  timeline: {
+                    stone: [
+                      {
+                        id: 'victim#0',
+                        name: 'Victim',
+                        ownerId: '1',
+                        scoreValue: 2,
+                      },
+                    ],
+                  },
+                  hands: {
+                    '0': [
+                      {
+                        id: 'stone-age-fire#0',
+                        name: 'Fire',
+                        ownerId: '0',
+                        tags: [
+                          'play:discard:1',
+                          'discard:target:today:any',
+                        ],
+                      },
+                    ],
+                  },
+                  rulesEnabled: true,
+                });
+              }}
+            >
+              Seed Fire discard
+            </button>
+            <button
+              type="button"
+              data-testid="e2e-seed-free-tools"
+              disabled={!moves?.debugSeedBoard}
+              onClick={() => {
+                moves?.debugSeedBoard?.({
+                  phase: 'play',
+                  currentDay: 1,
+                  currentPlayerHomeEra: { '0': 'stone', '1': 'future' },
+                  timeline: {
+                    stone: [
+                      { id: 'host#0', name: 'Host', ownerId: '0', scoreValue: 1 },
+                      { id: 'other#0', name: 'Other', ownerId: '1', scoreValue: 2 },
+                    ],
+                  },
+                  hands: {
+                    '0': [
+                      {
+                        id: 'hib#0',
+                        name: 'Hibernation',
+                        ownerId: '0',
+                        cardType: 'action',
+                        tags: ['play:attach'],
+                      },
+                    ],
+                  },
+                  rulesEnabled: false,
+                });
+              }}
+            >
+              Seed free-tools board
+            </button>
+            <button
+              type="button"
+              data-testid="e2e-seed-scoring-manual"
+              disabled={!moves?.debugSeedBoard}
+              onClick={() => {
+                // Keep phase=play first so boardgame.io does not endIf mid-seed
+                // and wipe dual-seat rendering. Cards land on timeline; scoring
+                // desk tools work for free:score-* during play when rules off.
+                moves?.debugSeedBoard?.({
+                  phase: 'play',
+                  currentDay: 1,
+                  currentPlayerHomeEra: { '0': 'stone', '1': 'future' },
+                  timeline: {
+                    stone: [
+                      { id: 's0-card', name: 'S0', ownerId: '0', scoreValue: 2 },
+                      { id: 's1-card', name: 'S1', ownerId: '0', scoreValue: 1 },
+                      { id: 's2-card', name: 'S2', ownerId: '1', scoreValue: 3 },
+                    ],
+                  },
+                  rulesEnabled: false,
+                });
+              }}
+            >
+              Seed manual scoring
+            </button>
+            <button
+              type="button"
+              data-testid="e2e-enter-scoring"
+              disabled={!moves?.debugSeedBoard}
+              onClick={() => {
+                moves?.debugSeedBoard?.({
+                  clearBoard: false,
+                  phase: 'scoring',
+                  rulesEnabled: false,
+                });
+              }}
+            >
+              Enter scoring phase
+            </button>
+            <span data-testid="e2e-phase-label" style={{ opacity: 0.85 }}>
+              G.phase={G.phase} ctx={String(ctx.phase)} rules=
+              {G.config?.rulesEnabled === false ? 'OFF' : 'ON'} seed=
+              {G.config?.debugSeed ? '1' : '0'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Free tools sticky bar (rules-off) */}
+      {rulesOff && (
+        <div
+          data-testid="free-tools-bar"
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 25,
+            marginBottom: 10,
+            padding: '10px 12px',
+            background: 'rgba(120, 53, 15, 0.97)',
+            border: '1px solid #eab308',
+            borderRadius: 8,
+            color: '#fef3c7',
+            fontSize: 12,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            Rules engine OFF — free tools
+            {!freeToolsAllowed && G.phase === 'play'
+              ? ' (current player only)'
+              : ''}
+          </div>
+          <div style={{ marginBottom: 6, opacity: 0.9, fontSize: 11 }}>
+            Selected: {freeSelected.length ? freeSelected.join(', ') : 'none'} · Era target:{' '}
+            <select
+              data-testid="free-era-target"
+              value={freeEraTarget}
+              onChange={(e) => setFreeEraTarget(e.target.value as EraId)}
+              style={{ fontSize: 11, marginLeft: 4 }}
+            >
+              {ERA_ORDER.map((e) => (
+                <option key={e} value={e}>
+                  {ERA_LABELS[e]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              data-testid="free-clear-selection"
+              onClick={() => setFreeSelected([])}
+              style={{ marginLeft: 8, fontSize: 11 }}
+            >
+              Clear
+            </button>
+            <div style={{ marginTop: 4, opacity: 0.85, lineHeight: 1.35 }}>
+              Open <strong>Your discard</strong> below → select cards (or use → Hand on a
+              card) · only your discard is available.
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(
+              [
+                [
+                  'Attach',
+                  'free:attach',
+                  () =>
+                    primarySelected &&
+                    secondSelected &&
+                    runFreeTool('free:attach', {
+                      cardId: primarySelected,
+                      hostCardId: secondSelected,
+                    }),
+                  freeSelected.length >= 2,
+                ],
+                [
+                  'Detach→hand',
+                  'free:detach',
+                  () =>
+                    primarySelected &&
+                    runFreeTool('free:detach', { cardId: primarySelected }),
+                  !!primarySelected,
+                ],
+                [
+                  'Discard',
+                  'free:discard',
+                  () =>
+                    freeSelected.length &&
+                    runFreeTool('free:discard', { cardIds: freeSelected }),
+                  freeSelected.length > 0,
+                ],
+                [
+                  'To era',
+                  'free:to-era',
+                  () =>
+                    primarySelected &&
+                    runFreeTool('free:to-era', {
+                      cardId: primarySelected,
+                      eraId: freeEraTarget,
+                      position: 'top',
+                    }),
+                  !!primarySelected,
+                ],
+                [
+                  'Swap',
+                  'free:swap',
+                  () =>
+                    freeSelected.length === 2 &&
+                    runFreeTool('free:swap', { cardIds: freeSelected }),
+                  freeSelected.length === 2,
+                ],
+                [
+                  '→ Score pile',
+                  'free:to-score-pile',
+                  () =>
+                    freeSelected.length &&
+                    runFreeTool('free:to-score-pile', {
+                      cardIds: freeSelected,
+                      pileOwnerId: playerID,
+                    }),
+                  freeSelected.length > 0,
+                ],
+                [
+                  'Draw 1',
+                  'free:draw',
+                  () => runFreeTool('free:draw', { amount: 1 }),
+                  true,
+                ],
+                [
+                  'Discard → Hand',
+                  'free:recover-hand',
+                  () =>
+                    freeSelected.length &&
+                    runFreeTool('free:recover-hand', { cardIds: freeSelected }),
+                  freeSelected.length > 0,
+                ],
+              ] as const
+            ).map(([label, testId, onClick, enabled]) => (
+              <button
+                key={testId}
+                type="button"
+                data-testid={`free-tool-${testId}`}
+                disabled={!freeToolsAllowed || !enabled}
+                onClick={() => onClick()}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  borderRadius: 4,
+                  border: '1px solid #ca8a04',
+                  background: freeToolsAllowed && enabled ? '#854d0e' : '#44403c',
+                  color: '#fef3c7',
+                  cursor: freeToolsAllowed && enabled ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {(G.phase === 'scoring' || ctx.phase === 'scoring') && (
+            <div
+              data-testid="manual-scoring-desk"
+              style={{
+                marginTop: 10,
+                paddingTop: 8,
+                borderTop: '1px solid #a16207',
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                Manual scoring desk
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+                {(G.playerOrder || []).map((pid) => (
+                  <div key={pid} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    P{pid} bonus:
+                    <button
+                      type="button"
+                      data-testid={`free-bonus-dec-${pid}`}
+                      disabled={!freeToolsAllowed}
+                      onClick={() =>
+                        runFreeTool('free:score-bonus-delta', {
+                          targetPlayerId: pid,
+                          amount: -1,
+                        })
+                      }
+                    >
+                      −
+                    </button>
+                    <strong data-testid={`manual-bonus-${pid}`}>
+                      {G.manualBonus?.[pid] ?? G.bonusPoints?.[pid] ?? 0}
+                    </strong>
+                    <button
+                      type="button"
+                      data-testid={`free-bonus-inc-${pid}`}
+                      disabled={!freeToolsAllowed}
+                      onClick={() =>
+                        runFreeTool('free:score-bonus-delta', {
+                          targetPlayerId: pid,
+                          amount: 1,
+                        })
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  Cap {freeEraTarget}:
+                  <button
+                    type="button"
+                    data-testid="free-cap-dec"
+                    disabled={!freeToolsAllowed}
+                    onClick={() =>
+                      runFreeTool('free:score-slot-cap', {
+                        eraId: freeEraTarget,
+                        amount: -1,
+                      })
+                    }
+                  >
+                    −
+                  </button>
+                  <strong data-testid="manual-cap">
+                    {G.manualSlotCap?.[freeEraTarget] ??
+                      G.config?.scoringSlots ??
+                      6}
+                  </strong>
+                  <button
+                    type="button"
+                    data-testid="free-cap-inc"
+                    disabled={!freeToolsAllowed}
+                    onClick={() =>
+                      runFreeTool('free:score-slot-cap', {
+                        eraId: freeEraTarget,
+                        amount: 1,
+                      })
+                    }
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <button
+                  type="button"
+                  data-testid="free-mark-processed"
+                  disabled={!freeToolsAllowed || !primarySelected}
+                  onClick={() =>
+                    primarySelected &&
+                    runFreeTool('free:score-mark-processed', {
+                      cardId: primarySelected,
+                      processed: true,
+                    })
+                  }
+                >
+                  Mark scored
+                </button>
+                <button
+                  type="button"
+                  data-testid="free-claim-pile"
+                  disabled={!freeToolsAllowed || freeSelected.length === 0}
+                  onClick={() =>
+                    runFreeTool('free:score-claim-pile', {
+                      cardIds: freeSelected,
+                      pileOwnerId: playerID,
+                    })
+                  }
+                >
+                  Claim pile
+                </button>
+                <button
+                  type="button"
+                  data-testid="free-set-current"
+                  disabled={!freeToolsAllowed || !primarySelected}
+                  onClick={() =>
+                    primarySelected &&
+                    runFreeTool('free:score-set-current', {
+                      cardId: primarySelected,
+                    })
+                  }
+                >
+                  Set current
+                </button>
+                <button
+                  type="button"
+                  data-testid="free-score-ack"
+                  disabled={!freeToolsAllowed}
+                  onClick={() => runFreeTool('free:score-ack', {})}
+                >
+                  OK — next
+                </button>
+                <button
+                  type="button"
+                  data-testid="free-era-cleanup-open"
+                  disabled={!freeToolsAllowed}
+                  onClick={() => setCleanupPreviewOpen(true)}
+                >
+                  Era cleanup…
+                </button>
+                <button
+                  type="button"
+                  data-testid="free-finalize-scores"
+                  disabled={!freeToolsAllowed}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Finalize scores now? Uses score piles + bonus ledger.',
+                      )
+                    ) {
+                      runFreeTool('free:score-finalize', {});
+                    }
+                  }}
+                  style={{ fontWeight: 700, background: '#166534', color: '#fff' }}
+                >
+                  Finalize scores
+                </button>
+              </div>
+              {cleanupPreviewOpen && (
+                <div
+                  data-testid="era-cleanup-dialog"
+                  style={{
+                    marginTop: 8,
+                    padding: 10,
+                    background: '#1c1917',
+                    borderRadius: 6,
+                    border: '1px solid #a16207',
+                  }}
+                >
+                  <div style={{ marginBottom: 6 }}>
+                    Cleanup <strong>{ERA_LABELS[freeEraTarget]}</strong>
+                  </div>
+                  <label style={{ display: 'block', marginBottom: 4 }}>
+                    <input
+                      type="radio"
+                      name="cleanup-mode"
+                      checked={cleanupMode === 'outside-capacity'}
+                      onChange={() => setCleanupMode('outside-capacity')}
+                    />{' '}
+                    Mode A — Outside capacity (default)
+                  </label>
+                  <label style={{ display: 'block', marginBottom: 6 }}>
+                    <input
+                      type="radio"
+                      name="cleanup-mode"
+                      checked={cleanupMode === 'unprocessed'}
+                      onChange={() => setCleanupMode('unprocessed')}
+                    />{' '}
+                    Mode B — Unprocessed only
+                  </label>
+                  {(() => {
+                    const prev = previewEraCleanup(G, freeEraTarget, cleanupMode);
+                    return (
+                      <div data-testid="cleanup-preview" style={{ fontSize: 11, marginBottom: 8 }}>
+                        Preview: {prev.toPile.length} → score piles,{' '}
+                        {prev.toDiscard.length} → discard, {prev.eraActions.length}{' '}
+                        era-action → discard
+                      </div>
+                    );
+                  })()}
+                  <button
+                    type="button"
+                    data-testid="free-era-cleanup-confirm"
+                    onClick={() => {
+                      runFreeTool('free:score-era-cleanup', {
+                        eraId: freeEraTarget,
+                        mode: cleanupMode,
+                      });
+                      setCleanupPreviewOpen(false);
+                    }}
+                  >
+                    Confirm cleanup
+                  </button>
+                  <button
+                    type="button"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => setCleanupPreviewOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Opponent status strip */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -1263,6 +2164,7 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
               {p?.homeEra ? ` · ${ERA_LABELS[p.homeEra as EraId] || p.homeEra}` : ' · no era'}
               {p?.ready ? ' · ready' : ''}
               {` · hand ${p?.hand?.length ?? 0}`}
+              {` · discard ${p?.discard?.length ?? 0}`}
             </div>
           );
         })}
@@ -1279,10 +2181,12 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
           const slotNotes = scoringSlotModifierNotes(G, era);
           const stack = eraState?.stack ?? [];
           const walk = G.scoringWalk;
+          // Prefer live walk fields (Wonky re-discovery) — not a frozen steps list.
           const isScoringEra =
             (G.phase === 'scoring' || ctx.phase === 'scoring') &&
-            walk?.currentCardId &&
-            walk.steps[walk.stepIndex]?.eraId === era;
+            !!walk?.currentCardId &&
+            (walk.activeEraId === era ||
+              walk.steps[walk.stepIndex]?.eraId === era);
 
           return (
             <div
@@ -1293,11 +2197,12 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
               data-scoring-active={isScoringEra ? 'true' : 'false'}
               style={{
                 minWidth: '140px',
+                // Always 3px border so highlighting never reflows layout / scroll.
                 border: isScoringEra
                   ? '3px solid #eab308'
                   : isActive
                     ? '3px solid #38bdf8'
-                    : '1px solid #334155',
+                    : '3px solid #334155',
                 borderRadius: '6px',
                 padding: '6px',
                 background: isScoringEra
@@ -1305,6 +2210,7 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   : isActive
                     ? '#0c4a6e'
                     : '#1e2937',
+                overflowAnchor: 'none',
               }}
             >
               <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
@@ -1397,14 +2303,20 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   <span style={{ color: '#64748b' }}>empty</span>
                 ) : (
                   stack.map((cardId: string, i: number) => {
-                    const card = G.cards?.[cardId] as TimestreamsCard | undefined;
+                    // Hydrate art/tags from pack catalog (Immortality imageUrl, etc.)
+                    const card =
+                      (getLiveCard(G, cardId) as TimestreamsCard | undefined) ||
+                      (G.cards?.[cardId] as TimestreamsCard | undefined);
                     const label = card?.name || cardId.split('#')[0] || cardId;
                     const inScoringSlot = i < slots;
                     const processed =
-                      (G.phase === 'scoring' || ctx.phase === 'scoring') &&
-                      isCardProcessedForUi(G, cardId, era);
+                      ((G.phase === 'scoring' || ctx.phase === 'scoring') &&
+                        isCardProcessedForUi(G, cardId, era)) ||
+                      !!G.manualProcessed?.[cardId];
                     const isCurrent =
-                      G.scoringWalk?.currentCardId === cardId;
+                      G.scoringWalk?.currentCardId === cardId ||
+                      G.manualCurrentCardId === cardId;
+                    const freeSel = freeSelected.includes(cardId);
                     const fullCard = card || {
                       id: cardId,
                       name: label,
@@ -1424,21 +2336,26 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                         data-in-scoring-slot={inScoringSlot ? 'true' : 'false'}
                         data-scoring-processed={processed ? 'true' : 'false'}
                         data-scoring-current={isCurrent ? 'true' : 'false'}
+                        data-free-selected={freeSel ? 'true' : 'false'}
                         style={{
                           padding: '2px 4px',
                           borderBottom: '1px solid #1e2937',
                           opacity: inScoringSlot || isCurrent || processed ? 1 : 0.55,
                           borderRadius: 4,
-                          background: isCurrent
-                            ? '#854d0e'
-                            : processed
-                              ? '#14532d'
-                              : 'transparent',
-                          outline: isCurrent
-                            ? '2px solid #facc15'
-                            : processed
-                              ? '1px solid #22c55e'
-                              : undefined,
+                          background: freeSel
+                            ? '#1e3a5f'
+                            : isCurrent
+                              ? '#854d0e'
+                              : processed
+                                ? '#14532d'
+                                : 'transparent',
+                          outline: freeSel
+                            ? '2px solid #38bdf8'
+                            : isCurrent
+                              ? '2px solid #facc15'
+                              : processed
+                                ? '1px solid #22c55e'
+                                : undefined,
                         }}
                       >
                         <div
@@ -1455,14 +2372,20 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                           }}
                           onMouseEnter={() => handleCardHover(fullCard)}
                           onMouseLeave={() => handleCardHover(null)}
+                          onClick={() => {
+                            if (rulesOff) toggleFreeSelect(cardId);
+                          }}
                         >
                           {i + 1}. {label}
                           {processed ? ' ✓' : ''}
                           {isCurrent ? ' ◀' : ''}
+                          {freeSel ? ' ●' : ''}
                           {!inScoringSlot && !processed && !isCurrent ? ' (past slots)' : ''}
                         </div>
                         {attachedIds.map((attId) => {
-                          const att = G.cards?.[attId] as TimestreamsCard | undefined;
+                          const att =
+                            (getLiveCard(G, attId) as TimestreamsCard | undefined) ||
+                            (G.cards?.[attId] as TimestreamsCard | undefined);
                           const attLabel =
                             att?.name || attId.split('#')[0] || attId;
                           const attCard = att || {
@@ -1475,21 +2398,29 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                             hasScoreEffect: false,
                             hasReact: false,
                           };
+                          const attSel = freeSelected.includes(attId);
                           return (
                             <div
                               key={attId}
                               data-testid={`timeline-attachment-${attId}`}
                               data-host={cardId}
+                              data-free-selected={attSel ? 'true' : 'false'}
                               style={{
                                 paddingLeft: 14,
-                                color: '#a5b4fc',
+                                color: attSel ? '#7dd3fc' : '#a5b4fc',
                                 fontSize: 10,
                                 cursor: 'pointer',
+                                outline: attSel ? '1px solid #38bdf8' : undefined,
                               }}
                               onMouseEnter={() => handleCardHover(attCard)}
                               onMouseLeave={() => handleCardHover(null)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (rulesOff) toggleFreeSelect(attId);
+                              }}
                             >
                               - {attLabel}
+                              {attSel ? ' ●' : ''}
                             </div>
                           );
                         })}
@@ -1604,25 +2535,303 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
           onPlayAction={handlePlayAction}
           onPass={handlePass}
           onCardHover={handleCardHover}
+          freeSelectedIds={rulesOff ? freeSelected : undefined}
+          onFreeSelect={rulesOff ? toggleFreeSelect : undefined}
         />
       )}
 
-      {/* Rules prompts — options only for the decider (private decks / choices). */}
+      {/* Own discard pile — private view (only your cards; never opponents') */}
+      {playerID && (
+        <div
+          data-testid="discard-pile"
+          style={{
+            marginTop: 10,
+            padding: 10,
+            background: '#1e2937',
+            border: rulesOff ? '2px solid #eab308' : '1px solid #475569',
+            borderRadius: 8,
+            overflowAnchor: 'none',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
+            <button
+              type="button"
+              data-testid="discard-pile-toggle"
+              onClick={() => setDiscardOpenPref((o) => !(o ?? discardOpen))}
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flex: 1,
+                minWidth: 160,
+                background: 'transparent',
+                border: 'none',
+                color: '#e2e8f0',
+                cursor: 'pointer',
+                font: 'inherit',
+                padding: 0,
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 13 }}>
+                Your discard ({myDiscard.length})
+              </span>
+              <span style={{ fontSize: 11, opacity: 0.7 }}>
+                {discardOpen ? '▾ hide' : '▸ show'}
+              </span>
+            </button>
+            {rulesOff && myDiscard.length > 0 && (
+              <button
+                type="button"
+                data-testid="discard-recover-selected"
+                disabled={
+                  !freeToolsAllowed ||
+                  !freeSelected.some((id) =>
+                    myDiscard.some((c) => c.id === id),
+                  )
+                }
+                onClick={() => {
+                  const ids = freeSelected.filter((id) =>
+                    myDiscard.some((c) => c.id === id),
+                  );
+                  if (ids.length) {
+                    runFreeTool('free:recover-hand', { cardIds: ids });
+                  }
+                }}
+                title="Move selected cards from your discard to your hand"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  borderRadius: 4,
+                  border: '1px solid #ca8a04',
+                  background: freeToolsAllowed ? '#854d0e' : '#44403c',
+                  color: '#fef3c7',
+                  cursor: freeToolsAllowed ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Selected → Hand
+              </button>
+            )}
+          </div>
+          {rulesOff && (
+            <div
+              data-testid="discard-free-hint"
+              style={{ fontSize: 11, color: '#fde68a', marginTop: 6, lineHeight: 1.35 }}
+            >
+              Rules OFF: click a card to select, or press <strong>→ Hand</strong> on a card
+              to return it to your hand. You can only recover from <em>your</em> discard.
+              {!freeToolsAllowed && G.phase === 'play'
+                ? ' (wait for your turn)'
+                : ''}
+            </div>
+          )}
+          {discardOpen && (
+            <div
+              data-testid="discard-pile-list"
+              style={{
+                marginTop: 10,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                maxHeight: 320,
+                overflowY: 'auto',
+              }}
+            >
+              {myDiscard.length === 0 ? (
+                <span
+                  data-testid="discard-pile-empty"
+                  style={{ fontSize: 12, color: '#64748b' }}
+                >
+                  Empty — discarded cards will appear here.
+                </span>
+              ) : (
+                [...myDiscard].reverse().map((card, i) => {
+                  const live =
+                    (getLiveCard(G, card.id) as TimestreamsCard | undefined) ||
+                    card;
+                  const label = live.name || live.id.split('#')[0] || live.id;
+                  const freeSel = freeSelected.includes(live.id);
+                  return (
+                    <div
+                      key={`${live.id}-disc-${i}`}
+                      data-testid={`discard-card-${live.id}`}
+                      data-free-selected={freeSel ? 'true' : 'false'}
+                      role="button"
+                      tabIndex={0}
+                      onMouseEnter={() => handleCardHover(live)}
+                      onMouseLeave={() => handleCardHover(null)}
+                      onClick={() => {
+                        if (rulesOff) toggleFreeSelect(live.id);
+                      }}
+                      style={{
+                        width: 110,
+                        padding: 6,
+                        borderRadius: 6,
+                        border: freeSel
+                          ? '2px solid #38bdf8'
+                          : '1px solid #475569',
+                        background: freeSel ? '#1e3a5f' : '#0f172a',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                      }}
+                    >
+                      {live.imageUrl ? (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: 88,
+                            marginBottom: 4,
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                            background: '#0b1220',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <img
+                            src={live.imageUrl}
+                            alt={label}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display =
+                                'none';
+                            }}
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                              objectFit: 'contain',
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                      <div style={{ fontWeight: 700, lineHeight: 1.25 }}>
+                        {label}
+                      </div>
+                      <div style={{ color: '#94a3b8', marginTop: 2 }}>
+                        {formatCardCaption(live)}
+                      </div>
+                      {rulesOff && (
+                        <button
+                          type="button"
+                          data-testid={`discard-to-hand-${live.id}`}
+                          disabled={!freeToolsAllowed}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            runFreeTool('free:recover-hand', {
+                              cardIds: [live.id],
+                            });
+                          }}
+                          style={{
+                            marginTop: 6,
+                            width: '100%',
+                            padding: '4px 6px',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            borderRadius: 4,
+                            border: '1px solid #38bdf8',
+                            background: freeToolsAllowed ? '#0c4a6e' : '#334155',
+                            color: '#e0f2fe',
+                            cursor: freeToolsAllowed ? 'pointer' : 'not-allowed',
+                          }}
+                        >
+                          → Hand
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+          {discardOpen && myDiscard.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 10, color: '#64748b' }}>
+              Newest first · only your discard · hover for full detail
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fixed attention banner when YOU must answer a play prompt off-turn */}
+      {activePrompt && isMyPrompt && G.phase === 'play' && (
+        <div
+          data-testid="play-choice-attention"
+          style={{
+            position: 'fixed',
+            top: 8,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            maxWidth: 'min(560px, 94vw)',
+            padding: '10px 16px',
+            background: 'rgba(180, 83, 9, 0.98)',
+            border: '2px solid #fbbf24',
+            borderRadius: 10,
+            color: '#fffbeb',
+            fontWeight: 800,
+            fontSize: 14,
+            boxShadow: '0 8px 28px rgba(0,0,0,0.55)',
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          Your decision is required — scroll to the amber panel or use the choices
+          below
+        </div>
+      )}
+
+      {/* Rules prompts — sticky/fixed so chooser always sees options (play + score). */}
       {activePrompt && (
         <div
           data-testid="rules-prompt"
           style={{
             marginTop: 12,
             padding: 12,
-            border: '2px solid #eab308',
+            border: isMyPrompt ? '3px solid #fbbf24' : '2px solid #eab308',
             borderRadius: 8,
             background: isMyPrompt ? '#422006' : '#1e2937',
             color: '#fef3c7',
+            // Fixed when you must act in play so dual-seat / long boards can't hide it.
+            position: isMyPrompt
+              ? 'fixed'
+              : G.phase === 'scoring' || ctx.phase === 'scoring'
+                ? 'sticky'
+                : 'relative',
+            left: isMyPrompt ? 12 : undefined,
+            right: isMyPrompt ? 12 : undefined,
+            bottom: isMyPrompt
+              ? 12 + (Number(playerID) || 0) * 8
+              : G.phase === 'scoring' || ctx.phase === 'scoring'
+                ? 8
+                : undefined,
+            maxWidth: isMyPrompt ? 'min(720px, calc(100vw - 24px))' : undefined,
+            marginLeft: isMyPrompt ? 'auto' : undefined,
+            marginRight: isMyPrompt ? 'auto' : undefined,
+            zIndex: isMyPrompt ? 90 : 26,
+            overflowAnchor: 'none',
+            boxShadow: isMyPrompt
+              ? '0 12px 40px rgba(0,0,0,0.65)'
+              : G.phase === 'scoring' || ctx.phase === 'scoring'
+                ? '0 8px 24px rgba(0,0,0,0.55)'
+                : undefined,
+            maxHeight: isMyPrompt ? '70vh' : undefined,
+            overflowY: isMyPrompt ? 'auto' : undefined,
           }}
         >
           {!isMyPrompt ? (
             <div style={{ fontWeight: 700 }} data-testid="prompt-waiting">
               Waiting for P{activePrompt.deciderId} to complete a card choice…
+              {activePrompt.reason === 'play:choice'
+                ? ' (they decide discard invention vs discard from hand)'
+                : ''}
             </div>
           ) : (
             <>
@@ -1645,8 +2854,61 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                       ? 'Copy play ability — choose an invention in play'
                       : activePrompt.reason === 'play:play-invention'
                         ? 'Coronation — choose an invention from your hand to play'
+                        : activePrompt.reason === 'recover:from-discard' ||
+                            activePrompt.reason === 'play:recover'
+                          ? promptMin === 0
+                            ? 'Recover — choose a card from your discard (or None to skip)'
+                            : 'Recover — choose a card from your discard pile'
+                          : activePrompt.reason === 'recover:to-deck'
+                            ? 'Recover — choose card(s) from discard to shuffle into your deck'
+                            : activePrompt.reason === 'cost:discard-from-hand:1' ||
+                                activePrompt.reason?.startsWith('cost:discard-from-hand')
+                              ? 'Pay cost — discard one card from your hand'
+                              : activePrompt.reason === 'cost:discard-self'
+                                ? 'Discard this card to force opponents to discard 2 from hand?'
+                                : activePrompt.reason === 'discard:opponents-hand'
+                                  ? 'Semiconductor — discard cards from your hand'
+                                  : activePrompt.reason === 'retaliate:discard'
+                                    ? 'You may discard another invention in Today (or None)'
                         : activePrompt.reason === 'play:choice'
-                          ? 'Choose one effect'
+                          ? (() => {
+                              const playedId = playedCardIdFromPromptId(
+                                activePrompt.id,
+                              );
+                              const played = G.cards?.[playedId] as
+                                | TimestreamsCard
+                                | undefined;
+                              const playedName =
+                                played?.name || playedId || 'this card';
+                              const targetKey = `${playedId}:choose-target`;
+                              const targetRaw =
+                                G.pendingPlayEffect?.choices?.[targetKey];
+                              const targetId = Array.isArray(targetRaw)
+                                ? targetRaw[0]
+                                : targetRaw;
+                              const target = targetId
+                                ? (G.cards?.[String(targetId)] as
+                                    | TimestreamsCard
+                                    | undefined)
+                                : activePrompt.labelCardId &&
+                                    activePrompt.labelCardId !== playedId
+                                  ? (G.cards?.[
+                                      activePrompt.labelCardId
+                                    ] as TimestreamsCard | undefined)
+                                  : undefined;
+                              const targetName =
+                                target?.name ||
+                                (typeof targetId === 'string' ? targetId : null);
+                              const offTurn =
+                                G.pendingPlayEffect &&
+                                G.pendingPlayEffect.actorPlayerId !== playerID;
+                              if (targetName) {
+                                return offTurn
+                                  ? `${playedName} — YOUR invention “${targetName}”: discard it from play, OR discard 3 cards from your hand`
+                                  : `${playedName} — choose an effect (for ${targetName})`;
+                              }
+                              return `${playedName} — choose one effect`;
+                            })()
                         : activePrompt.reason === 'play:choice-discard'
                           ? 'Choose a card to discard'
                         : activePrompt.reason === 'swap:count:2'
@@ -1655,6 +2917,8 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                           ? 'Time Jump — choose two inventions in different eras'
                         : activePrompt.reason === 'swap:target:self'
                           ? 'Choose an invention to swap with'
+                        : activePrompt.reason === 'crop-swap'
+                          ? 'Crop Rotation — swap with an adjacent invention (or None)'
                         : activePrompt.reason === 'play:extra-turn'
                           ? 'Take an extra turn?'
                         : activePrompt.reason === 'score:swap'
@@ -1751,6 +3015,21 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
               Select a card in Today or Tomorrow to discard.
             </p>
           )}
+          {(activePrompt.reason === 'recover:from-discard' ||
+            activePrompt.reason === 'recover:to-deck' ||
+            activePrompt.reason === 'play:recover') && (
+            <p style={{ fontSize: 12, margin: '0 0 10px', opacity: 0.9 }}>
+              {promptMin === 0
+                ? 'Select a discarded card to return, or None / confirm empty to skip.'
+                : `Select ${promptMax > 1 ? `up to ${promptMax} cards` : 'a card'} from your discard pile.`}
+            </p>
+          )}
+          {(activePrompt.reason === 'cost:discard-from-hand:1' ||
+            activePrompt.reason?.startsWith('cost:discard-from-hand')) && (
+            <p style={{ fontSize: 12, margin: '0 0 10px', opacity: 0.9 }}>
+              Discard one card from your hand to pay for the recovery.
+            </p>
+          )}
           {(activePrompt.reason === 'swap:count:2' ||
             activePrompt.reason === 'swap:different-eras') && (
             <p style={{ fontSize: 12, margin: '0 0 10px', opacity: 0.9 }}>
@@ -1832,16 +3111,8 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
           {activePrompt.kind !== 'choose-number' &&
             activePrompt.reason !== 'score:guess' &&
             activePrompt.reason !== 'score:guess-secret' && (() => {
-              const groupOptsByEra =
-                activePrompt.reason === 'swap:different-eras' ||
-                activePrompt.reason === 'score:perform-other' ||
-                activePrompt.reason === 'score:steal-perform' ||
-                activePrompt.reason === 'score:bonus-copy' ||
-                activePrompt.reason === 'score:penalty-target' ||
-                activePrompt.reason === 'score:move-target' ||
-                activePrompt.reason === 'score:steal-perform' ||
-                activePrompt.reason === 'play:swap';
               const locateOptEra = (id: string): EraId | null => {
+                if (!id || id === '__none__' || id === '') return null;
                 for (const e of ERA_ORDER) {
                   const era = G.timeline[e];
                   if (!era) continue;
@@ -1851,6 +3122,36 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                 }
                 return null;
               };
+              /** Stack/actions order within an era (timeline order), not option-array order. */
+              const sortIdsByEraOrder = (eraId: EraId, ids: string[]): string[] => {
+                const era = G.timeline[eraId];
+                if (!era) return ids;
+                const stack = era.stack ?? [];
+                const actions = era.actions ?? [];
+                return [...ids].sort((a, b) => {
+                  const sa = stack.indexOf(a);
+                  const sb = stack.indexOf(b);
+                  if (sa >= 0 && sb >= 0) return sa - sb;
+                  if (sa >= 0) return -1;
+                  if (sb >= 0) return 1;
+                  const aa = actions.indexOf(a);
+                  const ab = actions.indexOf(b);
+                  if (aa >= 0 && ab >= 0) return aa - ab;
+                  if (aa >= 0) return -1;
+                  if (ab >= 0) return 1;
+                  return 0;
+                });
+              };
+              // Group any choose-card prompt whose options sit on the timeline
+              // (swap, score targets, laser discard, shell game, etc.) so multi-era
+              // picks read top→bottom in era order, matching the board.
+              const erasHit = new Set<EraId>();
+              for (const id of activePrompt.options) {
+                const e = locateOptEra(id);
+                if (e) erasHit.add(e);
+              }
+              const groupOptsByEra =
+                activePrompt.kind === 'choose-card' && erasHit.size >= 1;
               const eraRows: { era: EraId | null; ids: string[] }[] = [];
               if (groupOptsByEra) {
                 const buckets = new Map<EraId | 'other', string[]>();
@@ -1862,7 +3163,10 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                 }
                 for (const e of ERA_ORDER) {
                   if (buckets.has(e)) {
-                    eraRows.push({ era: e, ids: buckets.get(e)! });
+                    eraRows.push({
+                      era: e,
+                      ids: sortIdsByEraOrder(e, buckets.get(e)!),
+                    });
                   }
                 }
                 if (buckets.has('other')) {
@@ -1903,13 +3207,51 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                 const isEraOpt =
                   activePrompt.reason === 'score:move-era' &&
                   (ERA_ORDER as readonly string[]).includes(optId);
+                // Option A/B labels come from the card that carries option-a:/option-b: tags.
+                // Surgical Strike sets labelCardId = *target* invention (for title copy);
+                // Biotechnology sets labelCardId = *copied* card (Laser tags). Prefer the
+                // card that actually has branch tags.
                 const sourceCard = isBranchOpt
-                  ? (G.cards?.[
-                      activePrompt.labelCardId ||
-                        playedCardIdFromPromptId(activePrompt.id)
-                    ] as TimestreamsCard | undefined)
+                  ? (() => {
+                      const playedId = playedCardIdFromPromptId(activePrompt.id);
+                      const labelId = activePrompt.labelCardId;
+                      const played = G.cards?.[playedId] as
+                        | TimestreamsCard
+                        | undefined;
+                      const labeled = labelId
+                        ? (G.cards?.[labelId] as TimestreamsCard | undefined)
+                        : undefined;
+                      const hasBranch = (c?: TimestreamsCard) =>
+                        (c?.tags ?? []).some(
+                          (t) =>
+                            t.startsWith('option-a:') || t.startsWith('option-b:'),
+                        );
+                      if (hasBranch(labeled)) return labeled;
+                      if (hasBranch(played)) return played;
+                      return labeled || played;
+                    })()
                   : undefined;
-                const card = (G.cards?.[optId] || {}) as TimestreamsCard;
+                // Resolve mental-poker point ciphertexts → pack card ids for labels
+                const resolvedOptId =
+                  !isNone && !isPlayerOpt && !isBranchOpt && !isMoveOpt && !isYesNoOpt
+                    ? resolveCardIdFromPoint(G, optId) || optId
+                    : optId;
+                const card = (G.cards?.[resolvedOptId] ||
+                  G.cards?.[optId] ||
+                  {}) as TimestreamsCard;
+                const displayName =
+                  (card?.name && card.name !== card.id && card.name !== optId
+                    ? card.name
+                    : null) ||
+                  (resolvedOptId !== optId && !resolvedOptId.startsWith('0')
+                    ? resolvedOptId
+                        .replace(/^[^#]+-/, '')
+                        .replace(/#\d+$/, '')
+                        .replace(/-/g, ' ')
+                    : null) ||
+                  (optId.length > 16 && /^[0-9a-fA-F]+$/.test(optId)
+                    ? `Encrypted card…${optId.slice(-6)}`
+                    : null);
                 const selected = promptSelection.includes(optId);
                 const pickOrder = selected
                   ? promptSelection.indexOf(optId) + 1
@@ -1952,9 +3294,14 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                               : 'No'
                       : isRedirectTake
                         ? 'Take the hit (this card is discarded)'
-                        : isRedirectOpt && card?.name
-                          ? `Redirect to ${card.name}`
-                          : card.name || optId;
+                        : isRedirectOpt && (card?.name || displayName)
+                          ? `Redirect to ${card.name || displayName}`
+                          : card.name && card.name !== optId
+                            ? card.name
+                            : displayName ||
+                              (optId.length > 20
+                                ? `${optId.slice(0, 8)}…`
+                                : optId);
                 const hoverCard =
                   !isNone &&
                   !isPlayerOpt &&
@@ -1963,9 +3310,15 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                   !isYesNoOpt &&
                   !isRedirectTake &&
                   !isEraOpt &&
-                  card?.id
-                    ? card
+                  (card?.id || card?.imageUrl)
+                    ? card?.id
+                      ? card
+                      : null
                     : null;
+                const isPeekCardOpt =
+                  activePrompt.reason === 'peek:own-to-hand' ||
+                  activePrompt.reason === 'discard:opponent-deck-card' ||
+                  activePrompt.reason === 'play:search-deck';
                 return (
                   <button
                     key={optId || '__empty__'}
@@ -1974,6 +3327,11 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                     data-selected={selected ? 'true' : 'false'}
                     data-pick-order={pickOrder || undefined}
                     data-era={locateOptEra(optId) || undefined}
+                    title={
+                      isNone || isPlayerOpt || isBranchOpt
+                        ? undefined
+                        : card.name || resolvedOptId || optId
+                    }
                     onClick={() => togglePromptOption(optId)}
                     onMouseEnter={() => hoverCard && handleCardHover(hoverCard)}
                     onMouseLeave={() => handleCardHover(null)}
@@ -1991,10 +3349,15 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                           ? isBranchOpt || isYesNoOpt || isRedirectTake || isEraOpt
                             ? 220
                             : 140
+                          : isPeekCardOpt
+                            ? 128
                           : 110,
+                      maxWidth: isPeekCardOpt ? 140 : undefined,
                       minHeight:
                         isBranchOpt || isMoveOpt || isYesNoOpt || isRedirectTake || isEraOpt
                           ? 56
+                          : isPeekCardOpt
+                            ? 72
                           : undefined,
                       padding: 6,
                       borderRadius: 6,
@@ -2004,6 +3367,8 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                       cursor: 'pointer',
                       textAlign: 'left',
                       position: 'relative',
+                      overflow: 'hidden',
+                      flexShrink: 0,
                     }}
                   >
                     {isMultiSelectPrompt && selected && (
@@ -2050,6 +3415,11 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                         <img
                           src={card.imageUrl}
                           alt={label}
+                          onError={(e) => {
+                            // Hide broken art (wrong path / missing deploy file)
+                            (e.currentTarget as HTMLImageElement).style.display =
+                              'none';
+                          }}
                           style={{
                             maxWidth: '100%',
                             maxHeight: '100%',
@@ -2069,6 +3439,8 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                             ? 13
                             : 11,
                         fontWeight: 600,
+                        wordBreak: 'break-word',
+                        lineHeight: 1.25,
                       }}
                     >
                       {label}
@@ -2080,10 +3452,11 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                       !isYesNoOpt &&
                       !isEraOpt && (
                         <div style={{ fontSize: 10, color: '#94a3b8' }}>
-                          {card.cardType || ''}
-                          {locateOptEra(optId)
-                            ? ` · ${ERA_LABELS[locateOptEra(optId)!]}`
-                            : ''}
+                          {formatCardCaption(card, {
+                            eraLabel: locateOptEra(optId)
+                              ? ERA_LABELS[locateOptEra(optId)!]
+                              : undefined,
+                          })}
                         </div>
                       )}
                   </button>
@@ -2166,13 +3539,27 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
                 Confirm choice
               </button>
               {promptSelection.length > 0 && (
-                <span style={{ fontSize: 12 }} data-testid="prompt-selection-label">
+                <span
+                  style={{ fontSize: 12, wordBreak: 'break-word', maxWidth: '70%' }}
+                  data-testid="prompt-selection-label"
+                >
                   Selected:{' '}
                   {promptSelection
-                    .map(
-                      (id) =>
-                        (G.cards?.[id] as TimestreamsCard | undefined)?.name || id,
-                    )
+                    .map((id) => {
+                      if (id === '__none__' || id === '') return 'None';
+                      const resolved = resolveCardIdFromPoint(G, id) || id;
+                      const c =
+                        (G.cards?.[resolved] as TimestreamsCard | undefined) ||
+                        (G.cards?.[id] as TimestreamsCard | undefined);
+                      if (c?.name && c.name !== id && c.name !== resolved) return c.name;
+                      if (
+                        id.length > 16 &&
+                        /^[0-9a-fA-F]+$/.test(id)
+                      ) {
+                        return c?.name || `Card …${id.slice(-6)}`;
+                      }
+                      return c?.name || resolved;
+                    })
                     .join(', ')}
                 </span>
               )}
@@ -2230,6 +3617,9 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
             )}
             <div style={{ flex: 1, minWidth: 180, whiteSpace: 'pre-wrap' }}>
               <strong>{hoveredCard.name || hoveredCard.id}</strong>
+              <div style={{ color: '#94a3b8', marginTop: 4, fontSize: 11 }}>
+                {formatCardCaption(hoveredCard)}
+              </div>
               <div style={{ color: '#94a3b8', marginTop: 4 }}>{composeCardText(hoveredCard)}</div>
             </div>
           </div>

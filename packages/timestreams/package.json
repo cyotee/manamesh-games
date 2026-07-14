@@ -17,7 +17,10 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
+    "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@manamesh/boardgameio-crypto": "workspace:*",
@@ -25,6 +28,7 @@
     "boardgame.io": "^0.50.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "typescript": "^5.0.0",

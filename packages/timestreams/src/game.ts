@@ -87,6 +87,13 @@ import { isMoveBlocked, isDiscardBlocked } from "./effects/boardOps";
 import { timestreamsCardSchema } from "./deck";
 import { materializeHomeEraDecks } from "./deckResolver";
 import type { PackCatalog } from "./packCatalog";
+import {
+  applyFreeTool,
+  disableRulesEngine,
+  type FreeToolArgs,
+  type FreeToolId,
+} from "./freeTools";
+import { debugSeedBoard, type DebugSeedBoardArgs } from "./debugSeed";
 
 // =============================================================================
 // Game Definition
@@ -97,31 +104,73 @@ function nextAfterSetup(G: TimestreamsState): string {
 }
 
 /**
- * Toggle rules engine mid-game (synced over P2P). Any player may call this —
- * no turn check — so a broken rules path can be disabled without waiting for
- * the current player.
+ * Rules engine policy (RULES_OFF_PRD §2.1):
+ * - Default ON; host setup value is shared.
+ * - Mid-game: only disable (ON→OFF) is allowed.
+ * - Re-enable is forbidden once OFF / rulesLockedOff.
  */
 function setRulesEnabledMove(
   G: TimestreamsState,
   enabled: boolean,
-): void {
+  playerId?: string,
+): typeof INVALID_MOVE | void {
   if (!G.config) {
     G.config = { ...DEFAULT_CONFIG };
   }
-  G.config.rulesEnabled = !!enabled;
-  if (!enabled) {
-    // Drop any half-resolved prompt queue so play can continue structurally.
-    G.pendingPrompts = [];
+  // One-way: never re-enable after lock or once already OFF.
+  if (enabled) {
+    if (G.config.rulesEnabled === false || G.config.rulesLockedOff) {
+      return INVALID_MOVE;
+    }
+    // Already ON — no-op
+    return;
   }
+  // Disable path
+  if (G.config.rulesEnabled === false) {
+    return; // already off
+  }
+  disableRulesEngine(G, playerId ?? "?");
 }
 
-/** Shared move map fragment for the diagnostic toggle (every phase that needs it). */
+/** Shared move map fragment for the rules toggle + free tools. */
 const setRulesEnabledMoveDef = {
   setRulesEnabled: {
-    move: ({ G }: { G: TimestreamsState }, enabled: boolean) => {
-      setRulesEnabledMove(G, enabled);
+    move: (
+      { G, playerID }: { G: TimestreamsState; playerID?: string | null },
+      enabled: boolean,
+    ) => {
+      const r = setRulesEnabledMove(G, enabled, playerID ?? undefined);
+      if (r === INVALID_MOVE) return INVALID_MOVE;
     },
     client: false,
+  },
+  /** Structural free tools when rulesEnabled === false (RULES_OFF_PRD). */
+  freeTool: {
+    move: (
+      {
+        G,
+        ctx,
+        playerID,
+      }: { G: TimestreamsState; ctx: Ctx; playerID?: string | null },
+      toolId: FreeToolId,
+      args: FreeToolArgs = {},
+    ) => {
+      const pid = playerID ?? ctx.currentPlayer;
+      if (!pid) return INVALID_MOVE;
+      const r = applyFreeTool(G, pid, toolId, args, ctx.currentPlayer);
+      if (r === "INVALID_MOVE") return INVALID_MOVE;
+    },
+    ...CONCURRENT,
+  },
+  /**
+   * Stage board for e2e when config.debugSeed === true.
+   * Concurrent so either dual-seat can call it.
+   */
+  debugSeedBoard: {
+    move: ({ G }: { G: TimestreamsState }, args: DebugSeedBoardArgs = {}) => {
+      if (!debugSeedBoard(G, args)) return INVALID_MOVE;
+    },
+    ...CONCURRENT,
   },
 };
 
@@ -130,8 +179,11 @@ function beginPlayPhase(G: TimestreamsState): void {
   G.phase = "play";
   if (!G.currentDay || G.currentDay < 1) G.currentDay = 1;
   // Day 1 first player = earliest home era (RULES.md).
+  // turn.order.first reads dayFirstPlayer (must not mutate frozen G).
+  // startOfDayPending stays false so the first endTurn advances normally;
+  // endDay re-sets it for subsequent days.
   G.dayFirstPlayer = dayFirstPlayer(G, G.currentDay);
-  G.startOfDayPending = true;
+  G.startOfDayPending = false;
   // Replace placeholders with home-era decks from the asset pack catalog (if any).
   materializeHomeEraDecks(G);
   // Plaintext: materialize hands from the card registry immediately.
@@ -150,27 +202,36 @@ function beginPlayPhase(G: TimestreamsState): void {
  * - extraTurns (Androids / Inflation — same player goes again)
  * - skipNextTurn (skip and clear the flag)
  */
+/** Mutate a property only when the object is extensible/writable (not frozen G). */
+function trySet<T extends object, K extends keyof T>(obj: T, key: K, value: T[K]): void {
+  try {
+    obj[key] = value;
+  } catch {
+    // boardgame.io freezes G during turn-order next(); skip side effects
+  }
+}
+
 export function resolveNextPlayOrderPos(
   G: TimestreamsState,
   ctx: Ctx,
 ): number {
   if (G.startOfDayPending) {
-    G.startOfDayPending = false;
+    trySet(G, "startOfDayPending", false);
     const pid = G.dayFirstPlayer || dayFirstPlayer(G, G.currentDay || 1);
-    G.dayFirstPlayer = pid;
+    trySet(G, "dayFirstPlayer", pid);
     return playOrderIndexForPlayer(G, pid);
   }
 
   const current = ctx.currentPlayer;
   const flags = getTurnFlags(G, current);
   if (flags.extraTurns > 0) {
-    flags.extraTurns -= 1;
+    trySet(flags, "extraTurns", flags.extraTurns - 1);
     // Extra turn continues for this player (Androids: noInvention already set).
     return playOrderIndexForPlayer(G, current);
   }
 
   // Leaving this player's turn sequence — clear per-turn restrictions.
-  flags.noInventionThisTurn = false;
+  trySet(flags, "noInventionThisTurn", false);
 
   const order = homeEraTurnOrder(G);
   if (order.length === 0) {
@@ -186,7 +247,7 @@ export function resolveNextPlayOrderPos(
     const pid = order[idx];
     const f = getTurnFlags(G, pid);
     if (f.skipNextTurn) {
-      f.skipNextTurn = false;
+      trySet(f, "skipNextTurn", false);
       continue;
     }
     return playOrderIndexForPlayer(G, pid);
@@ -579,10 +640,11 @@ export const TimestreamsGame: Game<TimestreamsState> = {
            * Within a day, turns cycle homeEraTurnOrder until all pass.
            */
           first: ({ G }: { G: TimestreamsState }) => {
+            // Do not mutate G here — boardgame.io freezes state during turn-order
+            // init (assigning dayFirstPlayer throws "read only property").
+            // beginPlayPhase / endDay already set dayFirstPlayer + startOfDayPending.
             const pid =
               G.dayFirstPlayer || dayFirstPlayer(G, G.currentDay || 1);
-            G.dayFirstPlayer = pid;
-            G.startOfDayPending = false;
             return playOrderIndexForPlayer(G, pid);
           },
           next: ({ G, ctx }: { G: TimestreamsState; ctx: Ctx }) =>
@@ -700,8 +762,11 @@ export const TimestreamsModule: GameModule<TimestreamsCard, TimestreamsState> = 
   },
 
   validateMove: (state: TimestreamsState, playerID: string, moveName: string, ...args: unknown[]): MoveValidation => {
-    // Structural-only when rules engine is disabled for testing.
+    // Free tools + structural play when rules engine is off.
     if (state.config?.rulesEnabled === false) {
+      if (moveName === "setRulesEnabled" && args[0] === true) {
+        return { valid: false, reason: "rules cannot be re-enabled this match" };
+      }
       return { valid: true };
     }
     // Basic rules enforcement (government, protect/move/discard blocks)

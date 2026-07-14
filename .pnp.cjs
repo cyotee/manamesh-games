@@ -78,7 +78,7 @@ const RAW_RUNTIME_STATE =
       [null, {\
         "packageLocation": "./",\
         "packageDependencies": [\
-          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=8418e4&locator=manamesh-games%40workspace%3A."],\
+          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=28b120&locator=manamesh-games%40workspace%3A."],\
           ["boardgameIO-p2p", "virtual:460ae0435c0880f54642fa954af09a5f090edfaa5481a02c409e9fea8b372ce668ff538e3ccf06479b00839dbe98d51ef2883fc035e6d964db05091fcc462866#file:./packages/boardgameIO-p2p#./packages/boardgameIO-p2p::hash=41dea3&locator=manamesh-games%40workspace%3A."],\
           ["manamesh-games", "workspace:."]\
         ],\
@@ -6800,6 +6800,7 @@ const RAW_RUNTIME_STATE =
           ["@manamesh/boardgameio-crypto", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#workspace:packages/boardgameio-crypto"],\
           ["@manamesh/frontend", "workspace:packages/manamesh/packages/frontend"],\
           ["@manamesh/timestreams", "workspace:packages/timestreams"],\
+          ["@playwright/test", "npm:1.61.1"],\
           ["boardgame.io", "workspace:packages/boardgame.io"],\
           ["react", "npm:18.3.1"],\
           ["react-dom", "virtual:4d4f64bfc76919a077056f5d9871226905de0f8013f7205009c425fa58a95305892e629d1108de4743196c79fa28e31bdcd20878f27b0c30488679597a47fa87#npm:18.3.1"],\
@@ -7667,6 +7668,16 @@ const RAW_RUNTIME_STATE =
           ["pvtsutils", "npm:1.3.6"],\
           ["tslib", "npm:2.8.1"],\
           ["tsyringe", "npm:4.10.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@playwright/test", [\
+      ["npm:1.61.1", {\
+        "packageLocation": "../../../.yarn/berry/cache/@playwright-test-npm-1.61.1-8d56fe0fbb-10c0.zip/node_modules/@playwright/test/",\
+        "packageDependencies": [\
+          ["@playwright/test", "npm:1.61.1"],\
+          ["playwright", "npm:1.61.1"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -13510,14 +13521,14 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["boardgame.io", [\
-      ["file:./packages/boardgame.io#./packages/boardgame.io::hash=8418e4&locator=manamesh-games%40workspace%3A.", {\
-        "packageLocation": "../../../.yarn/berry/cache/boardgame.io-file-857b918aa2-10c0.zip/node_modules/boardgame.io/",\
+      ["file:./packages/boardgame.io#./packages/boardgame.io::hash=28b120&locator=manamesh-games%40workspace%3A.", {\
+        "packageLocation": "../../../.yarn/berry/cache/boardgame.io-file-e6a199ecbe-10c0.zip/node_modules/boardgame.io/",\
         "packageDependencies": [\
           ["@koa/cors", "npm:3.4.3"],\
           ["@koa/router", "npm:10.1.1"],\
           ["@types/koa", "npm:2.15.2"],\
           ["@types/koa__router", "npm:8.0.11"],\
-          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=8418e4&locator=manamesh-games%40workspace%3A."],\
+          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=28b120&locator=manamesh-games%40workspace%3A."],\
           ["flatted", "npm:3.4.2"],\
           ["immer", "npm:9.0.21"],\
           ["koa", "npm:2.16.4"],\
@@ -13644,7 +13655,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./.yarn/__virtual__/boardgameIO-p2p-virtual-6bd14d68fc/4/.yarn/berry/cache/boardgameIO-p2p-file-588b196e75-10c0.zip/node_modules/boardgameIO-p2p/",\
         "packageDependencies": [\
           ["@types/boardgame.io", null],\
-          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=8418e4&locator=manamesh-games%40workspace%3A."],\
+          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=28b120&locator=manamesh-games%40workspace%3A."],\
           ["boardgameIO-p2p", "virtual:460ae0435c0880f54642fa954af09a5f090edfaa5481a02c409e9fea8b372ce668ff538e3ccf06479b00839dbe98d51ef2883fc035e6d964db05091fcc462866#file:./packages/boardgameIO-p2p#./packages/boardgameIO-p2p::hash=41dea3&locator=manamesh-games%40workspace%3A."],\
           ["peerjs", "npm:1.5.5"],\
           ["tweetnacl", "npm:1.0.3"],\
@@ -18844,6 +18855,14 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["fsevents", [\
+      ["patch:fsevents@npm%3A2.3.2#optional!builtin<compat/fsevents>::version=2.3.2&hash=df0bf1", {\
+        "packageLocation": "./.yarn/unplugged/fsevents-patch-19706e7e35/node_modules/fsevents/",\
+        "packageDependencies": [\
+          ["fsevents", "patch:fsevents@npm%3A2.3.2#optional!builtin<compat/fsevents>::version=2.3.2&hash=df0bf1"],\
+          ["node-gyp", "npm:12.3.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["patch:fsevents@npm%3A2.3.3#optional!builtin<compat/fsevents>::version=2.3.3&hash=df0bf1", {\
         "packageLocation": "./.yarn/unplugged/fsevents-patch-6b67494872/node_modules/fsevents/",\
         "packageDependencies": [\
@@ -23488,7 +23507,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:.", {\
         "packageLocation": "./",\
         "packageDependencies": [\
-          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=8418e4&locator=manamesh-games%40workspace%3A."],\
+          ["boardgame.io", "file:./packages/boardgame.io#./packages/boardgame.io::hash=28b120&locator=manamesh-games%40workspace%3A."],\
           ["boardgameIO-p2p", "virtual:460ae0435c0880f54642fa954af09a5f090edfaa5481a02c409e9fea8b372ce668ff538e3ccf06479b00839dbe98d51ef2883fc035e6d964db05091fcc462866#file:./packages/boardgameIO-p2p#./packages/boardgameIO-p2p::hash=41dea3&locator=manamesh-games%40workspace%3A."],\
           ["manamesh-games", "workspace:."]\
         ],\
@@ -25708,6 +25727,26 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/platform-npm-1.3.6-8c3cef9352-10c0.zip/node_modules/platform/",\
         "packageDependencies": [\
           ["platform", "npm:1.3.6"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["playwright", [\
+      ["npm:1.61.1", {\
+        "packageLocation": "../../../.yarn/berry/cache/playwright-npm-1.61.1-55c1fb1408-10c0.zip/node_modules/playwright/",\
+        "packageDependencies": [\
+          ["fsevents", "patch:fsevents@npm%3A2.3.2#optional!builtin<compat/fsevents>::version=2.3.2&hash=df0bf1"],\
+          ["playwright", "npm:1.61.1"],\
+          ["playwright-core", "npm:1.61.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["playwright-core", [\
+      ["npm:1.61.1", {\
+        "packageLocation": "../../../.yarn/berry/cache/playwright-core-npm-1.61.1-0f9bd8b431-10c0.zip/node_modules/playwright-core/",\
+        "packageDependencies": [\
+          ["playwright-core", "npm:1.61.1"]\
         ],\
         "linkType": "HARD"\
       }]\

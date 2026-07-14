@@ -1,5 +1,9 @@
 # Timestreams Tag Test Gap Report
 
+> **Superseded for engine correctness (2026-07-10).**  
+> Use **[RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md)** and **[RULES_ENGINE_GAP_CLOSURE_PLAN.md](./RULES_ENGINE_GAP_CLOSURE_PLAN.md)**.  
+> This document remains as a historical tag-string inventory. Many items marked covered later were only non-throwing smokes (`p1Families.full.test.ts`), not behavioral proof.
+
 **Date:** 2026-07-08  
 **Sources:** pack manifests (`assets/packs/timestreams/**/manifest.json`), `assets/packs/tag_definitions.md`, tests under `src/**/*.test.ts(x)`.
 

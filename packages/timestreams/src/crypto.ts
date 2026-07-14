@@ -42,6 +42,7 @@ import {
   resetSetupPlayer,
 } from "@manamesh/boardgameio-crypto";
 import { assignRandomHomeEras } from "./homeEra";
+import { hydrateCardFromPack, registerCard } from "./effects/state";
 
 // =============================================================================
 // Helpers
@@ -192,6 +193,10 @@ export function createCryptoInitialState(
     ...moduleConfig,
     deckSize,
   };
+  // Host started with rules OFF → locked for the whole match (no re-enable).
+  if (resolvedConfig.rulesEnabled === false) {
+    resolvedConfig.rulesLockedOff = true;
+  }
 
   // Setup is the true starting phase (home eras). Mental-poker keyExchange
   // follows only when playMode === "mental-poker".
@@ -216,6 +221,23 @@ export function createCryptoInitialState(
     cards: cardRegistry,
     activityLog: [],
     pendingDealRemaining: {},
+    // Pre-seed bags so rules-engine getters never need to extend frozen G
+    // (playerView / turn-order freeze G during React render & endTurn).
+    turnFlags: Object.fromEntries(
+      playerOrder.map((pid) => [
+        pid,
+        {
+          skipNextTurn: false,
+          extraTurns: 0,
+          noInventionThisTurn: false,
+          allowNextInventionEra: null,
+        },
+      ]),
+    ),
+    attachments: {},
+    modifiers: [],
+    pendingTriggers: [],
+    pendingPrompts: [],
   };
 
   // Seed card visibility for every card across all players' decks
@@ -231,8 +253,7 @@ export function createCryptoInitialState(
  * Safe to call only when decks are still unencrypted.
  */
 export function dealPlaintextHands(G: TimestreamsState, day = 1): void {
-  const numPlayers = G.playerOrder.length;
-  const drawCount = G.config.drawTable[numPlayers] ?? 6;
+  const drawCount = drawCountForPlayers(G);
 
   for (const playerId of G.playerOrder) {
     const player = G.players[playerId];
@@ -250,10 +271,16 @@ export function dealPlaintextHands(G: TimestreamsState, day = 1): void {
     for (let i = 0; i < count; i++) {
       const top = deck.shift();
       if (!top) break;
-      const cardId = top.ciphertext;
+      // Prefer registry id; plain decks store card id as ciphertext.
+      const cardId =
+        resolveCardIdFromPoint(G, top.ciphertext) ||
+        (!looksLikeSecpPointHex(top.ciphertext) ? top.ciphertext : null) ||
+        top.ciphertext;
       const fromRegistry = G.cards?.[cardId];
+      // Always stamp ownerId = drawing player so decider:target-owner prompts
+      // (Surgical Strike, etc.) match the seat that owns the invention.
       const card: TimestreamsCard = fromRegistry
-        ? { ...fromRegistry }
+        ? { ...fromRegistry, ownerId: playerId }
         : {
             id: cardId,
             name: cardId,
@@ -272,6 +299,13 @@ export function dealPlaintextHands(G: TimestreamsState, day = 1): void {
       if (G.cardVisibility) {
         G.cardVisibility[cardId] = "owner-known";
       }
+    }
+  }
+
+  // Clear any stale mental-poker deal queue after a plain deal.
+  if (G.pendingDealRemaining) {
+    for (const pid of G.playerOrder) {
+      G.pendingDealRemaining[pid] = 0;
     }
   }
 
@@ -729,12 +763,38 @@ function ensureCardPointLookup(G: TimestreamsState): Record<string, string> {
   return lookup;
 }
 
+/** True if string looks like a secp hex point (compressed 02/03 or uncompressed 04). */
+export function looksLikeSecpPointHex(s: string): boolean {
+  if (!s || typeof s !== "string") return false;
+  const t = s.trim();
+  if (t.length < 16) return false;
+  if (!/^[0-9a-fA-F]+$/.test(t)) return false;
+  return t.startsWith("02") || t.startsWith("03") || t.startsWith("04");
+}
+
 /** Map fully-peeled curve point ciphertext back to a known card id. */
 export function resolveCardIdFromPoint(
   G: TimestreamsState,
   pointCiphertext: string,
 ): string | null {
-  const want = secpPointNormalizeHex(pointCiphertext);
+  // Plain card ids (tests / after peek rewrite) — never feed to secp
+  if (!looksLikeSecpPointHex(pointCiphertext)) {
+    if (G.cards?.[pointCiphertext]) return pointCiphertext;
+    for (const pid of G.playerOrder) {
+      for (const c of G.encryptedDecks[pid] ?? []) {
+        if (c.layers === 0 && c.ciphertext === pointCiphertext) {
+          return c.ciphertext;
+        }
+      }
+    }
+    return null;
+  }
+  let want: string;
+  try {
+    want = secpPointNormalizeHex(pointCiphertext);
+  } catch {
+    return null;
+  }
   const lookup = ensureCardPointLookup(G);
   for (const [cardId, hex] of Object.entries(lookup)) {
     if (hex === want) return cardId;
@@ -758,7 +818,7 @@ export function requestDraw(
   ownerId: string,
   cardIndex: number,
   requestedBy: string,
-  purpose: "draw" | "search" = "draw",
+  purpose: "draw" | "search" | "peek" = "draw",
 ): void {
   const nonOwners = G.playerOrder.filter((pid) => pid !== ownerId);
   // Full peel: everyone removes their layer; owner last so final plaintext is available.
@@ -780,6 +840,8 @@ export function requestDraw(
     G,
     purpose === "search"
       ? `P${requestedBy} requested full-deck decrypt (search)`
+      : purpose === "peek"
+        ? `P${requestedBy} requested decrypt for peek (P${ownerId} deck)`
       : `P${requestedBy} requested decrypt for P${ownerId}'s draw`,
     "decrypt",
   );
@@ -898,6 +960,282 @@ function enqueueNextSearchDecrypt(G: TimestreamsState): void {
   }
   requestDraw(G, op.ownerId, 0, op.ownerId, "search");
   op.statusMessage = `Decrypting deck for search… ${op.decryptDone}/${op.decryptTotal}`;
+}
+
+/**
+ * Fortune Teller–style peek: decrypt the top `count` cards of `ownerId`'s deck,
+ * rewrite them as plain card ids on top of the deck, then open a choose prompt.
+ * Returns true if a prompt was opened or decrypt started; false if deck empty.
+ */
+export function startPeekReveal(
+  G: TimestreamsState,
+  ownerId: string,
+  sourceCardId: string,
+  count: number,
+  opts: {
+    allowNone: boolean;
+    reason: "peek:own-to-hand" | "discard:opponent-deck-card";
+    /** Player who answers the prompt (usually the Fortune Teller player). */
+    deciderId: string;
+  },
+): boolean {
+  const deck = G.encryptedDecks[ownerId] ?? [];
+  const n = Math.min(Math.max(0, count), deck.length);
+  if (n === 0) return false;
+
+  // Fully plain deck: resolve ids and open prompt immediately (no cooperative peel).
+  if (!deckHasEncryption(G, ownerId)) {
+    const revealed: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const raw = deck[i].ciphertext;
+      const cardId =
+        resolveCardIdFromPoint(G, raw) ||
+        (!looksLikeSecpPointHex(raw) ? raw : null) ||
+        raw;
+      deck[i] = { ciphertext: cardId, layers: 0 };
+      ensurePlainCardRegistered(G, cardId, ownerId);
+      revealed.push(cardId);
+    }
+    openPeekChoosePrompt(G, sourceCardId, opts.deciderId, revealed, opts);
+    return true;
+  }
+
+  // Mixed or encrypted: start a peek-deck op. Plain tops are drained first
+  // (board cannot peel layers===0); remaining encrypted tops use requestDraw.
+  const commits: Record<string, string | null> = {};
+  const reveals: Record<string, string | null> = {};
+  for (const pid of G.playerOrder) {
+    commits[pid] = null;
+    reveals[pid] = null;
+  }
+  const op: ActiveDeckOp = {
+    id: `peek:${sourceCardId}:${Date.now()}`,
+    kind: "peek-deck",
+    sourceCardId,
+    ownerId,
+    phase: "decrypt",
+    decryptTotal: n,
+    decryptDone: 0,
+    revealed: [],
+    toHand: opts.reason === "peek:own-to-hand",
+    shuffleAfter: false,
+    shuffleCommits: commits,
+    shuffleReveals: reveals,
+    finalSeedHex: null,
+    reencryptPlayerIndex: 0,
+    statusMessage: `Decrypting top ${n} for peek… 0/${n}`,
+    peekAllowNone: opts.allowNone,
+    peekReason: opts.reason,
+  };
+  G.activeDeckOp = op;
+  if (G.playEffectsComplete) delete G.playEffectsComplete[sourceCardId];
+  G.pendingPlayEffect = {
+    cardId: sourceCardId,
+    actorPlayerId: opts.deciderId,
+    kind: G.pendingPlayEffect?.kind || "action",
+    choices: { ...(G.pendingPlayEffect?.choices || {}) },
+  };
+  pushActivityLog(
+    G,
+    `P${opts.deciderId} peek — decrypting top ${n} of P${ownerId}'s deck`,
+    "decrypt",
+  );
+  enqueueNextPeekDecrypt(G);
+  return true;
+}
+
+function ensurePlainCardRegistered(
+  G: TimestreamsState,
+  cardId: string,
+  ownerId: string,
+): void {
+  if (!G.cards) G.cards = {};
+  if (G.cards[cardId]) {
+    hydrateCardFromPack(G, G.cards[cardId]);
+    return;
+  }
+  const card: TimestreamsCard = {
+    id: cardId,
+    name: cardId,
+    ownerId,
+    cardType: "invention",
+    subtypes: [],
+    hasPlayEffect: false,
+    hasScoreEffect: true,
+    hasReact: false,
+    scoreValue: 1,
+    tags: [],
+  };
+  registerCard(G, card);
+}
+
+function openPeekChoosePrompt(
+  G: TimestreamsState,
+  sourceCardId: string,
+  deciderId: string,
+  revealed: string[],
+  opts: {
+    allowNone: boolean;
+    reason: "peek:own-to-hand" | "discard:opponent-deck-card";
+  },
+): void {
+  const options =
+    opts.reason === "peek:own-to-hand" && opts.allowNone
+      ? [...revealed, "__none__"]
+      : [...revealed];
+  const promptId =
+    opts.reason === "peek:own-to-hand"
+      ? `${sourceCardId}:peek-own-hand`
+      : `${sourceCardId}:peek-opp-discard`;
+  G.pendingPrompts = [
+    {
+      id: promptId,
+      deciderId,
+      kind: "choose-card",
+      options,
+      min: 1,
+      max: 1,
+      reason: opts.reason,
+    },
+  ];
+  if (G.playEffectsComplete) delete G.playEffectsComplete[sourceCardId];
+  G.pendingPlayEffect = {
+    cardId: sourceCardId,
+    actorPlayerId: deciderId,
+    kind: G.pendingPlayEffect?.kind || "action",
+    choices: { ...(G.pendingPlayEffect?.choices || {}) },
+  };
+  if (G.activeDeckOp?.kind === "peek-deck") {
+    G.activeDeckOp.phase = "choose";
+    G.activeDeckOp.statusMessage = "Choose a peeked card";
+  }
+}
+
+/**
+ * Consume already-plain (layers===0) tops into a peek op without cooperative peel.
+ * Required because the board skips peels when layers===0 (cannot re-encrypt).
+ */
+function takePlainTopsIntoPeekOp(G: TimestreamsState, op: ActiveDeckOp): void {
+  const deck = G.encryptedDecks[op.ownerId] ?? [];
+  while (
+    op.decryptDone < op.decryptTotal &&
+    deck.length > 0 &&
+    (deck[0].layers ?? 0) === 0
+  ) {
+    const raw = deck[0].ciphertext;
+    const cardId =
+      resolveCardIdFromPoint(G, raw) ||
+      (!looksLikeSecpPointHex(raw) ? raw : null) ||
+      raw;
+    deck.shift();
+    op.revealed.push(cardId);
+    op.decryptDone += 1;
+    ensurePlainCardRegistered(G, cardId, op.ownerId);
+    pushActivityLog(
+      G,
+      `Peek plain ${op.decryptDone}/${op.decryptTotal} for P${op.ownerId}: ${cardId}`,
+      "decrypt",
+    );
+  }
+  op.statusMessage = `Decrypting for peek… ${op.decryptDone}/${op.decryptTotal}`;
+}
+
+/**
+ * If a pending decrypt request targets a plain top card, materialize it immediately
+ * so the pipeline cannot stall (board never peels layers===0).
+ */
+function materializeStuckPlainDecryptRequests(
+  G: TimestreamsState,
+  ownerId: string,
+): void {
+  const pending = [...(G.pendingDecryptRequests ?? [])];
+  for (const req of pending) {
+    if (req.deckOwnerId !== ownerId || req.materialized) continue;
+    const deck = G.encryptedDecks[ownerId];
+    if (!deck) continue;
+    const card = deck[req.cardIndex];
+    if (!card || (card.layers ?? 0) !== 0) continue;
+    req.currentLayer = req.requiredLayers.length;
+    req.status = "complete";
+    materializeCompletedDraw(G, req);
+  }
+}
+
+function enqueueNextPeekDecrypt(G: TimestreamsState): void {
+  const op = G.activeDeckOp;
+  if (!op || op.kind !== "peek-deck" || op.phase !== "decrypt") return;
+
+  // Unstick plain tops that were queued as cooperative peels.
+  materializeStuckPlainDecryptRequests(G, op.ownerId);
+  takePlainTopsIntoPeekOp(G, op);
+
+  if (op.decryptDone >= op.decryptTotal) {
+    finishPeekDecrypt(G);
+    return;
+  }
+  if (hasActiveDecrypt(G, op.ownerId)) return;
+
+  const deck = G.encryptedDecks[op.ownerId] ?? [];
+  if (deck.length === 0) {
+    finishPeekDecrypt(G);
+    return;
+  }
+
+  // Top is plain → drain more plains (should be no-ops after takePlainTops)
+  if ((deck[0].layers ?? 0) === 0) {
+    takePlainTopsIntoPeekOp(G, op);
+    if (op.decryptDone >= op.decryptTotal || deck.length === 0) {
+      finishPeekDecrypt(G);
+    } else if ((deck[0]?.layers ?? 0) > 0) {
+      requestDraw(G, op.ownerId, 0, op.ownerId, "peek");
+      op.statusMessage = `Decrypting for peek… ${op.decryptDone}/${op.decryptTotal}`;
+    }
+    return;
+  }
+
+  requestDraw(G, op.ownerId, 0, op.ownerId, "peek");
+  op.statusMessage = `Decrypting for peek… ${op.decryptDone}/${op.decryptTotal}`;
+}
+
+function finishPeekDecrypt(G: TimestreamsState): void {
+  const op = G.activeDeckOp;
+  if (!op || op.kind !== "peek-deck") return;
+  const deck = G.encryptedDecks[op.ownerId] ?? (G.encryptedDecks[op.ownerId] = []);
+  // Put revealed plain ids back on top in original order (first revealed = top).
+  for (let i = op.revealed.length - 1; i >= 0; i--) {
+    const id = op.revealed[i];
+    deck.unshift({ ciphertext: id, layers: 0 });
+    ensurePlainCardRegistered(G, id, op.ownerId);
+  }
+  // Prefer original actor (Fortune Teller player) — may have been wiped if
+  // another card was played mid-decrypt; fall back to deck owner / op.
+  const deciderId =
+    G.pendingPlayEffect?.cardId === op.sourceCardId
+      ? G.pendingPlayEffect.actorPlayerId
+      : op.ownerId;
+  openPeekChoosePrompt(G, op.sourceCardId, deciderId, [...op.revealed], {
+    allowNone: !!op.peekAllowNone,
+    reason: op.peekReason || "peek:own-to-hand",
+  });
+  // Always re-bind pendingPlayEffect so submitPlayChoice works after interruption.
+  G.pendingPlayEffect = {
+    cardId: op.sourceCardId,
+    actorPlayerId: deciderId,
+    kind: G.pendingPlayEffect?.kind || "action",
+    choices: {
+      ...(G.pendingPlayEffect?.cardId === op.sourceCardId
+        ? G.pendingPlayEffect.choices
+        : {}),
+    },
+  };
+  if (G.playEffectsComplete) delete G.playEffectsComplete[op.sourceCardId];
+  pushActivityLog(
+    G,
+    `Peek ready — ${op.revealed.length} card(s) revealed for P${deciderId}`,
+    "decrypt",
+  );
+  // Keep op until peek executor finishes (or clear on choose)
+  op.phase = "choose";
 }
 
 function finishSearchDecrypt(G: TimestreamsState): void {
@@ -1151,8 +1489,93 @@ function hasActiveDecrypt(G: TimestreamsState, ownerId: string): boolean {
   );
 }
 
+function drawCountForPlayers(G: TimestreamsState): number {
+  const n = G.playerOrder.length;
+  const table = G.config?.drawTable ?? DEFAULT_CONFIG.drawTable;
+  return table[n] ?? DEFAULT_CONFIG.drawTable[n] ?? 6;
+}
+
 /**
- * If the player still needs draws and has no in-flight request, enqueue top-card decrypt.
+ * Instantly materialize the top plain (layers===0) deck card into hand.
+ * Used when mental-poker layers are already gone or playMode is effectively plain.
+ * Returns true if one card was drawn.
+ */
+function materializePlainTopDraw(G: TimestreamsState, ownerId: string): boolean {
+  const deck = G.encryptedDecks[ownerId];
+  if (!deck || deck.length === 0) return false;
+  const top = deck[0];
+  if ((top.layers ?? 0) !== 0) return false;
+
+  const cardId =
+    resolveCardIdFromPoint(G, top.ciphertext) ||
+    (!looksLikeSecpPointHex(top.ciphertext) ? top.ciphertext : null);
+  if (!cardId) {
+    // Unresolvable — drop the slot so the pipeline cannot stall forever.
+    deck.shift();
+    pushActivityLog(
+      G,
+      `P${ownerId}: plain draw skipped (unresolved id)`,
+      "deal",
+    );
+    return false;
+  }
+
+  const fromRegistry = G.cards?.[cardId];
+  const card: TimestreamsCard = fromRegistry
+    ? { ...fromRegistry, ownerId }
+    : {
+        id: cardId,
+        name: cardId,
+        ownerId,
+        cardType: "invention",
+        subtypes: [],
+        hasPlayEffect: false,
+        hasScoreEffect: true,
+        hasReact: false,
+        scoreValue: 1,
+        tags: [],
+      };
+
+  deck.shift();
+  if (!G.cards) G.cards = {};
+  G.cards[card.id] = card;
+  const player = G.players[ownerId];
+  if (!player) return false;
+  player.hand.push(card);
+  if (G.cardVisibility) G.cardVisibility[cardId] = "owner-known";
+  if (G.pendingDealRemaining && G.pendingDealRemaining[ownerId] > 0) {
+    G.pendingDealRemaining[ownerId] -= 1;
+  }
+  pushActivityLog(G, `P${ownerId} drew ${card.name || cardId} (plain)`, "deal");
+  return true;
+}
+
+/**
+ * Drain pending plain draws immediately (no crypto). Safe when top is layers 0.
+ */
+function drainPlainDraws(G: TimestreamsState, ownerId: string): void {
+  if (!G.pendingDealRemaining) return;
+  let guard = 64;
+  while ((G.pendingDealRemaining[ownerId] ?? 0) > 0 && guard-- > 0) {
+    const deck = G.encryptedDecks[ownerId];
+    if (!deck?.length) {
+      G.pendingDealRemaining[ownerId] = 0;
+      break;
+    }
+    if ((deck[0].layers ?? 0) !== 0) break;
+    if (!materializePlainTopDraw(G, ownerId)) {
+      // Failed materialize already shifted or stalled — stop if remaining stuck
+      if ((G.pendingDealRemaining[ownerId] ?? 0) > 0 && deck.length === 0) {
+        G.pendingDealRemaining[ownerId] = 0;
+      }
+      break;
+    }
+  }
+}
+
+/**
+ * If the player still needs draws and has no in-flight request, enqueue top-card decrypt
+ * — or materialize immediately when the top card is already plain (layers 0).
  */
 export function enqueueNextDrawIfNeeded(G: TimestreamsState, ownerId: string): void {
   if (!G.pendingDealRemaining) G.pendingDealRemaining = {};
@@ -1164,16 +1587,39 @@ export function enqueueNextDrawIfNeeded(G: TimestreamsState, ownerId: string): v
     return;
   }
   if (hasActiveDecrypt(G, ownerId)) return;
+
+  // Plain top-of-deck: never open a cooperative peel (board skips layers===0).
+  if ((deck[0].layers ?? 0) === 0) {
+    drainPlainDraws(G, ownerId);
+    // If remaining encrypted cards still need decrypt after plain prefix:
+    if ((G.pendingDealRemaining[ownerId] ?? 0) > 0) {
+      const next = G.encryptedDecks[ownerId]?.[0];
+      if (next && (next.layers ?? 0) > 0) {
+        requestDraw(G, ownerId, 0, ownerId);
+      } else if (!next) {
+        G.pendingDealRemaining[ownerId] = 0;
+      }
+    }
+    return;
+  }
+
   requestDraw(G, ownerId, 0, ownerId);
 }
 
 /**
- * Create sequential day-deal decrypt pipeline for each player.
- * One active top-of-deck request at a time; next enqueued after materialize.
+ * Create sequential day-deal pipeline for each player.
+ * Encrypted decks: cooperative decrypt one-at-a-time.
+ * Plain decks (layers 0): instant materialize into hand (no board peel needed).
  */
-export function dealForDay(G: TimestreamsState, _day: number): void {
-  const numPlayers = G.playerOrder.length;
-  const drawCount = G.config.drawTable[numPlayers] ?? 0;
+export function dealForDay(G: TimestreamsState, day: number): void {
+  // Fully plain tables: same path as plaintext playMode (instant deal).
+  const anyEncrypted = G.playerOrder.some((pid) => deckHasEncryption(G, pid));
+  if (!anyEncrypted) {
+    dealPlaintextHands(G, day);
+    return;
+  }
+
+  const drawCount = drawCountForPlayers(G);
   if (!G.pendingDealRemaining) G.pendingDealRemaining = {};
 
   for (const playerId of G.playerOrder) {
@@ -1183,8 +1629,14 @@ export function dealForDay(G: TimestreamsState, _day: number): void {
       continue;
     }
     const count = Math.min(drawCount, deck.length);
-    G.pendingDealRemaining[playerId] = (G.pendingDealRemaining[playerId] ?? 0) + count;
-    pushActivityLog(G, `Dealing ${count} card(s) to P${playerId} (decrypt)`, "deal");
+    G.pendingDealRemaining[playerId] =
+      (G.pendingDealRemaining[playerId] ?? 0) + count;
+    pushActivityLog(
+      G,
+      `Dealing ${count} card(s) to P${playerId}` +
+        (deckHasEncryption(G, playerId) ? " (decrypt)" : " (plain)"),
+      "deal",
+    );
     enqueueNextDrawIfNeeded(G, playerId);
   }
 }
@@ -1222,16 +1674,53 @@ function materializeCompletedDraw(G: TimestreamsState, request: DecryptRequest):
 
   let cardId = resolveCardIdFromPoint(G, enc.ciphertext);
   // Fallback: if somehow still a plain id (unencrypted tests)
-  if (!cardId && enc.ciphertext && !enc.ciphertext.startsWith("04")) {
+  if (!cardId && enc.ciphertext && !looksLikeSecpPointHex(enc.ciphertext)) {
     cardId = enc.ciphertext;
   }
   if (!cardId) {
     pushActivityLog(
       G,
-      `P${request.deckOwnerId}: decrypt complete but card id could not be resolved`,
+      `P${request.deckOwnerId}: decrypt complete but card id could not be resolved — skipping card`,
       "decrypt",
     );
+    // Drop the unresolvable slot so peek/search cannot stall forever at N/M.
+    deck.splice(cardIndex, 1);
     request.materialized = true;
+    request.status = "complete";
+    G.pendingDecryptRequests = G.pendingDecryptRequests.filter(
+      (r) => r.id !== request.id,
+    );
+    if (request.purpose === "peek") {
+      const op = G.activeDeckOp;
+      if (
+        op &&
+        op.kind === "peek-deck" &&
+        op.ownerId === request.deckOwnerId &&
+        op.phase === "decrypt"
+      ) {
+        // Count as done without a usable id so the pipeline can finish.
+        op.decryptDone += 1;
+        op.statusMessage = `Decrypting for peek… ${op.decryptDone}/${op.decryptTotal}`;
+        if (op.decryptDone >= op.decryptTotal || deck.length === 0) {
+          finishPeekDecrypt(G);
+        } else {
+          enqueueNextPeekDecrypt(G);
+        }
+      }
+    } else if (request.purpose === "search") {
+      const op = G.activeDeckOp;
+      if (op && op.ownerId === request.deckOwnerId && op.phase === "decrypt") {
+        op.decryptDone += 1;
+        if (deck.length === 0) finishSearchDecrypt(G);
+        else enqueueNextSearchDecrypt(G);
+      }
+    } else if (G.pendingDealRemaining?.[request.deckOwnerId]) {
+      G.pendingDealRemaining[request.deckOwnerId] = Math.max(
+        0,
+        (G.pendingDealRemaining[request.deckOwnerId] ?? 1) - 1,
+      );
+      enqueueNextDrawIfNeeded(G, request.deckOwnerId);
+    }
     return;
   }
 
@@ -1280,6 +1769,27 @@ function materializeCompletedDraw(G: TimestreamsState, request: DecryptRequest):
     return;
   }
 
+  // --- Peek: decrypt top N, stage in revealed, then put plain ids back on deck ---
+  if (request.purpose === "peek") {
+    const op = G.activeDeckOp;
+    if (op && op.kind === "peek-deck" && op.ownerId === request.deckOwnerId && op.phase === "decrypt") {
+      op.revealed.push(cardId);
+      op.decryptDone += 1;
+      op.statusMessage = `Decrypting for peek… ${op.decryptDone}/${op.decryptTotal}`;
+      pushActivityLog(
+        G,
+        `Peek decrypt ${op.decryptDone}/${op.decryptTotal} for P${op.ownerId}`,
+        "decrypt",
+      );
+      if (op.decryptDone >= op.decryptTotal || deck.length === 0) {
+        finishPeekDecrypt(G);
+      } else {
+        enqueueNextPeekDecrypt(G);
+      }
+    }
+    return;
+  }
+
   // --- Normal draw into hand ---
   const player = G.players[request.deckOwnerId];
   if (!player) return;
@@ -1314,14 +1824,34 @@ export function submitDecryptionShare(
   if (!request) return INVALID_MOVE;
   if (request.status === "complete" && request.materialized) return INVALID_MOVE;
 
-  const expectedPlayerId = request.requiredLayers[request.currentLayer];
-  if (expectedPlayerId !== playerId) return INVALID_MOVE;
-
   const deck = G.encryptedDecks[request.deckOwnerId];
   if (!deck) return INVALID_MOVE;
 
   const { cardIndex } = request;
   if (cardIndex < 0 || cardIndex >= deck.length) return INVALID_MOVE;
+
+  // Card already plain (layers 0): any required peels are no-ops — materialize now.
+  // Prevents Fortune Teller / day-deal stalls when tops are plain but a peel was queued.
+  const existing = deck[cardIndex];
+  if (existing && (existing.layers ?? 0) === 0) {
+    // Allow any player in requiredLayers (or deck owner) to complete plain materialize.
+    const allowed =
+      request.requiredLayers.includes(playerId) ||
+      playerId === request.deckOwnerId;
+    if (!allowed) return INVALID_MOVE;
+    request.currentLayer = request.requiredLayers.length;
+    request.status = "complete";
+    pushActivityLog(
+      G,
+      `P${playerId} materialized plain card for P${request.deckOwnerId} (${request.purpose || "draw"})`,
+      "decrypt",
+    );
+    materializeCompletedDraw(G, request);
+    return G;
+  }
+
+  const expectedPlayerId = request.requiredLayers[request.currentLayer];
+  if (expectedPlayerId !== playerId) return INVALID_MOVE;
 
   deck[cardIndex] = share;
   request.currentLayer++;
