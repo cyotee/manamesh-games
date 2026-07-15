@@ -2,10 +2,12 @@ addl
 Allomancy
 Allomantic
 Atium
+atts
 boardgame
 boardgameio
 cardtype
 Chainmail
+choosable
 Cybertechnology
 Cогогате
 Daniele
@@ -13,6 +15,7 @@ deckbuilder
 Deckbuilding
 discarder
 elim
+goldens
 Immortalıty
 Kelsier
 libp

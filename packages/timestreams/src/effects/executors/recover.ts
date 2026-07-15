@@ -118,8 +118,9 @@ export const recoverExecutor: Executor = ({ G, playerId, card, choices }) => {
       G.encryptedDecks[playerId].push({ ciphertext: c.id, layers: 0 } as any);
       log.push(`${card.id}: recovered ${c.id} to deck`);
     }
-    if (hasTag(card, 'play:shuffle-after')) {
-      const deck = G.encryptedDecks[playerId];
+    // R15: always shuffle after recover-to-deck (play:shuffle-after is redundant).
+    const deck = G.encryptedDecks[playerId];
+    if (deck.length > 1) {
       for (let i = deck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [deck[i], deck[j]] = [deck[j], deck[i]];

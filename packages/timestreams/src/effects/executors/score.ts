@@ -114,6 +114,11 @@ export function resolveCardScoreEffectsFull(
    * Targeting one closes the loop (steal still applies; ability not re-run).
    */
   performChain: Set<string> = new Set(),
+  /**
+   * Preview mode: compute extras/discards/steals without mutating board
+   * (used for era-medieval steal prompt prediction).
+   */
+  preview = false,
 ): ScoreEffectResult {
   const out = emptyResult();
   if (!card || !card.tags) return out;
@@ -121,8 +126,10 @@ export function resolveCardScoreEffectsFull(
     out.log.push(`${card.id}: perform-other depth cap`);
     return out;
   }
-  if (!G.firedTags) G.firedTags = [];
-  G.firedTags.push(`score:${card.id || 'unknown'}`);
+  if (!preview) {
+    if (!G.firedTags) G.firedTags = [];
+    G.firedTags.push(`score:${card.id || 'unknown'}`);
+  }
 
   const choiceStr = (key: string) => {
     const v = choices[key];
@@ -424,7 +431,7 @@ export function resolveCardScoreEffectsFull(
           break;
         }
       }
-      if (ok && swapPositions(G, aId, bId)) {
+      if (ok && !preview && swapPositions(G, aId, bId)) {
         out.log.push(`${card.id}: score-swapped ${aId} <-> ${bId}`);
         // International Diplomacy etc.: each swapped card may retaliate if moved by opponent
         for (const mid of [aId, bId]) {
@@ -444,6 +451,8 @@ export function resolveCardScoreEffectsFull(
             ] as any;
           }
         }
+      } else if (ok && preview) {
+        out.log.push(`${card.id}: score-swap preview ${aId} <-> ${bId}`);
       } else if (ok) {
         out.log.push(`${card.id}: score-swap fizzles (locate failed)`);
       }
@@ -453,7 +462,7 @@ export function resolveCardScoreEffectsFull(
       const eras = erasForScope(G, scope, card.id);
       const exclude = hasTag(card, 'target:exclude-self') ? card.id : undefined;
       const cands = candidateTargets(G, { kind: 'invention', eras, excludeCardId: exclude });
-      if (cands.length >= 2 && swapPositions(G, cands[0], cands[1])) {
+      if (cands.length >= 2 && !preview && swapPositions(G, cands[0], cands[1])) {
         out.log.push(`${card.id}: score-swapped ${cands[0]} <-> ${cands[1]} (auto)`);
       }
     } else {
@@ -557,6 +566,10 @@ export function resolveCardScoreEffectsFull(
           out.log.push(
             `${card.id}: score-move of ${tid} cancelled (era-stone once-per-game)`,
           );
+        } else if (preview) {
+          out.log.push(
+            `${card.id}: score-move preview ${tid} → ${destEra} (${destPos})`,
+          );
         } else {
           moveToEra(G, tid, destEra, destPos);
           out.log.push(`${card.id}: moved ${tid} to ${destEra} (${destPos})`);
@@ -655,7 +668,7 @@ export function resolveCardScoreEffectsFull(
             const nextChain = new Set(performChain);
             nextChain.add(card.id);
             mergeNestedScore(out, resolveCardScoreEffectsFull(
-              G, targetCard, eraId, _slotIndex, choices, _depth + 1, nextChain,
+              G, targetCard, eraId, _slotIndex, choices, _depth + 1, nextChain, preview,
             ));
             out.log.push(`${card.id}: perform-other ability of ${targetId} (as self)`);
           }
@@ -667,7 +680,7 @@ export function resolveCardScoreEffectsFull(
           const nextChain = new Set(performChain);
           nextChain.add(card.id);
           mergeNestedScore(out, resolveCardScoreEffectsFull(
-            G, targetCard, eraId, _slotIndex, choices, _depth + 1, nextChain,
+            G, targetCard, eraId, _slotIndex, choices, _depth + 1, nextChain, preview,
           ));
           out.log.push(`${card.id}: perform-other ability of ${targetId}`);
         }
@@ -884,13 +897,17 @@ export function resolveCardScoreEffectsFull(
       if (hasOptions) {
         const delta = slotDeltaFromScoreChoice(card, ch);
         if (delta) {
-          const adj = adjustEraScoringSlots(
-            G,
-            eraId as EraId,
-            delta,
-            `${delta > 0 ? '+' : ''}${delta} scoring slot(s) in ${eraId}`,
-          );
-          if (adj) out.log.push(`${card.id}: ${adj.note}`);
+          if (!preview) {
+            const adj = adjustEraScoringSlots(
+              G,
+              eraId as EraId,
+              delta,
+              `${delta > 0 ? '+' : ''}${delta} scoring slot(s) in ${eraId}`,
+            );
+            if (adj) out.log.push(`${card.id}: ${adj.note}`);
+          } else {
+            out.log.push(`${card.id}: score-choice preview slot delta ${delta}`);
+          }
         }
       } else if (
         (ch === 'yes' || ch === 'option-a' || ch === 'add') &&
@@ -898,13 +915,17 @@ export function resolveCardScoreEffectsFull(
       ) {
         const n = tagNumber(card, 'score:add-scoring-slots') || 0;
         if (n) {
-          const adj = adjustEraScoringSlots(
-            G,
-            eraId as EraId,
-            n,
-            `+${n} scoring slot(s) in ${eraId}`,
-          );
-          if (adj) out.log.push(`${card.id}: ${adj.note}`);
+          if (!preview) {
+            const adj = adjustEraScoringSlots(
+              G,
+              eraId as EraId,
+              n,
+              `+${n} scoring slot(s) in ${eraId}`,
+            );
+            if (adj) out.log.push(`${card.id}: ${adj.note}`);
+          } else {
+            out.log.push(`${card.id}: score-choice preview +${n} slots`);
+          }
         }
       }
     } else {
@@ -926,7 +947,11 @@ export function resolveCardScoreEffectsFull(
   }
 
   // Mark first-score after a successful resolution of a first-score card
-  if (hasTag(card, 'condition:first-score') && !hasUsedFirstScore(G, card.id)) {
+  if (
+    !preview &&
+    hasTag(card, 'condition:first-score') &&
+    !hasUsedFirstScore(G, card.id)
+  ) {
     markFirstScoreUsed(G, card.id);
   }
 

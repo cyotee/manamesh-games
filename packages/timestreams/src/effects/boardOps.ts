@@ -84,10 +84,31 @@ export function moveToEra(
   return true;
 }
 
+/**
+ * Attach an action onto a host invention. playAction initially parks actions in
+ * discard; once attached the card lives on the host (attachments map), not discard.
+ */
 export function attachTo(G: TimestreamsState, actionCardId: string, hostCardId: string): void {
   const attachments = getAttachments(G);
   if (!attachments[hostCardId]) attachments[hostCardId] = [];
-  attachments[hostCardId].push(actionCardId);
+  if (!attachments[hostCardId].includes(actionCardId)) {
+    attachments[hostCardId].push(actionCardId);
+  }
+  // Leave discard so the action is "on" the invention (Coronation, Inflation, …).
+  removeCardFromAllDiscards(G, actionCardId);
+}
+
+/** Remove a card id from every player's discard (attach / re-host paths). */
+export function removeCardFromAllDiscards(
+  G: TimestreamsState,
+  cardId: string,
+): void {
+  for (const pid of G.playerOrder) {
+    const p = G.players[pid];
+    if (!p?.discard?.length) continue;
+    const ix = p.discard.findIndex((c) => c.id === cardId);
+    if (ix >= 0) p.discard.splice(ix, 1);
+  }
 }
 
 export function discardFromPlay(G: TimestreamsState, cardId: string, actorPlayerId: string): boolean {

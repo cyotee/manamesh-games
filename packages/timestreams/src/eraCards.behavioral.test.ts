@@ -45,7 +45,9 @@ describe("era-medieval steal:bonus-points", () => {
       }),
     );
 
-    resolveScoring(G);
+    resolveScoring(G, {
+      "era-medieval:steal-bonus:medieval-poetry#0:0": "yes",
+    });
     expect(G.phase).toBe("gameOver");
     // P0 (medieval) should have stolen the +3; P1 printed only
     expect(G.scores!["0"]).toBeGreaterThanOrEqual(3);

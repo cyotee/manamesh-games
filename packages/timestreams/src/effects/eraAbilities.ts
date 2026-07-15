@@ -215,6 +215,68 @@ export function applyModernEraBeginRecover(
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Era-Medieval: steal bonus ledger deltas (interactive prompt, not auto)
+// ---------------------------------------------------------------------------
+
+export interface EraMedievalStealOffer {
+  eraCardId: string;
+  ownerId: string;
+  /** scoreChoices / prompt id */
+  promptId: string;
+  /** player who would receive the ledger delta if not stolen */
+  bonusOwnerId: string;
+  amount: number;
+  sourceCardId: string;
+  eventIndex: number;
+}
+
+/** Active era-medieval steal source still eligible (once-per-game not spent). */
+export function getEraMedievalStealSource(
+  G: TimestreamsState,
+): { eraCardId: string; ownerId: string } | null {
+  const ownerId = playerWithHomeEra(G, "medieval");
+  if (!ownerId) return null;
+  const eraCard =
+    findEraCardForPlayer(G, ownerId, "era-medieval") ||
+    (G.cards?.["era-medieval"] as TimestreamsCard | undefined) ||
+    null;
+  if (!eraCard) return null;
+  if (!hasTag(eraCard, "steal:bonus-points")) return null;
+  if (hasTag(eraCard, "limit:once-per-game") && isOncePerGameSpent(G, eraCard.id)) {
+    return null;
+  }
+  return { eraCardId: eraCard.id, ownerId };
+}
+
+/**
+ * Prompt: Medieval player may steal this ledger delta (yes) or leave it (no).
+ * Decider is always the medieval owner.
+ */
+export function eraMedievalStealPrompt(
+  offer: EraMedievalStealOffer,
+): PlayerPrompt {
+  return {
+    id: offer.promptId,
+    deciderId: offer.ownerId,
+    kind: "choose-option",
+    options: ["yes", "no"],
+    min: 1,
+    max: 1,
+    reason: "era-medieval-steal",
+    labelCardId: offer.eraCardId,
+  };
+}
+
+/** Build prompt id for a predicted/applied bonus event (must match addBonus sequencing). */
+export function eraMedievalStealPromptId(
+  eraCardId: string,
+  sourceCardId: string,
+  eventIndex: number,
+): string {
+  return `${eraCardId}:steal-bonus:${sourceCardId}:${eventIndex}`;
+}
+
 /**
  * Future era begin (scoring): optional +2 scoring slots.
  * Call when the scoring walk first enters the future era.

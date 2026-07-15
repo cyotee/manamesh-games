@@ -98,15 +98,18 @@ function evaluateOneCondition(tag: string, ctx: ConditionContext): boolean {
     return !hasUsedFirstScore(G, card.id);
   }
   if (rest === "attached-to-first-invention-of-era") {
+    // Positional: evaluated at process time against live stack order (not invent-time).
+    // "First invention" = stack index 0 in this era (oldest under append/push).
+    // If earlier score effects reordered the stack, use the host's position now.
     const host = Object.entries(G.attachments || {}).find(([, list]) =>
       list.includes(card.id),
     )?.[0];
     if (host) {
       const hloc = locateCard(G, host);
-      return !!hloc && hloc.index === 0;
+      return !!hloc && hloc.era === eraId && hloc.index === 0;
     }
     const loc = locateCard(G, card.id);
-    return !!loc && loc.index === 0;
+    return !!loc && loc.era === eraId && loc.index === 0;
   }
   if (rest === "today-modern-or-future") {
     return eraId === "modern" || eraId === "future";

@@ -3,7 +3,7 @@ import { ERA_ORDER } from "./types";
 import { scoringSlotCardIds, eraAllCardIds, eraForDay } from "./timeline";
 import { homeEraTurnOrder } from "./homeEra";
 import { effectiveScoreValue, discardFromPlay } from "./effects/boardOps";
-import { getCard, getPendingTriggers } from "./effects/state";
+import { getCard, getPendingTriggers, getAttachments } from "./effects/state";
 import { hasTag, tagNumber, tagValue, isOptionalFor } from "./effects/tags";
 import { resolveCardScoreEffectsFull } from "./effects/executors/score";
 import { fireEvent } from "./effects/triggers";
@@ -24,7 +24,12 @@ import {
   getEraStoneCancelOffer,
   eraStoneCancelPrompt,
   scoreMutationCancelledByEraStone,
+  getEraMedievalStealSource,
+  eraMedievalStealPrompt,
+  eraMedievalStealPromptId,
+  type EraMedievalStealOffer,
 } from "./effects/eraAbilities";
+
 import { registerCard } from "./effects/state";
 import { pushActivityLog } from "./crypto";
 import {
@@ -42,6 +47,69 @@ export function cardOwner(cardId: string, G?: TimestreamsState): string {
   }
   const parts = cardId.split("-card-");
   return parts[0] || "";
+}
+
+/** True when an attached action has its own score ability (Coronation +4, …). */
+function attachmentHasScoreAbility(
+  card: { hasScoreEffect?: boolean; tags?: string[] } | undefined,
+): boolean {
+  if (!card) return false;
+  if (card.hasScoreEffect) return true;
+  return (card.tags || []).some((t) => t.startsWith("score:"));
+}
+
+/**
+ * Attachment score timing relative to host.
+ * Default: before host (`attached:score:before` implicit).
+ * Opt-in after: `attached:score:after`.
+ */
+function attachmentScoreTiming(
+  card: { tags?: string[] } | undefined,
+): "before" | "after" {
+  if (card && hasTag(card as any, "attached:score:after")) return "after";
+  return "before";
+}
+
+/** Next unprocessed score-bearing attachment on a host for the given timing. */
+function nextAttachmentOnHost(
+  G: TimestreamsState,
+  hostId: string,
+  processedHere: string[],
+  timing: "before" | "after",
+): string | null {
+  for (const attId of getAttachments(G)[hostId] ?? []) {
+    if (processedHere.includes(attId)) continue;
+    const att = getCard(G, attId);
+    if (!attachmentHasScoreAbility(att)) continue;
+    if (attachmentScoreTiming(att) !== timing) continue;
+    return attId;
+  }
+  return null;
+}
+
+/**
+ * Send host attachments to their owners' discards and clear the map entry.
+ * Freeze host printed value (Hibernation ±modify) into scoreValueOverrides first
+ * so pile recompute still sees the modified value after attachments leave.
+ */
+function discardAttachmentsOfHost(G: TimestreamsState, hostId: string): void {
+  const atts = getAttachments(G);
+  const list = [...(atts[hostId] ?? [])];
+  if (!list.length) return;
+  if (!(G as any).scoreValueOverrides) (G as any).scoreValueOverrides = {};
+  const overrides = (G as any).scoreValueOverrides as Record<string, number>;
+  if (overrides[hostId] === undefined) {
+    overrides[hostId] = effectiveScoreValue(G, hostId);
+  }
+  delete atts[hostId];
+  for (const attId of list) {
+    if (isInAnyScorePile(G, attId)) continue;
+    const att = getCard(G, attId);
+    if (!att || !G.players[att.ownerId]) continue;
+    if (!G.players[att.ownerId].discard.some((x) => x.id === attId)) {
+      G.players[att.ownerId].discard.push(att);
+    }
+  }
 }
 
 /** Player to the left of `playerId` in `playerOrder` (guess:by:left-neighbor). */
@@ -338,6 +406,138 @@ function findBonusStealSources(G: TimestreamsState): { id: string; ownerId: stri
   return out;
 }
 
+/**
+ * Expand a score-effect result into ordered ledger deltas (matches applyScoreForStep
+ * addBonus call order: full.other entries, then all-players or owner extra).
+ */
+function expandBonusLedgerEvents(
+  G: TimestreamsState,
+  card: { id: string; ownerId?: string; tags?: string[] },
+  full: { extra: number; other: Record<string, number> },
+): { pid: string; amount: number }[] {
+  const events: { pid: string; amount: number }[] = [];
+  // Stable order (playerOrder) so prompt indices match applyScoreForStep
+  for (const pid of G.playerOrder) {
+    const n = full.other?.[pid];
+    if (n) events.push({ pid, amount: n });
+  }
+  for (const [pid, n] of Object.entries(full.other || {})) {
+    if (G.playerOrder.includes(pid)) continue;
+    if (n) events.push({ pid, amount: n });
+  }
+  const extra = full.extra || 0;
+  if (extra) {
+    if (hasTag(card as any, "score:to:all-players")) {
+      for (const pid of G.playerOrder) {
+        events.push({ pid, amount: extra });
+      }
+    } else if (card.ownerId) {
+      events.push({ pid: card.ownerId, amount: extra });
+    }
+  }
+  return events;
+}
+
+/**
+ * Predict ledger deltas without mutating the board.
+ * Uses resolveCardScoreEffectsFull(..., preview=true) so count/perform/nested/
+ * DS/copy paths match apply order for era-medieval steal prompts.
+ */
+function predictBonusLedgerEvents(
+  G: TimestreamsState,
+  card: NonNullable<ReturnType<typeof getCard>>,
+  eraId: EraId,
+  slotIndex: number,
+  choices: Record<string, string | string[]>,
+): { pid: string; amount: number }[] {
+  const full = resolveCardScoreEffectsFull(
+    G,
+    card,
+    eraId,
+    slotIndex,
+    choices,
+    0,
+    new Set(),
+    true, // preview — no board mutation
+  );
+  return expandBonusLedgerEvents(G, card, full);
+}
+
+/** First unanswered medieval steal prompt for a list of ledger events (ordered). */
+function firstUnansweredMedievalStealPrompt(
+  G: TimestreamsState,
+  sourceCardId: string,
+  events: { pid: string; amount: number }[],
+): import("./effects/types").PlayerPrompt | null {
+  const src = getEraMedievalStealSource(G);
+  if (!src) return null;
+  const choices = G.scoreChoices || {};
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i]!;
+    if (ev.pid === src.ownerId) continue;
+    if (!ev.amount) continue;
+    const promptId = eraMedievalStealPromptId(src.eraCardId, sourceCardId, i);
+    if (choices[promptId] !== undefined) continue;
+    if (!getEraMedievalStealSource(G)) return null;
+    return eraMedievalStealPrompt({
+      eraCardId: src.eraCardId,
+      ownerId: src.ownerId,
+      promptId,
+      bonusOwnerId: ev.pid,
+      amount: ev.amount,
+      sourceCardId,
+      eventIndex: i,
+    });
+  }
+  return null;
+}
+
+/** Collect first unanswered era-medieval steal prompt for this card's predicted bonuses. */
+function collectEraMedievalStealPrompts(
+  G: TimestreamsState,
+  cardId: string,
+): import("./effects/types").PlayerPrompt[] {
+  const card = getCard(G, cardId);
+  if (!card) return [];
+  if (!getEraMedievalStealSource(G)) return [];
+  const choices = G.scoreChoices || {};
+  const eraId =
+    (G.scoringActiveEra as EraId) ||
+    (G.scoringWalk?.activeEraId as EraId) ||
+    "stone";
+  const slotIndex = G.scoringWalk?.slotsUsedInEra ?? 0;
+  const events = predictBonusLedgerEvents(G, card, eraId, slotIndex, choices);
+  const p = firstUnansweredMedievalStealPrompt(G, cardId, events);
+  return p ? [p] : [];
+}
+
+/**
+ * Queue medieval steal prompt during delayed rescore; returns true if walk must pause.
+ */
+function pauseWalkForMedievalStealIfNeeded(
+  G: TimestreamsState,
+  sourceCardId: string,
+  events: { pid: string; amount: number }[],
+  finishedEra?: EraId,
+): boolean {
+  if (!G.scoringWalk) return false;
+  const p = firstUnansweredMedievalStealPrompt(G, sourceCardId, events);
+  if (!p) return false;
+  G.pendingPrompts = [p] as any;
+  G.scoringWalk.stepPhase = "choice";
+  G.scoringWalk.currentCardId = sourceCardId;
+  G.scoringWalk.lastSummary = `Era-Medieval may steal bonus (${sourceCardId})`;
+  // Flag so submitScoreChoice resumes completeEra (delayed path only)
+  if (finishedEra) {
+    (G as any)._medievalStealPausedEra = finishedEra;
+  }
+  logScore(
+    G,
+    `  ⏳ Waiting for era-medieval steal on ${cardLabel(G, sourceCardId)}`,
+  );
+  return true;
+}
+
 function addBonus(
   G: TimestreamsState,
   pid: string,
@@ -346,29 +546,40 @@ function addBonus(
 ): void {
   if (!amount) return;
 
-  // Positive bonuses may be stolen once-per-game by era-medieval (PRD).
-  if (amount > 0) {
-    for (const src of findBonusStealSources(G)) {
-      if (src.ownerId === pid) continue; // don't steal from self
-      const r = tryStealBonusPoints(G, src.id, pid, amount);
-      if (r.stolen > 0) {
-        const b = ensureBonusPoints(G);
-        b[src.ownerId] = (b[src.ownerId] ?? 0) + r.stolen;
-        // suppress original: do not credit pid
-        if (!G.bonusLedger) G.bonusLedger = [];
-        G.bonusLedger.push({
-          playerId: src.ownerId,
-          amount: r.stolen,
-          sourceCardId: src.id,
-          sourceName: meta?.sourceName,
-          note: `stolen from P${pid} (${meta?.note || "bonus"})`,
-        });
-        logScore(
-          G,
-          `  · era steal: P${src.ownerId} takes +${r.stolen} bonus from P${pid} via ${src.id}`,
-        );
-        return;
-      }
+  // R5: any non-zero ledger delta may be stolen once-per-game — only on explicit
+  // "yes" in scoreChoices (interactive prompt or test pre-answer). Never auto-steal.
+  const sourceCardId = meta?.sourceCardId || "_anon";
+  if (!(G as any)._bonusEventSeq) (G as any)._bonusEventSeq = {};
+  const seqMap = (G as any)._bonusEventSeq as Record<string, number>;
+  const seq = seqMap[sourceCardId] ?? 0;
+  seqMap[sourceCardId] = seq + 1;
+
+  for (const src of findBonusStealSources(G)) {
+    if (src.ownerId === pid) continue; // don't steal from self
+    const promptId = eraMedievalStealPromptId(src.id, sourceCardId, seq);
+    const ans = (G.scoreChoices || {})[promptId];
+    const pick = Array.isArray(ans) ? ans[0] : ans;
+    if (pick !== "yes" && pick !== "steal") {
+      // unanswered or "no" — leave ledger change with original player
+      continue;
+    }
+    const r = tryStealBonusPoints(G, src.id, pid, amount);
+    if (r.stolen !== 0) {
+      const b = ensureBonusPoints(G);
+      b[src.ownerId] = (b[src.ownerId] ?? 0) + r.stolen;
+      if (!G.bonusLedger) G.bonusLedger = [];
+      G.bonusLedger.push({
+        playerId: src.ownerId,
+        amount: r.stolen,
+        sourceCardId: src.id,
+        sourceName: meta?.sourceName,
+        note: `stolen from P${pid} (${meta?.note || "bonus"})`,
+      });
+      logScore(
+        G,
+        `  · era steal: P${src.ownerId} takes ${r.stolen >= 0 ? "+" : ""}${r.stolen} bonus from P${pid} via ${src.id}`,
+      );
+      return;
     }
   }
 
@@ -891,6 +1102,13 @@ export function collectScoreAbilityPrompts(
     }
   }
 
+  // --- Era-Medieval steal (after ability choices that affect bonus amounts) ---
+  // One unanswered steal prompt at a time; requires explicit yes to steal.
+  const medSteal = collectEraMedievalStealPrompts(G, cardId);
+  if (medSteal.length) {
+    prompts.push(...medSteal);
+  }
+
   return prompts;
 }
 
@@ -986,6 +1204,9 @@ function applyScoreForStep(
 ): string {
   if (!(G as any).scoreValueOverrides) (G as any).scoreValueOverrides = {};
   ensureBonusPoints(G);
+  // Match collectEraMedievalStealPrompts event indices for this card apply
+  if (!(G as any)._bonusEventSeq) (G as any)._bonusEventSeq = {};
+  (G as any)._bonusEventSeq[step.cardId] = 0;
 
   G.scoringActiveEra = step.eraId;
   const c = getCard(G, step.cardId);
@@ -1113,8 +1334,22 @@ function applyScoreForStep(
       logScore(G, `  · discard ${cardLabel(G, did)} from play`);
     }
     // Ability bonuses / penalties → bonus ledger (not pile)
-    for (const [pid, n] of Object.entries(full.other)) {
+    // Order matches expandBonusLedgerEvents (playerOrder first)
+    for (const pid of G.playerOrder) {
+      const n = full.other[pid];
       if (!n) continue;
+      addBonus(G, pid, n, {
+        sourceCardId: c.id,
+        sourceName: name,
+        note: "targeted score effect",
+      });
+      logScore(
+        G,
+        `  · bonus ${n >= 0 ? "+" : ""}${n} → P${pid} (from ${name})`,
+      );
+    }
+    for (const [pid, n] of Object.entries(full.other)) {
+      if (G.playerOrder.includes(pid) || !n) continue;
       addBonus(G, pid, n, {
         sourceCardId: c.id,
         sourceName: name,
@@ -1210,10 +1445,11 @@ function humanizeEffectLog(G: TimestreamsState, line: string): string {
 /**
  * Finish an era only when its slots and era-actions are fully processed.
  * Cards stay on the board (movable by later effects) until this runs.
+ * @returns false if paused waiting on era-medieval steal (or similar) prompts.
  */
-function completeEra(G: TimestreamsState, finishedEra: EraId): void {
+function completeEra(G: TimestreamsState, finishedEra: EraId): boolean {
   const walk = G.scoringWalk;
-  if (!walk || walk.erasCompleted.includes(finishedEra)) return;
+  if (!walk || walk.erasCompleted.includes(finishedEra)) return true;
 
   G.scoringActiveEra = finishedEra;
   fireEvent(G, {
@@ -1260,6 +1496,20 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
             -1,
             G.scoreChoices || {},
           );
+          // Pause for medieval steal prompts before applying delayed bonuses
+          const delayEvents = expandBonusLedgerEvents(G, target, full);
+          if (
+            pauseWalkForMedievalStealIfNeeded(
+              G,
+              target.id,
+              delayEvents,
+              finishedEra,
+            )
+          ) {
+            return false;
+          }
+          (G as any)._bonusEventSeq = (G as any)._bonusEventSeq || {};
+          (G as any)._bonusEventSeq[target.id] = 0;
           for (const [pid, n] of Object.entries(full.other)) {
             if (n)
               addBonus(G, pid, n, {
@@ -1310,27 +1560,9 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
           );
         }
 
-        // Score even if not in a scoring slot — claim into inventor's pile
-        if (
-          (hasTag(registrar, "delayed:even-non-scoring") ||
-            hasTag(registrar, "score:delayed")) &&
-          stillInPlay &&
-          !isInAnyScorePile(G, rescoreId)
-        ) {
-          const o = target.ownerId;
-          if (o) {
-            // Remove from stack if still there so cleanup doesn't double-handle
-            const loc = locateCard(G, rescoreId);
-            if (loc && loc.zone !== "actions") {
-              G.timeline[loc.era].stack.splice(loc.index, 1);
-            }
-            pushToScorePile(G, o, rescoreId);
-            logScore(
-              G,
-              `  · delayed bank ${cardLabel(G, rescoreId)} → P${o} pile`,
-            );
-          }
-        }
+        // R8: delayed pass is ability-only — no floating forced pile bank.
+        // Printed value banks via normal slot cleanup when the card sits in a
+        // processed scoring slot of some era.
       }
       if (trigger.limit === "once") trigger.spent = true;
     }
@@ -1351,6 +1583,7 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
           G,
           `  · ${cardLabel(G, cid)} already in a score pile (skip)`,
         );
+        discardAttachmentsOfHost(G, cid);
         continue;
       }
 
@@ -1373,6 +1606,8 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
           );
         }
       }
+      // Attachments ride with the host into discard after their score abilities ran
+      discardAttachmentsOfHost(G, cid);
     }
     for (const actId of [...(era.actions ?? [])]) {
       const card = getCard(G, actId);
@@ -1402,6 +1637,7 @@ function completeEra(G: TimestreamsState, finishedEra: EraId): void {
     `Finished processing ${finishedEra} (pile+bonus display updated)`,
     "system",
   );
+  return true;
 }
 
 /**
@@ -1444,7 +1680,7 @@ function discoverNextStep(G: TimestreamsState): ScoringStep | null {
     if (walk.erasCompleted.includes(eraId)) continue;
     const era = G.timeline[eraId];
     if (!era) {
-      completeEra(G, eraId);
+      if (!completeEra(G, eraId)) return null;
       continue;
     }
 
@@ -1481,25 +1717,59 @@ function discoverNextStep(G: TimestreamsState): ScoringStep | null {
 
     const processedHere = processedInEra(G, eraId);
 
-    // Invention slots (Wonky) — prefer filling open slots before era-actions
-    // when unprocessed inventions remain.
-    if (walk.remainingSlots > 0) {
-      let nextUnscored: string | null = null;
-      for (const cid of era.stack) {
-        if (isInAnyScorePile(G, cid)) continue;
-        if (!processedHere.includes(cid)) {
-          nextUnscored = cid;
-          break;
+    // Invention slots (Wonky): for each host in stack order —
+    //   1) attached score abilities with timing before (default)
+    //   2) the host invention itself
+    //   3) attached score abilities with attached:score:after
+    // Positional conditions (first of era, offset-above, …) evaluate live at process time.
+    if (walk.remainingSlots > 0 || era.stack.some((cid) => processedHere.includes(cid))) {
+      for (const hostId of era.stack) {
+        if (isInAnyScorePile(G, hostId)) continue;
+        const hostDone = processedHere.includes(hostId);
+        // Before-host attachments only while this host still occupies a scoring slot path
+        // (host not yet processed, and slots remain or host is next up).
+        if (!hostDone && walk.remainingSlots > 0) {
+          const beforeAtt = nextAttachmentOnHost(
+            G,
+            hostId,
+            processedHere,
+            "before",
+          );
+          if (beforeAtt) {
+            walk.eraActionsPhase = false;
+            return {
+              eraId,
+              slotIndex: walk.slotsUsedInEra,
+              cardId: beforeAtt,
+              kind: "era-action",
+            };
+          }
+          walk.eraActionsPhase = false;
+          return {
+            eraId,
+            slotIndex: walk.slotsUsedInEra,
+            cardId: hostId,
+            kind: "slot",
+          };
         }
-      }
-      if (nextUnscored) {
-        walk.eraActionsPhase = false;
-        return {
-          eraId,
-          slotIndex: walk.slotsUsedInEra,
-          cardId: nextUnscored,
-          kind: "slot",
-        };
+        // After-host attachments once host ability has been applied
+        if (hostDone) {
+          const afterAtt = nextAttachmentOnHost(
+            G,
+            hostId,
+            processedHere,
+            "after",
+          );
+          if (afterAtt) {
+            walk.eraActionsPhase = false;
+            return {
+              eraId,
+              slotIndex: -1,
+              cardId: afterAtt,
+              kind: "era-action",
+            };
+          }
+        }
       }
     }
 
@@ -1535,7 +1805,10 @@ function discoverNextStep(G: TimestreamsState): ScoringStep | null {
     }
 
     // Era fully processed → cleanup, then try next era
-    completeEra(G, eraId);
+    if (!completeEra(G, eraId)) {
+      // Paused (e.g. era-medieval steal prompt mid-delayed-rescore)
+      return null;
+    }
   }
 
   return null;
@@ -1546,7 +1819,10 @@ function finalizeScoringWalk(G: TimestreamsState): void {
   if (G.scoringWalk) {
     for (const eraId of ERA_ORDER) {
       if (!G.scoringWalk.erasCompleted.includes(eraId)) {
-        completeEra(G, eraId);
+        if (!completeEra(G, eraId)) {
+          // Still waiting on steal prompts — do not finalize
+          return;
+        }
       }
     }
   }
@@ -1590,6 +1866,13 @@ function enterCurrentStep(G: TimestreamsState): boolean {
   const walk = G.scoringWalk!;
   const step = discoverNextStep(G);
   if (!step) {
+    // Mid-era pause (medieval steal on delayed rescore) leaves choice prompts set
+    if (
+      walk.stepPhase === "choice" &&
+      (G.pendingPrompts?.length ?? 0) > 0
+    ) {
+      return false;
+    }
     finalizeScoringWalk(G);
     return true;
   }
@@ -1671,6 +1954,22 @@ function enterCurrentStep(G: TimestreamsState): boolean {
  * processed — then finalize commits them to `G.scores`.
  */
 export function beginScoringPhase(G: TimestreamsState): boolean {
+  // Idempotent guard: never restart an in-flight walk. Double start happens when
+  // forceScoring begins the walk and scoring.onBegin also calls this (or when
+  // deferred endPhase + fallback both fire). Restart wipes bonusPoints while
+  // once-per-game flags remain spent (era-medieval steal becomes a no-op).
+  if (
+    G.scoringWalk &&
+    (G.phase === "scoring" || G.phase === "gameOver") &&
+    (G.scoringWalk.currentCardId != null ||
+      (G.scoringWalk.erasCompleted?.length ?? 0) > 0 ||
+      (G.scoringWalk.steps?.length ?? 0) > 0 ||
+      G.scoringWalk.stepPhase === "ack" ||
+      G.scoringWalk.stepPhase === "choice")
+  ) {
+    return G.phase === "gameOver";
+  }
+
   G.phase = "scoring";
   if (!(G as any).scoreChoices) (G as any).scoreChoices = {};
   G.scoringProcessedByEra = {};
@@ -1679,6 +1978,7 @@ export function beginScoringPhase(G: TimestreamsState): boolean {
   G.bonusPoints = emptyProvisionalScores(G);
   G.bonusLedger = [];
   G.scores = emptyProvisionalScores(G);
+  (G as any)._bonusEventSeq = {};
   // Clear piles from any prior partial run (fresh scoring)
   for (const pid of G.playerOrder) {
     if (G.players[pid]) G.players[pid].scorePile = [];
@@ -1766,6 +2066,25 @@ export function submitScoreChoice(
     G,
     `  ↳ P${playerId} chose [${front.reason || promptId}]: ${choiceDisplay}`,
   );
+
+  // Resume era completion paused for medieval steal during delayed rescore only.
+  // (In-slot steal prompts continue through normal re-collect / apply below.)
+  const pausedEra = (G as any)._medievalStealPausedEra as EraId | undefined;
+  if (
+    pausedEra &&
+    (front.reason === "era-medieval-steal" ||
+      String(front.id).includes(":steal-bonus:"))
+  ) {
+    if (!walk.erasCompleted.includes(pausedEra)) {
+      if (!completeEra(G, pausedEra)) {
+        // Another steal prompt still waiting
+        return false;
+      }
+    }
+    delete (G as any)._medievalStealPausedEra;
+    // Era finished after steal answer — advance walk to next step/era
+    return enterCurrentStep(G);
+  }
 
   // When selecting a perform/steal target, wipe that target's prior answers so
   // nested abilities re-fire (e.g. Mass Marketing bonus-copy after it already
@@ -2042,6 +2361,7 @@ export function resolveScoring(
   G.bonusLedger = [];
   if (!(G as any).scoreValueOverrides) (G as any).scoreValueOverrides = {};
   (G as any).scoringPhase = "slots";
+  (G as any)._bonusEventSeq = {};
   G.scoreChoices = { ...choices, ...(G.scoreChoices || {}) };
   for (const pid of G.playerOrder) {
     if (G.players[pid]) G.players[pid].scorePile = [];
@@ -2052,6 +2372,8 @@ export function resolveScoring(
     eraId: EraId,
     slotIndex: number,
   ) {
+    (G as any)._bonusEventSeq = (G as any)._bonusEventSeq || {};
+    (G as any)._bonusEventSeq[c.id] = 0;
     const owner = c.ownerId || cardOwner(c.id, G);
     const full = resolveCardScoreEffectsFull(
       G,
@@ -2111,7 +2433,9 @@ export function resolveScoring(
       }
       discardFromPlay(G, did, owner || "0");
     }
-    for (const [pid, n] of Object.entries(full.other)) {
+    for (const pid of G.playerOrder) {
+      const n = full.other[pid];
+      if (!n) continue;
       addBonus(G, pid, n, {
         sourceCardId: c.id,
         sourceName: c.name,
@@ -2160,12 +2484,33 @@ export function resolveScoring(
       }
       if (!nextUnscored) break;
 
+      // 1) Attachments with default before-host timing (Coronation, …)
+      {
+        const seen = new Set<string>();
+        let attId: string | null;
+        while (
+          (attId = nextAttachmentOnHost(
+            G,
+            nextUnscored,
+            processedHere(),
+            "before",
+          )) &&
+          !seen.has(attId)
+        ) {
+          seen.add(attId);
+          const ac = getCard(G, attId);
+          if (ac) applyFullToBoard(ac, eraId, slotsUsed);
+          markProcessedInEra(G, eraId, attId);
+        }
+      }
+
       const overrides = (G as any).scoreValueOverrides as Record<string, number>;
       if (overrides[nextUnscored] !== undefined) {
         const card = getCard(G, nextUnscored);
         if (card) card.scoreValue = overrides[nextUnscored];
       }
 
+      // 2) Host invention
       const c = getCard(G, nextUnscored);
       if (c) applyFullToBoard(c, eraId, slotsUsed);
 
@@ -2173,6 +2518,26 @@ export function resolveScoring(
       slotsUsed += 1;
       remainingSlots =
         computeScoringSlotsForEra(G, eraId, G.scoreChoices || {}) - slotsUsed;
+
+      // 3) Attachments tagged attached:score:after
+      {
+        const seen = new Set<string>();
+        let attId: string | null;
+        while (
+          (attId = nextAttachmentOnHost(
+            G,
+            nextUnscored,
+            processedHere(),
+            "after",
+          )) &&
+          !seen.has(attId)
+        ) {
+          seen.add(attId);
+          const ac = getCard(G, attId);
+          if (ac) applyFullToBoard(ac, eraId, -1);
+          markProcessedInEra(G, eraId, attId);
+        }
+      }
     }
 
     for (const actId of era.actions ?? []) {
@@ -2238,17 +2603,7 @@ export function resolveScoring(
               });
             }
           }
-          if (
-            (hasTag(registrar, "delayed:even-non-scoring") ||
-              hasTag(registrar, "score:delayed")) &&
-            !isInAnyScorePile(G, rescoreId)
-          ) {
-            const loc = locateCard(G, rescoreId);
-            if (loc && loc.zone !== "actions") {
-              G.timeline[loc.era].stack.splice(loc.index, 1);
-            }
-            if (target.ownerId) pushToScorePile(G, target.ownerId, rescoreId);
-          }
+          // R8: delayed pass is ability-only — no floating forced pile bank.
         }
         if (trigger.limit === "once") trigger.spent = true;
       }
@@ -2259,7 +2614,10 @@ export function resolveScoring(
     const before = [...era.stack];
     era.stack = [];
     for (const cid of before) {
-      if (isInAnyScorePile(G, cid)) continue;
+      if (isInAnyScorePile(G, cid)) {
+        discardAttachmentsOfHost(G, cid);
+        continue;
+      }
       if (processedList.includes(cid)) {
         const owner = cardOwner(cid, G);
         if (owner) pushToScorePile(G, owner, cid);
@@ -2269,6 +2627,7 @@ export function resolveScoring(
           G.players[card.ownerId].discard.push(card);
         }
       }
+      discardAttachmentsOfHost(G, cid);
     }
     era.actions = [];
   }

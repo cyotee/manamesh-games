@@ -67,9 +67,17 @@ export function applyDebugE2EAct(
       // Mirror end-of-last-day: set phase flag then leave play → scoring.
       G.phase = "scoring";
       if (opts.endPhase) {
+        // Prefer the phase machine: boardgame.io defers endPhase until after this
+        // move, then scoring.onBegin runs beginScoringPhase exactly once.
+        // Calling beginScoringPhase here as well double-starts the walk: the first
+        // pass applies steals/once-per-game, the second resets bonuses and leaves
+        // era-medieval spent (P0 score stuck at 0 in e2e).
         opts.endPhase();
+        // Sync mocks (unit tests) may begin the walk inside endPhase. Real
+        // boardgame.io leaves walk empty until onBegin — do NOT begin here.
+        return { ok: true, phase: G.phase };
       }
-      // If the phase machine did not run onBegin (or events missing), start walk.
+      // No events API (pure unit) — start walk directly.
       if (G.phase === "scoring" && !G.scoringWalk) {
         beginScoringPhase(G);
       }

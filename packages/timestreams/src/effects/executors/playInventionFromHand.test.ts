@@ -36,6 +36,8 @@ describe("playInventionFromHandExecutor (Coronation)", () => {
     expect(G.timeline[era].stack).toContain(invent.id);
     expect(G.players["0"].hand.map((c) => c.id)).not.toContain(invent.id);
     expect(G.attachments?.[invent.id] || []).toContain(coronation.id);
+    // Coronation must sit on the invention — not abandoned in discard
+    expect(G.players["0"].discard.map((c) => c.id)).not.toContain(coronation.id);
   });
 
   it("fizzles when no invention in hand", () => {

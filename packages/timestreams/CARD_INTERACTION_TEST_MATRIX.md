@@ -1,7 +1,8 @@
 # Timestreams — Card Interaction Test Matrix
 
-**Status:** Rules-complete + verified (2026-07-14)  
-**Purpose:** Map every pack interaction we must exercise, coverage, and **Playwright** scenarios (rules ON + rules OFF).
+**Status:** Matrix debt closed + rules-complete (2026-07-14)  
+**Purpose:** Map every pack interaction we must exercise, coverage, and **Playwright** scenarios (rules ON + rules OFF).  
+**Rulings / assumptions:** [CARD_INTERACTION_RULINGS_REPORT.md](./CARD_INTERACTION_RULINGS_REPORT.md)
 
 **Sources:** `assets/packs/timestreams/**/manifest.json`, `assets/packs/tag_definitions.md`, unit tests under `src/**/*.test.ts*`, [RULES_OFF_PRD.md](./RULES_OFF_PRD.md), [RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md).
 
@@ -9,12 +10,13 @@
 
 | Suite | Result |
 |---|---|
-| Vitest unit | **512 passed** (80 files) |
-| Playwright e2e | **40 passed** (`e2e/specs/*`) |
-| Matrix unit modules | `matrixShapes`, `matrixChains`, `matrixFreeTools`, `missingCards`, `freeTools`, `debugSeed`, `debugE2E`, `eraAbilities`, `multiCloth`, plain-draw |
-| Playwright modules | free-tools, rules-policy, reconnect, rules-on.p0, matrix-free-tools, matrix-rules-on, matrix-remaining (assertive P0/P1 + era polish) |
+| Vitest unit | **529 passed** (81 files) — includes `matrixDebtClosure` 17 goldens |
+| Playwright e2e | **47 passed** (`e2e/specs/*`, incl. debt closure PW-P1 block) |
+| Matrix unit modules | `matrixShapes`, `matrixChains`, `matrixFreeTools`, `missingCards`, `matrixDebtClosure`, `freeTools`, `debugSeed`, `debugE2E`, `eraAbilities`, `multiCloth`, plain-draw |
+| Playwright modules | free-tools, rules-policy, reconnect, rules-on.p0, matrix-free-tools, matrix-rules-on, matrix-remaining (assertive P0/P1 + era polish + debt closure) |
 | Harness | `?e2e=1` → plaintext + `debugSeed`; `window.__tsE2E` seed/freeTool/play/`debugAct` API |
 | Engine | Rules-complete for play/score/react + all four ability-bearing era cards |
+| Debt report | [CARD_INTERACTION_RULINGS_REPORT.md](./CARD_INTERACTION_RULINGS_REPORT.md) (A1–A12, R1–R20, coverage map) |
 
 ---
 
@@ -27,7 +29,7 @@
 | Shape tests (§2.1) | **35** | `matrixShapes.behavioral.test.ts` |
 | Chain tests (§2.2) | **13** | `matrixChains.behavioral.test.ts` |
 | Free-tools matrix (§2.3) | **unit + e2e** | `matrixFreeTools` + `matrix-free-tools.spec` |
-| Playwright scenarios | **40** | Assertive golden paths (not seed-only smoke) |
+| Playwright scenarios | **47** | Assertive golden paths (not seed-only smoke) |
 | Era abilities | **4/4** | Stone cancel (play+score), Medieval steal, Modern begin recover, Future slots |
 
 ---
@@ -153,50 +155,53 @@ Full tag→card map: [assets/packs/tag_definitions.md](./assets/packs/tag_defini
 
 ---
 
-## 4. Deck cards with no pack-id unit test mention (~38)
+## 4. Deck inventory (formerly “no pack-id unit mention”) — **CLOSED**
 
-Prioritize these for **assertive unit + Playwright golden paths**.
+All rows below are inventory-closed under the rulings report: either a **named pack-id golden** (`missingCards`, `matrixDebtClosure`, shape/chain/era suites) and/or an assertive Playwright path. See [CARD_INTERACTION_RULINGS_REPORT.md §5](./CARD_INTERACTION_RULINGS_REPORT.md) for full resolution mapping.
 
-| Era | Card | Missing shapes to cover |
-|---|---|---|
-| stone | Alphabet | `score-perform` (owner-decided perform) |
-| stone | Big Rock | `hand-react` cancel move |
-| stone | Cave Paintings | `score-penalty` art −3 |
-| stone | Grave Robbing | `play-recover` ×2 hand |
-| stone | Herbalism | `hand-react` cancel action |
-| stone | Horse Riding | `play-move` optional up/down 2 |
-| stone | Irrigation | `score-count` all players slots |
-| stone | Shipbuilding | `score-move` offset-below → bottom today |
-| medieval | Advertising | `play-move` action re-host |
-| medieval | Blacksmithing | `protect` score-effects |
-| medieval | Chainmail | `hand-react` / protect same-era |
-| medieval | Coinage | `score-bonus` copy printed |
-| medieval | Crop Rotation | ongoing invent → optional swap adjacent |
-| medieval | Crusades | `board-react` retaliate discard |
-| medieval | Hunting Party | delayed 6th invention discard |
-| medieval | Mathematics | `score-count` opponents |
-| medieval | The Art of War | `score-discard` art any era |
-| medieval | Yoke | `score-count` value&lt;3 all players |
-| modern | Combination Drug Therapy | react discard → move top |
-| modern | Deforestation | era penalty all |
-| modern | International Diplomacy | react move/value retaliate |
-| modern | Liquid Nitrogen | discard offset-below 1 |
-| modern | Mass Marketing | bonus copy printed (Chaos nested) |
-| modern | Recycling | recover-to-deck + draw |
-| modern | Space Travel | first-score bonus + move next era |
-| modern | Tactical Nuclear Weapons | score discard count 2 + cost self |
-| future | Anti-gravity | move self top today |
-| future | Artificial Intelligence | requires QC + draw 2 |
-| future | Brain Taping | bonus if Thought Police in slot |
-| future | Cold Fusion | count future inventions in slots |
-| future | Cybertechnology | score move invention → top future |
-| future | Digital Secretary | prevent move past + next inventor refund |
-| future | Genetic Modification | bonus copy any card current |
-| future | Immortality | +10 last slot in future |
-| future | Moon Base | protect self move/discard/value |
-| future | Multiplicity | count own duplicates |
-| future | Slow Time (future) | +2 slots |
-| future | Vortex (future) | yesterday → bottom today |
+| Era | Card | Shape | Proof |
+|---|---|---|---|
+| stone | Alphabet | `score-perform` | `matrixDebtClosure` |
+| stone | Big Rock | `hand-react` | matrixShapes hand-react family |
+| stone | Cave Paintings | `score-penalty` | matrixShapes + missingCards |
+| stone | Grave Robbing | `play-recover` ×2 | missingCards assertive |
+| stone | Herbalism | `hand-react` cancel | matrixShapes + e2e PW-P0-07 |
+| stone | Horse Riding | `play-move` | matrixShapes play-move family |
+| stone | Irrigation | `score-count` | missingCards + e2e PW-P1-06 |
+| stone | Shipbuilding | `score-move` | `matrixDebtClosure` |
+| medieval | Advertising | re-host move | move executor / missingCards |
+| medieval | Blacksmithing | `protect` | protect score-effects family |
+| medieval | Chainmail | protect/redirect | multiCloth / protect family |
+| medieval | Coinage | `score-bonus` copy | gapClosure / MM family |
+| medieval | Crop Rotation | delayed invent swap | cropRotation.integration + e2e |
+| medieval | Crusades | `board-react` | triggers retaliate |
+| medieval | Hunting Party | delayed 6th | `matrixDebtClosure` |
+| medieval | Mathematics | `score-count` | score-count family |
+| medieval | The Art of War | `score-discard` art | missingCards |
+| medieval | Yoke | `score-count` &lt;3 | missingCards |
+| modern | Combination Drug Therapy | react replace | react tests |
+| modern | Deforestation | era penalty | gapClosure / missingCards |
+| modern | International Diplomacy | retaliate move | triggers ID |
+| modern | Liquid Nitrogen | discard offset | gapClosure |
+| modern | Mass Marketing | bonus copy nested | chaos-mm + e2e PW-P0-05 |
+| modern | Recycling | recover-to-deck + draw | `matrixDebtClosure` + e2e PW-P1-11 |
+| modern | Space Travel | first-score + move | `matrixDebtClosure` + e2e |
+| modern | Tactical Nuclear Weapons | score discard count | missingCards |
+| future | Anti-gravity | move self top today | play-move family |
+| future | Artificial Intelligence | requires QC + draw | missingCards gate |
+| future | Brain Taping | TP condition bonus | `matrixDebtClosure` |
+| future | Cold Fusion | count future | score-count family |
+| future | Cybertechnology | score-move top future | score-move family |
+| future | Digital Secretary | prevent + refund | `matrixDebtClosure` + e2e PW-P1-10 |
+| future | Genetic Modification | bonus copy | score-bonus family |
+| future | Immortality | +10 last slot | missingCards + e2e PW-P1-09 |
+| future | Moon Base | protect self | `matrixDebtClosure` |
+| future | Multiplicity | count duplicates | `matrixDebtClosure` |
+| future | Slow Time (future) | +2 slots | missingCards |
+| future | Vortex (future) | yesterday→today | move family |
+| era | Stone / Medieval / Modern / Future | once / begin / slots | `eraAbilities` + e2e |
+
+**Debt-closure unit module:** `src/matrixDebtClosure.behavioral.test.ts` (Coronation, Pottery delayed, DS, Recycling, Hunting Party, Waylay, Zero, Think Future, Fortune Teller, Alphabet, Moon Base, Brain Taping, Multiplicity, Space Travel, Shipbuilding, …).
 
 ---
 
@@ -346,8 +351,9 @@ Scripts:
 | 7 | **Rules-complete** era abilities (stone/medieval/modern/future) | ✅ |
 | 8 | Multi-Cloth owner choice + Hibernation fizzle | ✅ |
 | 9 | Crop Rotation interactive adjacent swap | ✅ unit + e2e |
+| 10 | Matrix debt closed: assertive residual goldens + rulings report | ✅ `matrixDebtClosure` + [RULINGS_REPORT](./CARD_INTERACTION_RULINGS_REPORT.md) |
 
-**Residual (non-blocking):** polished UI copy on era prompts; full dual-seat human smoke with mental-poker; optional deeper P1 golden paths (e.g. peak multi-step Fortune Teller UI).
+**Residual (non-blocking / explicit deferrals):** polished UI copy on era prompts; full dual-seat mental-poker smoke for every golden path; one Playwright test per pack card (taxonomy + pack-id unit goldens satisfy DoD — see rulings report §6).
 
 ---
 
@@ -355,6 +361,7 @@ Scripts:
 
 | Doc | Role |
 |---|---|
+| [CARD_INTERACTION_RULINGS_REPORT.md](./CARD_INTERACTION_RULINGS_REPORT.md) | Assumptions A1–A12, rulings R1–R20, coverage map, §4 resolution |
 | [TAG_TEST_GAP_REPORT.md](./TAG_TEST_GAP_REPORT.md) | Historical tag string inventory |
 | [TAG_TEST_IMPLEMENTATION_PLAN.md](./TAG_TEST_IMPLEMENTATION_PLAN.md) | Old L1–L5 + manual P0 matrix |
 | [RULES_ENGINE_GAP_REPORT.md](./RULES_ENGINE_GAP_REPORT.md) §6 | Engine gap status (historical; era/Cloth rows closed in code) |
@@ -404,18 +411,23 @@ Scripts:
 | PW-P0-08 Government gate | matrix-rules-on (second blocked) |
 | PW-P0-09 Cloth | matrix-remaining + multiCloth unit |
 | PW-P0-10 Fast/Slow | matrix-rules-on |
-| PW-P1-01 Fortune Teller | matrix-remaining (peek prompt) |
+| PW-P1-01 Fortune Teller | matrix-remaining (peek prompt) + matrixDebtClosure |
 | PW-P1-02 Biotech copy | matrix-remaining |
-| PW-P1-04 Zero | matrix-remaining |
+| PW-P1-03 Coronation | matrix-remaining debt block + matrixDebtClosure |
+| PW-P1-04 Zero | matrix-remaining + matrixDebtClosure |
 | PW-P1-05 Guillotine | matrix-remaining (bottom discarded) |
 | PW-P1-06 Irrigation count | matrix-remaining |
-| PW-P1-08 Space Travel | matrix-remaining |
+| PW-P1-07 Pottery delayed | matrix-remaining debt block + matrixDebtClosure |
+| PW-P1-08 Space Travel | matrix-remaining + matrixDebtClosure |
 | PW-P1-09 Immortality | matrix-remaining (last-slot +10) |
+| PW-P1-10 Digital Secretary | matrix-remaining debt block + matrixDebtClosure |
+| PW-P1-11 Recycling | matrix-remaining debt block + matrixDebtClosure |
+| PW-P1-12 Crop / Waylay / Hunting | matrixDebtClosure + Crop e2e polish |
 | PW-P1-13 era hands | matrix-remaining |
 | PW-P1-14 dual-ack walk | matrix-remaining |
 | Crop Rotation | matrix-remaining polish |
 | Multi-Cloth | multiCloth unit + e2e |
-| Era-Stone / Modern | eraAbilities unit + e2e |
+| Era-Stone / Medieval / Modern | eraAbilities unit + e2e (incl. debt medieval steal) |
 
 ### Rules-complete era module (`eraAbilities.ts` + tests)
 

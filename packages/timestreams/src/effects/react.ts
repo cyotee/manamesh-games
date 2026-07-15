@@ -330,7 +330,10 @@ export function markOncePerGameUsed(G: any, cardId: string): void {
   if (!G.oncePerGameUsed.includes(cardId)) G.oncePerGameUsed.push(cardId);
 }
 
-/** Steal bonus points react (era-medieval): once per game when conditions match. */
+/**
+ * Steal bonus points react (era-medieval): once per game when conditions match.
+ * Amount may be positive or negative (R5: any ledger delta).
+ */
 export function tryStealBonusPoints(
   G: any,
   sourceCardId: string,
@@ -340,6 +343,7 @@ export function tryStealBonusPoints(
   const card = G.cards?.[sourceCardId];
   if (!card) return { stolen: 0, log: 'no card' };
   if (!hasTag(card, 'steal:bonus-points')) return { stolen: 0, log: 'no steal' };
+  if (!amount) return { stolen: 0, log: 'zero amount' };
   if (hasTag(card, 'limit:once-per-game') && isOncePerGameSpent(G, sourceCardId)) {
     return { stolen: 0, log: 'once-per-game spent' };
   }
