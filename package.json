@@ -7,14 +7,15 @@
     "packages/manamesh/packages/*"
   ],
   "scripts": {
-    "build": "yarn workspace @manamesh/frontend build",
-    "dev:frontend": "yarn workspace @manamesh/frontend dev",
-    "test:frontend": "yarn workspace @manamesh/frontend test",
+    "build": "yarn workspace @cyotee/manamesh build",
+    "dev:frontend": "yarn workspace @cyotee/manamesh dev",
+    "test:frontend": "yarn workspace @cyotee/manamesh test",
     "build:timestreams-vercel": "node packages/timestreams/scripts/build-vercel.mjs",
     "deploy:timestreams": "node packages/timestreams/scripts/build-vercel.mjs && cd deploy/timestreams && vercel deploy --prod --yes --name timestreams"
   },
   "dependencies": {
+    "@cyotee/boardgame.io": "workspace:*",
     "@cyotee/boardgameio-p2p": "workspace:*",
-    "boardgame.io": "file:./packages/boardgame.io"
+    "boardgame.io": "portal:./packages/boardgame.io"
   }
 }

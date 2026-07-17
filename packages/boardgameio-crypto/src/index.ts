@@ -29,8 +29,17 @@ export * from "./ecdsa";
 // ZK helpers (snarkjs wrapper; circuits live under src/circuits)
 export * from "./zk";
 
-// Range proof snarkjs wrappers
-export * from "./snarkjs-range";
+// Range proof snarkjs wrappers (omit Groth16* types re-exported from ./zk)
+export {
+  generateRangeProof,
+  verifyRangeProof,
+  verifyRangeProofFull,
+  serializeRangeProof,
+  deserializeRangeProof,
+  type RangeProofInput,
+  type RangeProofPublicSignals,
+  type RangeProof,
+} from "./snarkjs-range";
 export { RANGE_PROOF_VKEY } from "./range-proof-vkey";
 
 // boardgame.io setup-flow helpers (absorbed from former @cyotee/boardgameio-crypto)

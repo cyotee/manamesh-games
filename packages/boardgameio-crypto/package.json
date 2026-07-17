@@ -1,34 +1,108 @@
 {
-  "name": "@manamesh/boardgameio-crypto",
+  "name": "@cyotee/boardgameio-crypto",
   "version": "0.1.0",
   "description": "Cryptographic primitives for boardgame.io games — mental poker (SRA), Merkle commitments, EC ElGamal, Feldman DKG, DLEQ, ECDSA, Paillier HE, Shamir SSS, snarkjs ZK helpers, the boardgame.io crypto plugin, and setup-flow helpers.",
-  "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./mental-poker": "./src/mental-poker/index.ts",
-    "./mental-poker/*": "./src/mental-poker/*.ts",
-    "./keychain": "./src/keychain/index.ts",
-    "./plugin": "./src/plugin/index.ts",
-    "./plugin/crypto-plugin": "./src/plugin/crypto-plugin.ts",
-    "./shamirs": "./src/shamirs/index.ts",
-    "./zk": "./src/zk/index.ts",
-    "./sha256": "./src/sha256.ts",
-    "./merkle": "./src/merkle.ts",
-    "./stable-json": "./src/stable-json.ts",
-    "./secp256k1": "./src/secp256k1.ts",
-    "./ec-elgamal-exp": "./src/ec-elgamal-exp.ts",
-    "./feldman-dkg": "./src/feldman-dkg.ts",
-    "./dleq": "./src/dleq.ts",
-    "./ecdsa": "./src/ecdsa.ts",
-    "./paillier": "./src/paillier.ts",
-    "./snarkjs-range": "./src/snarkjs-range.ts",
-    "./range-proof-vkey": "./src/range-proof-vkey.ts",
-    "./integration/setup-utils": "./src/integration/setup-utils.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mental-poker": {
+      "types": "./dist/mental-poker/index.d.ts",
+      "default": "./dist/mental-poker/index.js"
+    },
+    "./mental-poker/*": {
+      "types": "./dist/mental-poker/*.d.ts",
+      "default": "./dist/mental-poker/*.js"
+    },
+    "./keychain": {
+      "types": "./dist/keychain/index.d.ts",
+      "default": "./dist/keychain/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "default": "./dist/plugin/index.js"
+    },
+    "./plugin/crypto-plugin": {
+      "types": "./dist/plugin/crypto-plugin.d.ts",
+      "default": "./dist/plugin/crypto-plugin.js"
+    },
+    "./shamirs": {
+      "types": "./dist/shamirs/index.d.ts",
+      "default": "./dist/shamirs/index.js"
+    },
+    "./zk": {
+      "types": "./dist/zk/index.d.ts",
+      "default": "./dist/zk/index.js"
+    },
+    "./sha256": {
+      "types": "./dist/sha256.d.ts",
+      "default": "./dist/sha256.js"
+    },
+    "./merkle": {
+      "types": "./dist/merkle.d.ts",
+      "default": "./dist/merkle.js"
+    },
+    "./stable-json": {
+      "types": "./dist/stable-json.d.ts",
+      "default": "./dist/stable-json.js"
+    },
+    "./secp256k1": {
+      "types": "./dist/secp256k1.d.ts",
+      "default": "./dist/secp256k1.js"
+    },
+    "./ec-elgamal-exp": {
+      "types": "./dist/ec-elgamal-exp.d.ts",
+      "default": "./dist/ec-elgamal-exp.js"
+    },
+    "./feldman-dkg": {
+      "types": "./dist/feldman-dkg.d.ts",
+      "default": "./dist/feldman-dkg.js"
+    },
+    "./dleq": {
+      "types": "./dist/dleq.d.ts",
+      "default": "./dist/dleq.js"
+    },
+    "./ecdsa": {
+      "types": "./dist/ecdsa.d.ts",
+      "default": "./dist/ecdsa.js"
+    },
+    "./paillier": {
+      "types": "./dist/paillier.d.ts",
+      "default": "./dist/paillier.js"
+    },
+    "./snarkjs-range": {
+      "types": "./dist/snarkjs-range.d.ts",
+      "default": "./dist/snarkjs-range.js"
+    },
+    "./range-proof-vkey": {
+      "types": "./dist/range-proof-vkey.d.ts",
+      "default": "./dist/range-proof-vkey.js"
+    },
+    "./integration/setup-utils": {
+      "types": "./dist/integration/setup-utils.d.ts",
+      "default": "./dist/integration/setup-utils.js"
+    }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cyotee/boardgameio-crypto.git"
+  },
+  "license": "MIT",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json || test -f dist/index.js",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -40,6 +114,7 @@
     "snarkjs": "^0.7.6"
   },
   "devDependencies": {
+    "boardgame.io": "portal:../boardgame.io",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1"
   }

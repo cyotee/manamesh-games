@@ -1,16 +1,33 @@
 {
-  "name": "manamesh-asset-pack-builder",
-  "private": true,
+  "name": "@cyotee/manamesh-asset-pack-builder",
   "version": "0.1.0",
+  "description": "Browser UI (and npx server) for scraping card images and building ManaMesh asset packs",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
+  "bin": "bin/cli.js",
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cyotee/manamesh-asset-pack-builder.git"
+  },
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "prepublishOnly": "npm run build",
+    "start": "node ./bin/cli.js"
   },
   "dependencies": {
     "fflate": "^0.8.2",

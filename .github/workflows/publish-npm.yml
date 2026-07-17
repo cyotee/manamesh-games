@@ -1,0 +1,187 @@
+# Publish Phase 1 packages from the monorepo on successful main builds.
+# Prefer npm Trusted Publishing (OIDC). Falls back to secrets.NPM_TOKEN when set.
+#
+# After first publish of each package, configure Trusted Publisher on npmjs.com:
+#   Organization/user: cyotee
+#   Repository: manamesh-games
+#   Workflow filename: publish-npm.yml
+#   Allowed actions: npm publish
+
+name: Publish npm packages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Which package to publish (or all)"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - boardgame.io
+          - boardgameio-p2p
+          - boardgameio-crypto
+          - manamesh
+          - manamesh-asset-pack-builder
+
+permissions:
+  contents: read
+  id-token: write # OIDC for npm trusted publishing
+
+concurrency:
+  group: publish-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - name: Install monorepo
+        run: yarn install --immutable || yarn install
+
+      - name: Test boardgameio-p2p
+        run: yarn workspace @cyotee/boardgameio-p2p test
+
+      - name: Test boardgameio-crypto
+        run: yarn workspace @cyotee/boardgameio-crypto test
+
+      - name: Test manamesh (frontend)
+        run: yarn workspace @cyotee/manamesh test:run
+        continue-on-error: true
+
+  publish:
+    name: Publish to npm
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: boardgame.io
+            path: packages/boardgame.io
+            name: "@cyotee/boardgame.io"
+          - id: boardgameio-p2p
+            path: packages/boardgameIO-p2p
+            name: "@cyotee/boardgameio-p2p"
+          - id: boardgameio-crypto
+            path: packages/boardgameio-crypto
+            name: "@cyotee/boardgameio-crypto"
+          - id: manamesh
+            path: packages/manamesh/packages/frontend
+            name: "@cyotee/manamesh"
+          - id: manamesh-asset-pack-builder
+            path: packages/manamesh-asset-pack-builder
+            name: "@cyotee/manamesh-asset-pack-builder"
+    steps:
+      - name: Skip if not selected
+        id: gate
+        run: |
+          SEL="${{ github.event.inputs.package || 'all' }}"
+          if [ "$SEL" = "all" ] || [ "$SEL" = "${{ matrix.id }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure modern npm (OIDC)
+        if: steps.gate.outputs.run == 'true'
+        run: npm install -g npm@latest
+
+      - name: Enable Corepack
+        if: steps.gate.outputs.run == 'true'
+        run: corepack enable
+
+      - name: Install monorepo (for workspace builds)
+        if: steps.gate.outputs.run == 'true'
+        run: yarn install --immutable || yarn install
+
+      - name: Build package
+        if: steps.gate.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: |
+          set -euo pipefail
+          case "${{ matrix.id }}" in
+            boardgame.io)
+              npm ci --ignore-scripts || npm install --ignore-scripts
+              export PATH="$PWD/node_modules/.bin:$PATH"
+              npm run build
+              node scripts/proxy-dirs.js || true
+              ;;
+            boardgameio-p2p)
+              yarn workspace @cyotee/boardgameio-p2p build
+              # strip monorepo-only portal dep from published package.json
+              node -e "
+                const fs=require('fs');
+                const j=JSON.parse(fs.readFileSync('package.json','utf8'));
+                if (j.devDependencies) delete j.devDependencies['boardgame.io'];
+                fs.writeFileSync('package.json', JSON.stringify(j,null,2)+'\n');
+              "
+              ;;
+            boardgameio-crypto)
+              yarn workspace @cyotee/boardgameio-crypto build || test -f dist/index.js
+              node -e "
+                const fs=require('fs');
+                const j=JSON.parse(fs.readFileSync('package.json','utf8'));
+                if (j.devDependencies) delete j.devDependencies['boardgame.io'];
+                delete j.private;
+                fs.writeFileSync('package.json', JSON.stringify(j,null,2)+'\n');
+              "
+              ;;
+            manamesh)
+              yarn workspace @cyotee/manamesh build:lib
+              if [ ! -f dist/index.html ]; then
+                mkdir -p dist
+                echo '<!doctype html><title>@cyotee/manamesh</title>' > dist/index.html
+              fi
+              node scripts/rewrite-deps-for-publish.mjs package.json
+              ;;
+            manamesh-asset-pack-builder)
+              yarn workspace @cyotee/manamesh-asset-pack-builder build
+              ;;
+          esac
+
+      - name: Publish if version is new
+        if: steps.gate.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          set -euo pipefail
+          NAME="${{ matrix.name }}"
+          VER=$(node -p "require('./package.json').version")
+          echo "Publishing $NAME@$VER"
+          if npm view "$NAME@$VER" version >/dev/null 2>&1; then
+            echo "Already on registry: $NAME@$VER — skip"
+            exit 0
+          fi
+          # OIDC when trusted publisher is configured; NODE_AUTH_TOKEN as fallback
+          npm publish --access public

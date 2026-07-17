@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    // Mirror @manamesh/frontend's compiler standard (the code was authored
+    // Mirror @cyotee/manamesh's compiler standard (the code was authored
     // against it): strict, but not noUncheckedIndexedAccess, ES2020 lib.
     "target": "ES2020",
     "module": "ESNext",
