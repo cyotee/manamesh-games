@@ -1,6 +1,8 @@
 # npm Trusted Publishing (GitHub Actions)
 
-Automated publish runs on **successful builds** of `main` / `master` (and `latest` for `boardgameIO-p2p`).
+Automated publish runs on **successful builds** of `main` / `master` (and `latest` for `boardgameIO-p2p`) in each **package repo**.
+
+**`manamesh-games` does not publish to npm.** It is a monorepo development host only.
 
 ## Repos and workflows
 
@@ -11,7 +13,6 @@ Automated publish runs on **successful builds** of `main` / `master` (and `lates
 | `@cyotee/boardgameio-crypto` | [cyotee/boardgameio-crypto](https://github.com/cyotee/boardgameio-crypto) | `publish-npm.yml` | `main` |
 | `@cyotee/manamesh` | [cyotee/manamesh](https://github.com/cyotee/manamesh) | `publish-npm.yml` | `main` |
 | `@cyotee/manamesh-asset-pack-builder` | [cyotee/manamesh-asset-pack-builder](https://github.com/cyotee/manamesh-asset-pack-builder) | `publish-npm.yml` | `main` |
-| (all five) | [cyotee/manamesh-games](https://github.com/cyotee/manamesh-games) | `publish-npm.yml` | `main` |
 
 Each workflow:
 
@@ -30,26 +31,26 @@ For each package page → **Settings** → **Trusted Publisher**:
 |-------|--------|
 | Provider | GitHub Actions |
 | Organization or user | `cyotee` |
-| Repository | matching repo name above |
+| Repository | matching package repo name above |
 | Workflow filename | `publish-npm.yml` (filename only) |
 | Environment | *(leave empty)* |
 | Allowed actions | **npm publish** (and optionally stage) |
 
-Use the **package-specific repo** for that package’s trusted publisher, **or** point all five at `manamesh-games` + monorepo `publish-npm.yml` if you prefer a single pipeline.
+Point each package’s Trusted Publisher at **that package’s own repo**, not at `manamesh-games`.
 
 ## Bootstrap (first version)
 
 Today, **first publish** of a new name usually cannot use OIDC until the package exists. Options:
 
 1. **Interactive local publish** once you can authenticate with npm (session login / OTP if required).
-2. **`NPM_TOKEN` repo secret** (already set on these repos from your environment). If your token is rejected for direct publish (npm 12 + GAT bypass policy), use option 1 or npm’s staged flow after the package exists.
+2. **`NPM_TOKEN` repo secret** on the package repos. If your token is rejected for direct publish (npm 12 + GAT bypass policy), use option 1 or npm’s staged flow after the package exists.
 3. After the first version is on the registry, configure Trusted Publisher and prefer OIDC (you can revoke long-lived write tokens).
 
 ## Secrets
 
 | Secret | Where | Purpose |
 |--------|--------|---------|
-| `NPM_TOKEN` | Each package repo + `manamesh-games` | Fallback auth when OIDC is not configured |
+| `NPM_TOKEN` | Each **package** repo only | Fallback auth when OIDC is not configured |
 
 OIDC does **not** need a write token once Trusted Publisher is set.
 
@@ -57,7 +58,7 @@ OIDC does **not** need a write token once Trusted Publisher is set.
 
 ```bash
 gh workflow run publish-npm.yml -R cyotee/boardgameio-crypto
-gh workflow run "Publish npm packages" -R cyotee/manamesh-games
+gh workflow run publish-npm.yml -R cyotee/boardgameIO-p2p
 ```
 
 ## Verify
