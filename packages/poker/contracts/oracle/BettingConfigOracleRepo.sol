@@ -14,12 +14,15 @@ import {BettingConfigOracleErrors} from "./BettingConfigOracleErrors.sol";
  *      in both a slot-parameterized and a default-slot form.
  */
 library BettingConfigOracleRepo {
-    // tag::STORAGE_SLOT[]
+    // tag::DEFAULT_SLOT[]
     /**
-     * @dev Dedicated storage slot for the betting config oracle.
+     * @dev ERC1967-style diamond storage slot (Crane LR-6).
      */
-    bytes32 internal constant STORAGE_SLOT = keccak256(abi.encode("manamesh.oracle.betting-config"));
-    // end::STORAGE_SLOT[]
+    bytes32 internal constant DEFAULT_SLOT =
+        bytes32(uint256(keccak256(abi.encode("manamesh.oracle.betting-config"))) - 1);
+    /// @dev Legacy alias.
+    bytes32 internal constant STORAGE_SLOT = DEFAULT_SLOT;
+    // end::DEFAULT_SLOT[]
 
     /**
      * @dev Basis-point denominator; a rake must be strictly below this.

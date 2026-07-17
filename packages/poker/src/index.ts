@@ -91,6 +91,11 @@ export {
   CryptoPokerModule,
   createCryptoInitialState,
   validateCryptoMove,
+  canAbortDecryptNow,
+  buildHandResult,
+  submitDecryptedShare,
+  approveDecrypt,
+  voteAbortDecrypt,
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
@@ -111,6 +116,30 @@ export {
 export type { HandOutcome, RoundStateTransition } from './signing';
 export { buildSettlement, encodeCard } from './handOutcome';
 export type { BuiltSettlement, SettleableHandState, BuildHandOutcomeOptions } from './handOutcome';
+
+// Live settlement client (mocked-viem testable; pair with frontend BlockchainService)
+export {
+  LiveSettlementClient,
+  pokerHandSettlerAbi,
+  requirePlayerAddresses,
+  buildHandInit,
+  noncesForSortedPlayers,
+  prepareSettlementPayload,
+  buildAssertHandCall,
+  buildSettleHandCall,
+} from './settlementClient';
+export type {
+  SettlementClientMode,
+  SettlementTableConfig,
+  SettlementWriteClient,
+  SettlementReadClient,
+  SettlementWriteArgs,
+  SettlementReadArgs,
+  LiveSettlementClientOptions,
+  TxCallResult,
+  AssertHandCall,
+  SettleHandCall,
+} from './settlementClient';
 
 // React board component
 export { PokerBoard } from './components/PokerBoard';

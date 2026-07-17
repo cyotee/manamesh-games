@@ -8,6 +8,7 @@ Texas Hold'em poker module for ManaMesh.
 - `docs/PRD_Deployment.md`
 - `docs/TASK.md`
 - `docs/GAME_FLOW_AND_SECURITY.md` — mental poker game flow + security
+- `docs/ADVERSARIAL_TESTS.md` — threat IDs → attack tests (settlement + crypto)
 - See also: `../manamesh/PRD_CONTRACTS.md` (locked contracts spec)
 
 **Maintaining alignment:**
@@ -47,8 +48,22 @@ lib/            forge-installed dependencies (forge-std, openzeppelin, crane)
 yarn install                 # at the manamesh-games root
 yarn workspace @manamesh/poker test
 
-# Solidity
+# Solidity (Crane Diamond + Foundry; solc 0.8.30 / prague)
 cd packages/poker
 forge build
 forge test
 ```
+
+### Foundry test layout (Crane-aligned)
+
+| Path | Role |
+|------|------|
+| `tests/foundry/base/TestBase_PokerSystem.sol` | `CraneTest` + production deploy via `PokerDeployLib` |
+| `tests/foundry/adversarial/*` | Multi-step attack suite (A1–A14) + deposit/withdraw invariants |
+| `tests/foundry/facets/PokerFacets_IFacet.t.sol` | LR-7 `Behavior_IFacet` declaration tests |
+| `tests/foundry/settler/*` | Unit harness + edge cases (sorted players, force-timeout) |
+| `tests/foundry/integration/*` | Diamond E2E deposit→assert→settle / force-timeout / deploy |
+| `tests/foundry/oracle/*` | BettingConfigOracle diamond tests |
+| `tests/foundry/verifier/*` | Level-1 hand evaluator + facet |
+
+Run `forge test` from `packages/poker`. Off-chain crypto adversarial: `src/crypto.adversarial.test.ts` (C1–C4). Mental-poker workflow/privacy for **2–5 player tables**: `src/mentalPoker.workflow.test.ts`, `src/mentalPoker.privacy.adversarial.test.ts` (M1–M12).

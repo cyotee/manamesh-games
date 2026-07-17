@@ -35,6 +35,13 @@ import {
   type EncryptedCard,
 } from "@manamesh/boardgameio-crypto/mental-poker";
 import {
+  keychainAdd,
+  keychainFromRecord,
+  MENTAL_POKER_KEYCHAIN_POLICY,
+  publicKeysEqual,
+  requirePrivateKeyMatchesPublished,
+} from "@manamesh/boardgameio-crypto/keychain";
+import {
   sha256Hex,
   deterministicShuffle,
   getCurrentSetupPlayer,
@@ -347,16 +354,34 @@ export function submitPublicKey(
 
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
-  if (!publicKey || typeof publicKey !== "string" || publicKey.length < 16) {
+  if (!publicKey || typeof publicKey !== "string") {
     return INVALID_MOVE;
   }
-  // Idempotent: same key ok; different key rejected
+  // Idempotent: same key (any encoding of same point) ok; different key rejected
   if (player.publicKey) {
-    if (player.publicKey === publicKey) return G;
+    if (publicKeysEqual(player.publicKey, publicKey)) return G;
     return INVALID_MOVE;
   }
 
-  player.publicKey = publicKey;
+  // Admit via shared keychain policy (valid curve, unique seats, unique keys)
+  const priorRecord: Record<string, string> = {};
+  for (const pid of G.playerOrder) {
+    const pk = G.players[pid]?.publicKey;
+    if (pk) priorRecord[pid] = pk;
+  }
+  const prior = keychainFromRecord(priorRecord, MENTAL_POKER_KEYCHAIN_POLICY);
+  const admitted = keychainAdd(
+    prior,
+    playerId,
+    publicKey,
+    MENTAL_POKER_KEYCHAIN_POLICY,
+  );
+  if (!admitted.ok) {
+    return INVALID_MOVE;
+  }
+
+  const canonical = admitted.entry.publicKey;
+  player.publicKey = canonical;
   pushActivityLog(G, `P${playerId} submitted public key`, "system");
 
   // Check if all players have submitted their public keys
@@ -380,9 +405,15 @@ export function submitPublicKey(
 /**
  * Apply one SRA encryption layer to every player's deck.
  *
- * Preferred path: client peels/encrypts locally and passes `preEncrypted`
- * (avoids multi-second main-thread work inside the multiplayer master).
- * Fallback: pass privateKey only (legacy / tests).
+ * **Multiplayer / production:** pass only `preEncrypted` (ciphertexts).
+ * Never put a private key in move args — peers/master must not see `sk`.
+ *
+ * **Offline / unit tests:** you may pass `privateKey` alone; sk↔pk binding is
+ * enforced and the layer is built inside the process (no network).
+ *
+ * Client flow:
+ * 1. `prepareEncryptionLayer(G, playerId, privateKey)` — local binding + encrypt
+ * 2. `encryptDeck(G, ctx, playerId, null, preEncrypted)` — submit ciphertexts only
  *
  * After the last setup player, phase advances to "shuffle".
  */
@@ -403,6 +434,8 @@ export function encryptDeck(
   if (player.hasEncrypted) return INVALID_MOVE;
 
   if (preEncrypted && typeof preEncrypted === "object") {
+    // Production path: structural validation only — no private key on the wire.
+    // Binding was already enforced client-side in prepareEncryptionLayer.
     for (const deckOwnerId of G.playerOrder) {
       const next = preEncrypted[deckOwnerId];
       if (!next || !Array.isArray(next) || next.length === 0) return INVALID_MOVE;
@@ -418,6 +451,10 @@ export function encryptDeck(
       G.encryptedDecks[deckOwnerId] = next;
     }
   } else if (privateKey) {
+    // Offline/tests only: bind sk to published pubkey, then encrypt in-process.
+    if (!requirePrivateKeyMatchesPublished(privateKey, player.publicKey)) {
+      return INVALID_MOVE;
+    }
     for (const deckOwnerId of G.playerOrder) {
       const deck = G.encryptedDecks[deckOwnerId];
       if (!deck || deck.length === 0) continue;
@@ -446,8 +483,8 @@ export function encryptDeck(
 }
 
 /**
- * Build one encryption layer for all decks (client-side helper).
- * Call from the board before submit so the multiplayer master stays responsive.
+ * Build one encryption layer for all decks (client-side crypto only).
+ * Prefer {@link prepareEncryptionLayer} so sk↔pk binding is checked first.
  */
 export function buildEncryptionLayer(
   G: TimestreamsState,
@@ -468,6 +505,28 @@ export function buildEncryptionLayer(
     }
   }
   return out;
+}
+
+/**
+ * Client-only: verify private key matches the published keychain public key,
+ * then build the encryption layer. Use this before submitting the multiplayer move.
+ *
+ * The private key must **not** be passed to `encryptDeck` / `moves.encryptDeck`.
+ *
+ * @throws Error if sk does not match the player's published public key
+ */
+export function prepareEncryptionLayer(
+  G: TimestreamsState,
+  playerId: string,
+  privateKey: string,
+): Record<string, EncryptedCard[]> {
+  const published = G.players[playerId]?.publicKey ?? null;
+  if (!requirePrivateKeyMatchesPublished(privateKey, published)) {
+    throw new Error(
+      "private_key_does_not_match_published_public_key",
+    );
+  }
+  return buildEncryptionLayer(G, privateKey);
 }
 
 // =============================================================================
@@ -1413,7 +1472,9 @@ export function beginDeckReencrypt(G: TimestreamsState): void {
 
 /**
  * Apply one player's encryption layer to the active deck-op owner's remaining deck.
- * Preferred: preEncrypted array for that deck only.
+ *
+ * **Multiplayer:** pass only `preEncrypted` (from {@link prepareDeckOpReencryptLayer}).
+ * **Offline/tests:** `privateKey` alone is allowed with sk↔pk binding in-process.
  */
 export function submitDeckOpReencrypt(
   G: TimestreamsState,
@@ -1434,12 +1495,22 @@ export function submitDeckOpReencrypt(
   }
 
   if (preEncrypted && Array.isArray(preEncrypted)) {
+    // Production: ciphertexts only — no private key on the wire.
     if (preEncrypted.length !== prev.length) return INVALID_MOVE;
     for (let i = 0; i < prev.length; i++) {
       if (preEncrypted[i].layers !== (prev[i].layers ?? 0) + 1) return INVALID_MOVE;
     }
     G.encryptedDecks[op.ownerId] = preEncrypted;
   } else if (privateKey) {
+    // Offline/tests only
+    if (
+      !requirePrivateKeyMatchesPublished(
+        privateKey,
+        G.players[playerId]?.publicKey,
+      )
+    ) {
+      return INVALID_MOVE;
+    }
     if ((prev[0]?.layers ?? 0) === 0) {
       G.encryptedDecks[op.ownerId] = encryptDeckLib(
         prev.map((c) => c.ciphertext),
@@ -1480,6 +1551,26 @@ export function buildDeckOpReencryptLayer(
     );
   }
   return reencryptDeck(prev, privateKey);
+}
+
+/**
+ * Client-only: sk↔pk binding then build re-encrypt layer for the multiplayer move.
+ * Do not pass `privateKey` to `submitDeckOpReencrypt` over the network.
+ */
+export function prepareDeckOpReencryptLayer(
+  G: TimestreamsState,
+  playerId: string,
+  privateKey: string,
+): EncryptedCard[] | null {
+  if (
+    !requirePrivateKeyMatchesPublished(
+      privateKey,
+      G.players[playerId]?.publicKey ?? null,
+    )
+  ) {
+    throw new Error("private_key_does_not_match_published_public_key");
+  }
+  return buildDeckOpReencryptLayer(G, privateKey);
 }
 
 /** True if this deck already has an active (not yet materialized) decrypt request. */

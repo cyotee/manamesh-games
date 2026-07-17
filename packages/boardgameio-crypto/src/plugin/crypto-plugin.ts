@@ -43,6 +43,12 @@ import {
   verifyShuffleProof,
   type Permutation,
 } from "../mental-poker";
+import {
+  keychainAdd,
+  keychainFromRecord,
+  MENTAL_POKER_KEYCHAIN_POLICY,
+  type KeychainState,
+} from "../keychain";
 
 // =============================================================================
 // Types
@@ -69,6 +75,12 @@ export interface CryptoPluginState {
 
   /** Player public keys (playerId -> publicKey hex) */
   publicKeys: Record<string, string>;
+
+  /**
+   * Optional keychain snapshot (GPG-style registry). Games using
+   * {@link MENTAL_POKER_KEYCHAIN_POLICY} may store admitted keys here.
+   */
+  keychain?: KeychainState;
 
   /** Deck commitments (playerId -> commitment) */
   commitments: Record<string, SerializedCommitment>;
@@ -310,7 +322,24 @@ export const CryptoPlugin = {
       },
 
       submitPublicKey: (playerId: string, publicKey: string): void => {
-        G.crypto.publicKeys[playerId] = publicKey;
+        // Admit under mental-poker policy (valid curve, unique ids, unique keys).
+        // Throws on reject so call sites / tests can catch; games that need
+        // INVALID_MOVE should use keychainAdd + policy directly (as poker does).
+        const prior = keychainFromRecord(
+          G.crypto.publicKeys ?? {},
+          MENTAL_POKER_KEYCHAIN_POLICY,
+        );
+        const admitted = keychainAdd(
+          prior,
+          playerId,
+          publicKey,
+          MENTAL_POKER_KEYCHAIN_POLICY,
+        );
+        if (!admitted.ok) {
+          throw new Error(`keychain_reject:${admitted.reason}`);
+        }
+        G.crypto.publicKeys[playerId] = admitted.entry.publicKey;
+        G.crypto.keychain = admitted.keychain;
       },
 
       allKeysSubmitted: (): boolean => {

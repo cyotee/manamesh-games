@@ -1,7 +1,7 @@
 # Poker Design Documents Map
 
 **Status:** Current  
-**Last Major Update:** 2026-06-24  
+**Last Major Update:** 2026-07-15 (adversarial next-wave plan S1–S10)  
 **Purpose:** Single source of truth index for all design, architecture, requirements, and planning documents related to the Texas Hold'em poker module (including mental-poker cryptography and on-chain settlement).
 
 **Scope:** Focuses on current design (post `packages/poker/` extraction and PRD_CONTRACTS.md). Historical documents are clearly marked.
@@ -24,6 +24,10 @@
 | **Poker Deployment Preparedness Report** | `packages/poker/docs/PREPAREDNESS_REPORT.md` | Assessment | Current | Current state (tests, features, gaps), readiness % (~75%), completed vs pending | All current docs |
 | **Mental Poker Game Workflow & Security** | `packages/poker/docs/GAME_FLOW_AND_SECURITY.md` | Technical spec | Current | P2P connection, SRA phases (key exchange/encrypt/shuffle), cooperative decryption, betting integration, security model (`client: false`, etc.) | crypto.ts, betting.ts, PokerBoard.tsx |
 | **Poker Hand Settlement Smart Contracts PRD** | `packages/manamesh/PRD_CONTRACTS.md` | Locked PRD | Current (design) | Purpose, HandInit/HandOutcome structs, contract interface (assert/settle/force-timeout), EIP-712, oracle, invariants, §11 locked decisions | contracts/, handOutcome.ts, signing.ts, PokerHandSettlerDFPkg |
+| **Adversarial Tests** | `packages/poker/docs/ADVERSARIAL_TESTS.md` | Security test map | Current | Threat IDs A1–A14 / C1–C4 / M1–M11 → automated tests; residual risks | `tests/foundry/adversarial/`, `src/crypto.adversarial.test.ts`, `src/mentalPoker.*` |
+| **Adversarial Test Implementation Plan** | `docs/superpowers/plans/2026-07-15-poker-adversarial-tests.md` | Plan | Phase 1 complete | Settlement adversarial suite A1–A14 / C1–C4 | ADVERSARIAL_TESTS.md |
+| **Mental Poker Adversarial Plan** | `docs/superpowers/plans/2026-07-15-mental-poker-adversarial-suite.md` | Plan | Phase 1 complete | Workflow + privacy M1–M12, G1–G7, R1–R6 | ADVERSARIAL_TESTS.md (M-threats) |
+| **Adversarial Next Wave Plan (S1–S10)** | `docs/superpowers/plans/2026-07-15-poker-adversarial-next-wave.md` | Plan | **Complete** | Multi-street settle, peels, concurrent decrypt, multi-winner, force-timeout N≥3, oracle mid-hand, eval parity, fee-token residual, BlockchainService, key-exchange | ADVERSARIAL_TESTS.md |
 | **Poker Betting Architecture (historical)** | `packages/poker/docs/historical/POKER_BETTING_ARCHITECTURE.md` | Architecture | Historical | Why off-chain betting + on-chain settlement (old GameVault version) | See current PRD_CONTRACTS.md and docs/TASK.md |
 
 ---

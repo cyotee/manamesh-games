@@ -430,9 +430,11 @@ export const TimestreamsGame: Game<TimestreamsState> = {
             moves: {
               ...setRulesEnabledMoveDef,
               encryptDeck: {
+                // Multiplayer: args are (null | undefined, preEncrypted) only.
+                // Never put privateKey in move args — use prepareEncryptionLayer client-side.
                 move: (
                   { G, ctx, playerID },
-                  privateKey?: string,
+                  privateKey?: string | null,
                   preEncrypted?: Record<string, { ciphertext: string; layers: number }[]>,
                 ) => encryptDeck(G, ctx, playerID, privateKey, preEncrypted as any),
                 ...CONCURRENT,
@@ -444,9 +446,10 @@ export const TimestreamsGame: Game<TimestreamsState> = {
       moves: {
         ...setRulesEnabledMoveDef,
         encryptDeck: {
+          // Multiplayer: (null, preEncrypted). Offline tests may pass privateKey alone.
           move: (
             { G, ctx, playerID },
-            privateKey?: string,
+            privateKey?: string | null,
             preEncrypted?: Record<string, { ciphertext: string; layers: number }[]>,
           ) => encryptDeck(G, ctx, playerID, privateKey, preEncrypted as any),
           ...CONCURRENT,

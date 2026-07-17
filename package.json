@@ -14,7 +14,7 @@
     "deploy:timestreams": "node packages/timestreams/scripts/build-vercel.mjs && cd deploy/timestreams && vercel deploy --prod --yes --name timestreams"
   },
   "dependencies": {
-    "boardgame.io": "file:./packages/boardgame.io",
-    "boardgameIO-p2p": "file:./packages/boardgameIO-p2p"
+    "@cyotee/boardgameio-p2p": "workspace:*",
+    "boardgame.io": "file:./packages/boardgame.io"
   }
 }

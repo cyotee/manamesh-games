@@ -27,6 +27,7 @@ import {
 } from './assets';
 import type { GameModule, GameConfig, MoveValidation } from '@manamesh/frontend/src/game/modules/types';
 import type { CardManifestEntry } from '@manamesh/frontend/src/assets/manifest/types';
+import { cryptoMoves } from './crypto';
 
 // =============================================================================
 // Initial State
@@ -545,8 +546,25 @@ const MistbornGame: Game<MistbornState> = {
   },
   phases: {
     setup: { start: true, next: 'keyExchange' },
-    keyExchange: { /* crypto for mental poker - full in later milestone */ },
-    encrypt: {},
+    keyExchange: {
+      // Mental-poker key exchange via keychain (MENTAL_POKER_KEYCHAIN_POLICY)
+      moves: {
+        submitPublicKey: {
+          client: false,
+          move: ({ G, ctx }: { G: MistbornState; ctx: Ctx }, playerId: string, publicKey: string) =>
+            cryptoMoves.submitPublicKey(G, ctx, playerId ?? ctx.playerID!, publicKey),
+        },
+      },
+    },
+    encrypt: {
+      moves: {
+        encryptDeck: {
+          client: false,
+          move: ({ G, ctx }: { G: MistbornState; ctx: Ctx }, playerId: string, privateKey: string) =>
+            cryptoMoves.encryptDeck(G, ctx, playerId ?? ctx.playerID!, privateKey),
+        },
+      },
+    },
     shuffle: {},
     play: {
       moves,

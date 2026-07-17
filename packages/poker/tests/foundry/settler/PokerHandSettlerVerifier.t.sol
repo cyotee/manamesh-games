@@ -79,9 +79,10 @@ contract PokerHandSettlerVerifierTest is Test {
     }
 
     function _init() internal view returns (HandInit memory init) {
+        // Sorted ascending: bob < alice.
         init.players = new address[](2);
-        init.players[0] = alice;
-        init.players[1] = bob;
+        init.players[0] = bob;
+        init.players[1] = alice;
         init.buyIns = new uint256[](2);
         init.buyIns[0] = BUY_IN;
         init.buyIns[1] = BUY_IN;
@@ -108,13 +109,13 @@ contract PokerHandSettlerVerifierTest is Test {
     function _assertHand() internal {
         HandInit memory init = _init();
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, settler.hashHandInit(init));
-        sigs[1] = _sign(bobPk, settler.hashHandInit(init));
+        sigs[0] = _sign(bobPk, settler.hashHandInit(init));
+        sigs[1] = _sign(alicePk, settler.hashHandInit(init));
         settler.assertHandMembership(init, sigs);
     }
 
-    /// @dev Board A-K-Q hearts + 2c 3d; alice holds J-T hearts (royal flush).
-    function _outcome(address[] memory winners, uint256 aliceStack, uint256 bobStack)
+    /// @dev Board A-K-Q hearts + 2c 3d; alice (index 1) holds J-T hearts (royal flush).
+    function _outcome(address[] memory winners, uint256 bobStack, uint256 aliceStack)
         internal
         view
         returns (HandOutcome memory o)
@@ -124,19 +125,19 @@ contract PokerHandSettlerVerifierTest is Test {
         o.winners = winners;
         o.payouts = new uint256[](winners.length);
         o.finalStacks = new uint256[](2);
-        o.finalStacks[0] = aliceStack;
-        o.finalStacks[1] = bobStack;
+        o.finalStacks[0] = bobStack;
+        o.finalStacks[1] = aliceStack;
         o.finalStateHash = keccak256("final");
         o.holeCards = new uint8[2][](2);
-        o.holeCards[0] = [_c(11, 2), _c(10, 2)]; // J-T hearts -> royal with the board
-        o.holeCards[1] = [_c(2, 3), _c(7, 1)]; // junk
+        o.holeCards[0] = [_c(2, 3), _c(7, 1)]; // bob junk
+        o.holeCards[1] = [_c(11, 2), _c(10, 2)]; // alice J-T hearts -> royal with the board
         o.communityCards = [_c(14, 2), _c(13, 2), _c(12, 2), _c(2, 0), _c(3, 1)];
     }
 
     function test_settleWithVerifier_acceptsTrueWinner() public {
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _outcome(winners, 195e18, 0);
+        HandOutcome memory o = _outcome(winners, 0, 195e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(alicePk, settler.hashHandOutcome(o));
 
@@ -148,7 +149,7 @@ contract PokerHandSettlerVerifierTest is Test {
         // Bob is declared + signs, but alice actually holds the royal flush.
         address[] memory winners = new address[](1);
         winners[0] = bob;
-        HandOutcome memory o = _outcome(winners, 0, 195e18);
+        HandOutcome memory o = _outcome(winners, 195e18, 0);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(bobPk, settler.hashHandOutcome(o));
 

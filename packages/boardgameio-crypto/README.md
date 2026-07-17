@@ -16,6 +16,7 @@ other in-tree package, so it can be consumed freely without import cycles.
 |--------|----------|
 | `@manamesh/boardgameio-crypto` | Barrel: re-exports everything below |
 | `@manamesh/boardgameio-crypto/mental-poker` | SRA commutative encryption, commitment + shuffle proofs |
+| `@manamesh/boardgameio-crypto/keychain` | GPG-style public-key registry + admission policies |
 | `@manamesh/boardgameio-crypto/plugin/crypto-plugin` | boardgame.io crypto plugin |
 | `@manamesh/boardgameio-crypto/merkle` | Merkle-tree commitments (Battleship) |
 | `@manamesh/boardgameio-crypto/ec-elgamal-exp`, `/feldman-dkg`, `/dleq` | Threshold Tally primitives |
@@ -23,6 +24,18 @@ other in-tree package, so it can be consumed freely without import cycles.
 | `@manamesh/boardgameio-crypto/paillier` | Paillier HE (HE Battleship) |
 | `@manamesh/boardgameio-crypto/shamirs` | Shamir secret sharing (ECIES-encrypted) |
 | `@manamesh/boardgameio-crypto/zk`, `/snarkjs-range` | snarkjs ZK helpers |
+
+## Agent / integration skill
+
+**Read before wiring crypto into a game:**  
+`.grok/skills/boardgameio-crypto/SKILL.md` (also under `.opencode/skills/boardgameio-crypto/`).
+
+Hard rules summarized there:
+
+1. Never put private keys in shared `G` or multiplayer move args — submit **ciphertexts / peels** only.  
+2. Admit public keys via **keychain** (`MENTAL_POKER_KEYCHAIN_POLICY` for multi-party SRA).  
+3. Bind encrypt sk → published pk **on the client** (`prepareEncryptionLayer` / `requirePrivateKeyMatchesPublished`).  
+4. Keep game phases / `INVALID_MOVE` in the game package; crypto stays pure.
 
 ## Test
 

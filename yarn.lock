@@ -1637,29 +1637,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@boardgame.io/p2p@workspace:packages/boardgameIO-p2p":
-  version: 0.0.0-use.local
-  resolution: "@boardgame.io/p2p@workspace:packages/boardgameIO-p2p"
-  dependencies:
-    "@types/jest": "npm:^27.0.2"
-    "@typescript-eslint/eslint-plugin": "npm:^5.4.0"
-    "@typescript-eslint/parser": "npm:^5.4.0"
-    boardgame.io: "npm:^0.50.1"
-    eslint: "npm:^8.2.0"
-    eslint-config-prettier: "npm:^9.0.0"
-    jest: "npm:^27.3.1"
-    peerjs: "npm:^1.3.2"
-    prettier: "npm:^3.0.3"
-    standard-version: "npm:^9.3.1"
-    ts-jest: "npm:^27.0.7"
-    tweetnacl: "npm:^1.0.3"
-    tweetnacl-util: "npm:^0.15.1"
-    typescript: "npm:^4.4.3"
-  peerDependencies:
-    boardgame.io: ">=0.49.1"
-  languageName: unknown
-  linkType: soft
-
 "@chainsafe/as-chacha20poly1305@npm:^0.1.0":
   version: 0.1.0
   resolution: "@chainsafe/as-chacha20poly1305@npm:0.1.0"
@@ -1855,6 +1832,30 @@ __metadata:
   checksum: 10c0/05c5368c13b662ee4c122c7bfbe5dc0b613416672a829f3e78bc49a357a197e0218d6e74e7c66cfcd04e15a179acab080bd3c69658c9fbefd0e1ccd950a07fc6
   languageName: node
   linkType: hard
+
+"@cyotee/boardgameio-p2p@workspace:*, @cyotee/boardgameio-p2p@workspace:packages/boardgameIO-p2p":
+  version: 0.0.0-use.local
+  resolution: "@cyotee/boardgameio-p2p@workspace:packages/boardgameIO-p2p"
+  dependencies:
+    "@types/jest": "npm:^27.0.2"
+    "@types/node": "npm:^18.0.0"
+    "@typescript-eslint/eslint-plugin": "npm:^5.4.0"
+    "@typescript-eslint/parser": "npm:^5.4.0"
+    boardgame.io: "workspace:*"
+    eslint: "npm:^8.2.0"
+    eslint-config-prettier: "npm:^9.0.0"
+    jest: "npm:^27.3.1"
+    peerjs: "npm:^1.3.2"
+    prettier: "npm:^3.0.3"
+    standard-version: "npm:^9.3.1"
+    ts-jest: "npm:^27.0.7"
+    tweetnacl: "npm:^1.0.3"
+    tweetnacl-util: "npm:^0.15.1"
+    typescript: "npm:^4.4.3"
+  peerDependencies:
+    boardgame.io: ">=0.49.1"
+  languageName: unknown
+  linkType: soft
 
 "@dnsquery/dns-packet@npm:^6.1.1":
   version: 6.1.1
@@ -4907,6 +4908,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": "npm:^17.0.0"
     "@chainsafe/libp2p-yamux": "npm:^8.0.1"
+    "@cyotee/boardgameio-p2p": "workspace:*"
     "@helia/unixfs": "npm:^7.0.1"
     "@libp2p/bootstrap": "npm:^12.0.11"
     "@libp2p/circuit-relay-v2": "npm:^4.1.3"
@@ -7627,6 +7629,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/node@npm:^18.0.0":
+  version: 18.19.130
+  resolution: "@types/node@npm:18.19.130"
+  dependencies:
+    undici-types: "npm:~5.26.4"
+  checksum: 10c0/22ba2bc9f8863101a7e90a56aaeba1eb3ebdc51e847cef4a6d188967ab1acbce9b4f92251372fd0329ecb924bbf610509e122c3dfe346c04dbad04013d4ad7d0
+  languageName: node
+  linkType: hard
+
 "@types/node@npm:^22.5.5":
   version: 22.19.19
   resolution: "@types/node@npm:22.19.19"
@@ -10268,7 +10279,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"boardgame.io@npm:^0.50.1, boardgame.io@npm:^0.50.2, boardgame.io@workspace:*, boardgame.io@workspace:packages/boardgame.io":
+"boardgame.io@npm:^0.50.2, boardgame.io@workspace:*, boardgame.io@workspace:packages/boardgame.io":
   version: 0.0.0-use.local
   resolution: "boardgame.io@workspace:packages/boardgame.io"
   dependencies:
@@ -10359,19 +10370,6 @@ __metadata:
     typescript: "npm:^3.8.2"
   languageName: unknown
   linkType: soft
-
-"boardgameIO-p2p@file:./packages/boardgameIO-p2p::locator=manamesh-games%40workspace%3A.":
-  version: 0.4.4
-  resolution: "boardgameIO-p2p@file:./packages/boardgameIO-p2p#./packages/boardgameIO-p2p::hash=41dea3&locator=manamesh-games%40workspace%3A."
-  dependencies:
-    peerjs: "npm:^1.3.2"
-    tweetnacl: "npm:^1.0.3"
-    tweetnacl-util: "npm:^0.15.1"
-  peerDependencies:
-    boardgame.io: ">=0.49.1"
-  checksum: 10c0/2494d2e09b73d2213827759b95308ca665097d17857a0387307639cbe2d5ccbb2277d54f2f88657c0f154e5482c73fe15cc0b977c79b57a979455d4f84ef0f7e
-  languageName: node
-  linkType: hard
 
 "body-parser@npm:^2.2.1":
   version: 2.2.2
@@ -19112,8 +19110,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "manamesh-games@workspace:."
   dependencies:
+    "@cyotee/boardgameio-p2p": "workspace:*"
     boardgame.io: "file:./packages/boardgame.io"
-    boardgameIO-p2p: "file:./packages/boardgameIO-p2p"
   languageName: unknown
   linkType: soft
 
@@ -25269,6 +25267,13 @@ __metadata:
   version: 7.25.0
   resolution: "undici-types@npm:7.25.0"
   checksum: 10c0/b30edc6d3a0aa0f1f4e0f4f56dc08b81ffbecc27e3b142b1363555104b076f9eebaa61dfd835d91a8341ad6c5e6f789ed2161f75b80855378828cd93ad7c9d26
+  languageName: node
+  linkType: hard
+
+"undici-types@npm:~5.26.4":
+  version: 5.26.5
+  resolution: "undici-types@npm:5.26.5"
+  checksum: 10c0/bb673d7876c2d411b6eb6c560e0c571eef4a01c1c19925175d16e3a30c4c428181fb8d7ae802a261f283e4166a0ac435e2f505743aa9e45d893f9a3df017b501
   languageName: node
   linkType: hard
 

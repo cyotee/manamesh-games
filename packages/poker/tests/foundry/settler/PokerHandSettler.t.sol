@@ -93,10 +93,11 @@ contract PokerHandSettlerTest is Test {
         vm.stopPrank();
     }
 
+    /// @dev Players strictly ascending: bob < alice by address for fixture keys.
     function _twoPlayerInit() internal view returns (HandInit memory init) {
         init.players = new address[](2);
-        init.players[0] = alice;
-        init.players[1] = bob;
+        init.players[0] = bob;
+        init.players[1] = alice;
         init.buyIns = new uint256[](2);
         init.buyIns[0] = BUY_IN;
         init.buyIns[1] = BUY_IN;
@@ -120,8 +121,8 @@ contract PokerHandSettlerTest is Test {
         init = _twoPlayerInit();
         bytes32 structHash = settler.hashHandInit(init);
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, structHash);
-        sigs[1] = _sign(bobPk, structHash);
+        sigs[0] = _sign(bobPk, structHash);
+        sigs[1] = _sign(alicePk, structHash);
         settler.assertHandMembership(init, sigs);
     }
 
@@ -175,8 +176,8 @@ contract PokerHandSettlerTest is Test {
         bytes32 handId = HandIdLib.handIdOf(init);
         bytes32 structHash = settler.hashHandInit(init);
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, structHash);
-        sigs[1] = _sign(bobPk, structHash);
+        sigs[0] = _sign(bobPk, structHash);
+        sigs[1] = _sign(alicePk, structHash);
         vm.expectRevert(abi.encodeWithSelector(PokerHandSettlerErrors.HandAlreadyAsserted.selector, handId));
         settler.assertHandMembership(init, sigs);
     }
@@ -185,9 +186,9 @@ contract PokerHandSettlerTest is Test {
         HandInit memory init = _twoPlayerInit();
         bytes32 structHash = settler.hashHandInit(init);
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, structHash);
-        sigs[1] = _sign(0xBADBAD, structHash); // not bob
-        vm.expectRevert(abi.encodeWithSelector(SignatureLib.InvalidSignature.selector, 1, bob));
+        sigs[0] = _sign(0xBADBAD, structHash); // not bob (index 0)
+        sigs[1] = _sign(alicePk, structHash);
+        vm.expectRevert(abi.encodeWithSelector(SignatureLib.InvalidSignature.selector, 0, bob));
         settler.assertHandMembership(init, sigs);
     }
 
@@ -198,8 +199,8 @@ contract PokerHandSettlerTest is Test {
         HandInit memory init = _twoPlayerInit();
         bytes32 structHash = settler.hashHandInit(init);
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, structHash);
-        sigs[1] = _sign(bobPk, structHash);
+        sigs[0] = _sign(bobPk, structHash);
+        sigs[1] = _sign(alicePk, structHash);
         vm.expectRevert(
             abi.encodeWithSelector(PokerHandSettlerErrors.InsufficientUnlockedBalance.selector, 50e18, BUY_IN)
         );
@@ -208,7 +209,8 @@ contract PokerHandSettlerTest is Test {
 
     // ----------------------------- settle -----------------------------------
 
-    function _outcomeFor(HandInit memory init, uint256 aliceStack, uint256 bobStack)
+    /// @dev finalStacks parallel to sorted players [bob, alice].
+    function _outcomeFor(HandInit memory init, uint256 bobStack, uint256 aliceStack)
         internal
         view
         returns (HandOutcome memory outcome)
@@ -220,19 +222,19 @@ contract PokerHandSettlerTest is Test {
         outcome.payouts = new uint256[](1);
         outcome.payouts[0] = aliceStack;
         outcome.finalStacks = new uint256[](2);
-        outcome.finalStacks[0] = aliceStack;
-        outcome.finalStacks[1] = bobStack;
+        outcome.finalStacks[0] = bobStack;
+        outcome.finalStacks[1] = aliceStack;
         outcome.finalStateHash = keccak256("final");
         outcome.holeCards = new uint8[2][](2);
-        outcome.holeCards[0] = [uint8(0x0E), uint8(0x0D)];
-        outcome.holeCards[1] = [uint8(0x02), uint8(0x03)];
+        outcome.holeCards[0] = [uint8(0x02), uint8(0x03)];
+        outcome.holeCards[1] = [uint8(0x0E), uint8(0x0D)];
         outcome.communityCards = [uint8(0x0C), uint8(0x0B), uint8(0x0A), uint8(0x09), uint8(0x08)];
     }
 
     function test_settle_reconcilesBalancesAndRake() public {
         HandInit memory init = _assertTwoPlayerHand();
         // pot=200e18, rake 2.5% = 5e18, so stacks sum to 195e18.
-        HandOutcome memory outcome = _outcomeFor(init, 195e18, 0);
+        HandOutcome memory outcome = _outcomeFor(init, 0, 195e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(alicePk, settler.hashHandOutcome(outcome));
 
@@ -252,7 +254,7 @@ contract PokerHandSettlerTest is Test {
     function test_settle_revertsOnConservationViolation() public {
         HandInit memory init = _assertTwoPlayerHand();
         // stacks sum to 200e18 but pot-rake is 195e18 -> violation.
-        HandOutcome memory outcome = _outcomeFor(init, 200e18, 0);
+        HandOutcome memory outcome = _outcomeFor(init, 0, 200e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(alicePk, settler.hashHandOutcome(outcome));
         vm.expectRevert(
@@ -264,7 +266,7 @@ contract PokerHandSettlerTest is Test {
     function test_settle_revertsWhenNotActive() public {
         HandInit memory init = _twoPlayerInit(); // never asserted
         bytes32 handId = HandIdLib.handIdOf(init);
-        HandOutcome memory outcome = _outcomeFor(init, 195e18, 0);
+        HandOutcome memory outcome = _outcomeFor(init, 0, 195e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(alicePk, settler.hashHandOutcome(outcome));
         vm.expectRevert(abi.encodeWithSelector(PokerHandSettlerErrors.HandNotActive.selector, handId));
@@ -273,7 +275,7 @@ contract PokerHandSettlerTest is Test {
 
     function test_settle_revertsOnWinnerSigMismatch() public {
         HandInit memory init = _assertTwoPlayerHand();
-        HandOutcome memory outcome = _outcomeFor(init, 195e18, 0);
+        HandOutcome memory outcome = _outcomeFor(init, 0, 195e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(bobPk, settler.hashHandOutcome(outcome)); // bob signs, but winner is alice
         vm.expectRevert(abi.encodeWithSelector(SignatureLib.InvalidSignature.selector, 0, alice));
@@ -282,7 +284,7 @@ contract PokerHandSettlerTest is Test {
 
     function test_settle_revertsOnDoubleSettle() public {
         HandInit memory init = _assertTwoPlayerHand();
-        HandOutcome memory outcome = _outcomeFor(init, 195e18, 0);
+        HandOutcome memory outcome = _outcomeFor(init, 0, 195e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(alicePk, settler.hashHandOutcome(outcome));
         settler.settleHand(init, outcome, wsigs);

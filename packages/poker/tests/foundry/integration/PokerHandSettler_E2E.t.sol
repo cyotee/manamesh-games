@@ -136,9 +136,10 @@ contract PokerHandSettlerE2ETest is Test {
     }
 
     function _init() internal view returns (HandInit memory init) {
+        // Sorted ascending: bob < alice by address for fixture keys.
         init.players = new address[](2);
-        init.players[0] = alice;
-        init.players[1] = bob;
+        init.players[0] = bob;
+        init.players[1] = alice;
         init.buyIns = new uint256[](2);
         init.buyIns[0] = BUY_IN;
         init.buyIns[1] = BUY_IN;
@@ -174,13 +175,14 @@ contract PokerHandSettlerE2ETest is Test {
         HandInit memory init = _init();
         bytes32 sh = PokerSettlementHashLib.hashHandInit(init);
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, sh);
-        sigs[1] = _sign(bobPk, sh);
+        sigs[0] = _sign(bobPk, sh);
+        sigs[1] = _sign(alicePk, sh);
         IPokerHandSettler(settlerProxy).assertHandMembership(init, sigs);
     }
 
-    /// @dev Board A-K-Q hearts + 2c 3d; alice holds J-T hearts (royal flush).
-    function _royalOutcome(address[] memory winners, uint256 aliceStack, uint256 bobStack)
+    /// @dev Board A-K-Q hearts + 2c 3d; alice (index 1) holds J-T hearts (royal flush).
+    ///      finalStacks parallel to sorted players [bob, alice].
+    function _royalOutcome(address[] memory winners, uint256 bobStack, uint256 aliceStack)
         internal
         view
         returns (HandOutcome memory o)
@@ -190,12 +192,12 @@ contract PokerHandSettlerE2ETest is Test {
         o.winners = winners;
         o.payouts = new uint256[](winners.length);
         o.finalStacks = new uint256[](2);
-        o.finalStacks[0] = aliceStack;
-        o.finalStacks[1] = bobStack;
+        o.finalStacks[0] = bobStack;
+        o.finalStacks[1] = aliceStack;
         o.finalStateHash = keccak256("final");
         o.holeCards = new uint8[2][](2);
-        o.holeCards[0] = [_c(11, 2), _c(10, 2)];
-        o.holeCards[1] = [_c(2, 3), _c(7, 1)];
+        o.holeCards[0] = [_c(2, 3), _c(7, 1)];
+        o.holeCards[1] = [_c(11, 2), _c(10, 2)];
         o.communityCards = [_c(14, 2), _c(13, 2), _c(12, 2), _c(2, 0), _c(3, 1)];
     }
 
@@ -205,7 +207,7 @@ contract PokerHandSettlerE2ETest is Test {
 
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _royalOutcome(winners, 195e18, 0);
+        HandOutcome memory o = _royalOutcome(winners, 0, 195e18);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(alicePk, PokerSettlementHashLib.hashHandOutcome(o));
 
@@ -226,7 +228,7 @@ contract PokerHandSettlerE2ETest is Test {
         // Declare bob the winner (he signs), but alice actually holds the royal.
         address[] memory winners = new address[](1);
         winners[0] = bob;
-        HandOutcome memory o = _royalOutcome(winners, 0, 195e18);
+        HandOutcome memory o = _royalOutcome(winners, 195e18, 0);
         bytes[] memory wsigs = new bytes[](1);
         wsigs[0] = _sign(bobPk, PokerSettlementHashLib.hashHandOutcome(o));
 
@@ -240,7 +242,7 @@ contract PokerHandSettlerE2ETest is Test {
 
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _royalOutcome(winners, 195e18, 0);
+        HandOutcome memory o = _royalOutcome(winners, 0, 195e18);
         bytes[] memory sigs = new bytes[](1);
         sigs[0] = _sign(alicePk, PokerSettlementHashLib.hashHandOutcome(o));
 
@@ -251,9 +253,14 @@ contract PokerHandSettlerE2ETest is Test {
         rst.playerStacks = new uint256[](2);
         rst.actionHash = keccak256("actions");
 
+        bytes[] memory lrSigs = new bytes[](2);
+        bytes32 lrHash = PokerSettlementHashLib.hashRoundStateTransition(rst);
+        lrSigs[0] = _sign(bobPk, lrHash);
+        lrSigs[1] = _sign(alicePk, lrHash);
+
         // Anyone can submit after timeout; bob submits.
         vm.prank(bob);
-        IPokerHandSettler(settlerProxy).forceTimeoutSettlement(_init(), o, sigs, rst);
+        IPokerHandSettler(settlerProxy).forceTimeoutSettlement(_init(), o, sigs, rst, lrSigs);
 
         assertEq(IPokerHandSettler(settlerProxy).balanceOf(alice), 1_095e18);
         assertEq(IPokerHandSettler(settlerProxy).balanceOf(operator), 5e18);

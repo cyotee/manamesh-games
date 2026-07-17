@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./mental-poker": "./src/mental-poker/index.ts",
     "./mental-poker/*": "./src/mental-poker/*.ts",
+    "./keychain": "./src/keychain/index.ts",
     "./plugin": "./src/plugin/index.ts",
     "./plugin/crypto-plugin": "./src/plugin/crypto-plugin.ts",
     "./shamirs": "./src/shamirs/index.ts",

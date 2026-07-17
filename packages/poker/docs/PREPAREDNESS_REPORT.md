@@ -86,11 +86,14 @@ The poker game is **substantially complete** for a playable, cryptographically f
 
 ### Critical (Must Fix for Deployment)
 1. **Real On-Chain Settlement Wiring**
-   - `settlePot()` in `frontend/src/blockchain/mock-service.ts` is purely in-memory.
-   - No calls to `buildSettlement()`, EIP-712 signing of outcomes, or `PokerHandSettler.settleHand`.
-   - No live wallet address mapping (playerID → address) passed to settlement helpers.
-   - New-hand recreation after settlement still relies on mock balances.
-   - References: `App.tsx` (handleNewHand), `mock-service.ts`, historical betting architecture.
+   - **S9 progress (2026-07-15):** Testable dual path landed.
+     - `@manamesh/poker` `settlementClient.ts` — `prepareSettlementPayload`, `buildAssertHandCall` / `buildSettleHandCall`, `LiveSettlementClient` with injected viem-like ports (18 unit tests, no real RPC).
+     - Frontend `live-service.ts` + extended `BlockchainService` (`assertHandMembership`, `settleHand`, `settleFromState`, `mode`) + mock fallback + `createBlockchainService` factory + env config helper.
+   - **Still residual for deploy:**
+     - Default `App.tsx` still calls mock `settlePot(HandResult)` — not yet wired to `settleFromState` + wallet-signed HandOutcome.
+     - No deployed settler/oracle addresses or live viem clients in production config.
+     - Winner EIP-712 signing from connected wallets and FoldAuth / force-timeout client paths incomplete.
+   - References: S9 in `ADVERSARIAL_TESTS.md`, `TASK.md` US-PD.1.1, `App.tsx` (handleNewHand), `mock-service.ts` / `live-service.ts`.
 
 2. **Contract Deployment & Configuration**
    - No contracts have been deployed on any network.

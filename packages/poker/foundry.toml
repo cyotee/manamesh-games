@@ -16,6 +16,8 @@ evm_version = "prague"
 ffi = false
 verbosity = 2
 fuzz = { runs = 256 }
+# S7 parity: allow Foundry tests to load shared hand-eval vectors.
+fs_permissions = [{ access = "read", path = "./test-vectors" }]
 
 [profile.ci]
 fuzz = { runs = 1000 }

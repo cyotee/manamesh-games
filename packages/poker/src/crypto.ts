@@ -64,6 +64,12 @@ import {
 } from "@manamesh/boardgameio-crypto/mental-poker";
 import { secpIsValidPointHex, validateEncryptedCard, validatePlayerIdentity } from "@manamesh/boardgameio-crypto/secp256k1";
 import {
+  keychainAdd,
+  keychainFromRecord,
+  MENTAL_POKER_KEYCHAIN_POLICY,
+  requirePrivateKeyMatchesPublished,
+} from "@manamesh/boardgameio-crypto/keychain";
+import {
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
@@ -233,7 +239,12 @@ export function createCryptoInitialState(config: GameConfig): CryptoPokerState {
 /**
  * Submit public key during key exchange phase.
  */
-function submitPublicKey(
+/**
+ * Mental-poker key admission: valid finite secp256k1 points, one key per seat,
+ * no two seats share the same public key. Implemented via boardgameio-crypto
+ * {@link MENTAL_POKER_KEYCHAIN_POLICY} — no game rules inside the crypto package.
+ */
+export function submitPublicKey(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
@@ -261,8 +272,30 @@ function submitPublicKey(
   if (!player) return INVALID_MOVE;
   if (player.publicKey) return INVALID_MOVE; // Already submitted
 
-  player.publicKey = publicKey;
-  G.crypto.publicKeys[playerId] = publicKey;
+  // Rebuild keychain from committed publicKeys + admit under mental-poker policy.
+  // Pure crypto admission; game only maps reject → INVALID_MOVE and stores result.
+  const prior = keychainFromRecord(
+    G.crypto.publicKeys ?? {},
+    MENTAL_POKER_KEYCHAIN_POLICY,
+  );
+  const admitted = keychainAdd(
+    prior,
+    playerId,
+    publicKey,
+    MENTAL_POKER_KEYCHAIN_POLICY,
+  );
+  if (!admitted.ok) {
+    console.log(
+      "[CryptoPoker] submitPublicKey INVALID_MOVE: keychain reject",
+      admitted.reason,
+    );
+    return INVALID_MOVE;
+  }
+
+  const canonical = admitted.entry.publicKey;
+  player.publicKey = canonical;
+  G.crypto.publicKeys[playerId] = canonical;
+  G.crypto.keychain = admitted.keychain;
 
   // Check if all players have submitted
   const allSubmitted = G.playerOrder.every(
@@ -279,7 +312,7 @@ function submitPublicKey(
 /**
  * Encrypt deck during encrypt phase.
  */
-function encryptDeck(
+export function encryptDeck(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
@@ -295,6 +328,16 @@ function encryptDeck(
 
   const player = G.players[playerId];
   if (player.hasEncrypted) return INVALID_MOVE;
+
+  // sk must derive the public key admitted to the keychain at key exchange
+  const published =
+    player.publicKey ?? G.crypto.publicKeys[playerId] ?? null;
+  if (!requirePrivateKeyMatchesPublished(privateKey, published)) {
+    console.log(
+      "[CryptoPoker] encryptDeck INVALID_MOVE: private key does not match published public key",
+    );
+    return INVALID_MOVE;
+  }
 
   // Perform actual encryption
   const existingDeck = G.crypto.encryptedZones["deck"];
@@ -356,7 +399,7 @@ function encryptDeck(
 /**
  * Shuffle deck during shuffle phase.
  */
-function shuffleEncryptedDeck(
+export function shuffleEncryptedDeck(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
@@ -364,6 +407,10 @@ function shuffleEncryptedDeck(
   events?: { endPhase?: () => void },
 ): CryptoPokerState | typeof INVALID_MOVE {
   if (G.phase !== "shuffle") return INVALID_MOVE;
+
+  if (!validatePlayerIdentity(ctx.playerID, playerId)) {
+    return INVALID_MOVE;
+  }
 
   const currentPlayer = getCurrentSetupPlayer(G);
   if (playerId !== currentPlayer) return INVALID_MOVE;
@@ -433,7 +480,7 @@ function shuffleEncryptedDeck(
 /**
  * Deal hole cards to all players (encrypted).
  */
-function dealHoleCards(G: CryptoPokerState): void {
+export function dealHoleCards(G: CryptoPokerState): void {
   // In crypto mode, this moves encrypted cards to player hand zones
   // The actual card values remain encrypted until peek/reveal
 
@@ -474,7 +521,7 @@ function dealHoleCards(G: CryptoPokerState): void {
  * Deal community cards (flop/turn/river) from encrypted deck.
  * Uses cooperative decryption - players must approve before cards are revealed.
  */
-function dealCommunityCards(
+export function dealCommunityCards(
   G: CryptoPokerState,
   ctx: Ctx,
   count: number,
@@ -601,7 +648,9 @@ function processCommunityCardDecrypt(G: CryptoPokerState): void {
       let decrypted = { ...encryptedCard };
 
       for (const playerId of G.playerOrder) {
-        const share = request.decryptionShares[playerId];
+        // Community requests are single-index; peels stored as length-1 arrays.
+        const shareArr = request.decryptionShares[playerId];
+        const share = shareArr?.[0];
         if (share && share.layers < decrypted.layers) {
           decrypted = { ...share };
         }
@@ -640,7 +689,7 @@ function processCommunityCardDecrypt(G: CryptoPokerState): void {
  * Request to peek at hole cards via cooperative decryption.
  * V2 Security Fix: Uses cooperative decryption instead of stored private keys.
  */
-function peekHoleCards(
+export function peekHoleCards(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
@@ -859,15 +908,19 @@ function requestDecrypt(
 }
 
 /**
- * Approve a decrypt request and submit decryption share.
+ * Approve a decrypt request and submit decryption peels.
  * V2 Security Fix: Player decrypts LOCALLY and sends the RESULT, not their private key.
+ *
+ * @param decryptedCardOrShares - One EncryptedCard (single-index request) or an
+ *   array parallel to `request.cardIndices` (multi-card hole peeks). Each entry
+ *   should be a progressive peel of the *current* zone card with this player's key.
  */
-function approveDecrypt(
+export function approveDecrypt(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
   requestId: string,
-  decryptedCard: EncryptedCard,
+  decryptedCardOrShares: EncryptedCard | EncryptedCard[],
 ): CryptoPokerState | typeof INVALID_MOVE {
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
@@ -886,23 +939,43 @@ function approveDecrypt(
     return INVALID_MOVE;
   }
 
-  if (request.approvals[playerId]) {
+  // Already approved *and* share submitted → no double-submit.
+  // (Requester is auto-approved on peekHoleCards but still must submit a share.)
+  if (request.approvals[playerId] && request.decryptionShares[playerId]) {
     console.log(
       "[CryptoPoker] Player",
       playerId,
-      "already approved request",
+      "already approved request with share",
       requestId,
     );
     return INVALID_MOVE;
   }
 
-  request.approvals[playerId] = true;
-
-  if (!validateEncryptedCard(decryptedCard)) {
+  const shares: EncryptedCard[] = Array.isArray(decryptedCardOrShares)
+    ? decryptedCardOrShares
+    : [decryptedCardOrShares];
+  if (shares.length !== request.cardIndices.length) {
     return INVALID_MOVE;
   }
+  for (const s of shares) {
+    if (!validateEncryptedCard(s)) return INVALID_MOVE;
+  }
 
-  request.decryptionShares[playerId] = decryptedCard;
+  request.approvals[playerId] = true;
+  request.decryptionShares[playerId] = shares;
+
+  // Progressive peel: update zone cards toward fewer layers using this share set.
+  const zone = G.crypto.encryptedZones[request.zoneId];
+  if (zone) {
+    for (let j = 0; j < request.cardIndices.length; j++) {
+      const idx = request.cardIndices[j];
+      if (idx < 0 || idx >= zone.length) continue;
+      const share = shares[j];
+      if (share.layers < zone[idx].layers) {
+        zone[idx] = { ...share };
+      }
+    }
+  }
 
   const notification: DecryptNotification = {
     type: "approval",
@@ -921,49 +994,55 @@ function approveDecrypt(
   );
 
   const allApproved = G.playerOrder.every((pid) => request.approvals[pid]);
+  // Mental-poker privacy: every player must submit peels, not merely approve.
+  const allShares = G.playerOrder.every(
+    (pid) =>
+      !!request.decryptionShares[pid] &&
+      request.decryptionShares[pid].length === request.cardIndices.length,
+  );
 
-  if (allApproved) {
-    console.log("[CryptoPoker] All players approved! Completing decryption...");
-
-    request.status = "completed";
+  if (allApproved && allShares) {
+    console.log("[CryptoPoker] All players approved with shares! Completing decryption...");
 
     if (request.requestingPlayer === "community") {
-      processCommunityCardDecrypt(G);
+      // Ensure zone reflects best peels from all players
+      applyBestPeelsToZone(G, request);
+      const zoneCards = G.crypto.encryptedZones[request.zoneId];
+      const fullyPeeled =
+        !!zoneCards &&
+        request.cardIndices.every((idx) => zoneCards[idx]?.layers === 0);
+      if (fullyPeeled) {
+        request.status = "completed";
+        processCommunityCardDecrypt(G);
+      }
     } else {
+      applyBestPeelsToZone(G, request);
       const requestingPlayer = G.players[request.requestingPlayer];
       const handZone = G.crypto.encryptedZones[request.zoneId];
 
       if (handZone && requestingPlayer && !requestingPlayer.hasPeeked) {
         const peekedCards: PokerCard[] = [];
+        let fullyRevealed = true;
 
-        for (let i = 0; i < handZone.length; i++) {
-          if (!request.cardIndices.includes(i)) continue;
-
-          // Use the most-reduced share sent by players (progressive peel pattern).
-          let decrypted = { ...handZone[i] };
-
-          for (const pid of G.playerOrder) {
-            const share = request.decryptionShares[pid];
-            if (share && share.layers < decrypted.layers) {
-              decrypted = { ...share };
-            }
+        for (const i of request.cardIndices) {
+          const decrypted = handZone[i];
+          if (!decrypted || decrypted.layers !== 0) {
+            fullyRevealed = false;
+            peekedCards.push({
+              id: "unknown",
+              rank: "?" as PokerCard["rank"],
+              suit: "spades" as const,
+            });
+            continue;
           }
-
-          if (decrypted.layers === 0) {
-            const cardId = lookupCardIdFromPoint(
-              G.crypto.cardPointLookup,
-              decrypted.ciphertext,
-            );
-            if (cardId) {
-              peekedCards.push(parseCardId(cardId));
-            } else {
-              peekedCards.push({
-                id: "unknown",
-                rank: "?" as PokerCard["rank"],
-                suit: "spades" as const,
-              });
-            }
+          const cardId = lookupCardIdFromPoint(
+            G.crypto.cardPointLookup,
+            decrypted.ciphertext,
+          );
+          if (cardId) {
+            peekedCards.push(parseCardId(cardId));
           } else {
+            fullyRevealed = false;
             peekedCards.push({
               id: "unknown",
               rank: "?" as PokerCard["rank"],
@@ -972,32 +1051,57 @@ function approveDecrypt(
           }
         }
 
-        requestingPlayer.peekedCards = peekedCards;
-        requestingPlayer.hasPeeked = true;
-
-        console.log(
-          "[CryptoPoker] Cooperative decryption complete for player",
-          request.requestingPlayer,
-        );
+        if (fullyRevealed) {
+          request.status = "completed";
+          requestingPlayer.peekedCards = peekedCards;
+          requestingPlayer.hasPeeked = true;
+          console.log(
+            "[CryptoPoker] Cooperative decryption complete for player",
+            request.requestingPlayer,
+          );
+        } else {
+          console.warn(
+            "[CryptoPoker] Shares present but cards not fully peeled — leaving request pending",
+          );
+        }
       }
 
-      G.peekNotifications.push({
-        playerId: request.requestingPlayer,
-        timestamp: Date.now(),
-      });
+      if (request.status === "completed") {
+        G.peekNotifications.push({
+          playerId: request.requestingPlayer,
+          timestamp: Date.now(),
+        });
+        const completeNotification: DecryptNotification = {
+          type: "completed",
+          requestId,
+          playerId: request.requestingPlayer,
+          message: `Cards revealed for Player ${request.requestingPlayer}`,
+          timestamp: Date.now(),
+        };
+        G.decryptNotifications.push(completeNotification);
+      }
     }
-
-    const completeNotification: DecryptNotification = {
-      type: "completed",
-      requestId,
-      playerId: request.requestingPlayer,
-      message: `Cards revealed for Player ${request.requestingPlayer}`,
-      timestamp: Date.now(),
-    };
-    G.decryptNotifications.push(completeNotification);
   }
 
   return G;
+}
+
+/** Apply the minimum-layer share for each card index across all players to the zone. */
+function applyBestPeelsToZone(G: CryptoPokerState, request: DecryptRequest): void {
+  const zone = G.crypto.encryptedZones[request.zoneId];
+  if (!zone) return;
+  for (let j = 0; j < request.cardIndices.length; j++) {
+    const idx = request.cardIndices[j];
+    if (idx < 0 || idx >= zone.length) continue;
+    let best = { ...zone[idx] };
+    for (const pid of G.playerOrder) {
+      const share = request.decryptionShares[pid]?.[j];
+      if (share && share.layers < best.layers) {
+        best = { ...share };
+      }
+    }
+    zone[idx] = best;
+  }
 }
 
 /**
@@ -1024,7 +1128,7 @@ function dismissNotification(
  * Release decryption keys for hole cards (proves valid cards on fold).
  * Player submits their decrypted hole cards to prove they had valid cards.
  */
-function releaseKey(
+export function releaseKey(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
@@ -1057,7 +1161,7 @@ function releaseKey(
  * Challenge a player who folded without releasing their keys.
  * If successful, the game is voided and the challenger(s) win.
  */
-function challengeVoid(
+export function challengeVoid(
   G: CryptoPokerState,
   ctx: Ctx,
   challengerId: string,
@@ -1082,7 +1186,7 @@ function challengeVoid(
   G.foldChallenges.push({
     challenger: challengerId,
     challenged: challengedPlayerId,
-    timestamp: now,
+    timestamp: logicalNow,
   });
 
   G.phase = "voided";
@@ -1103,7 +1207,7 @@ function challengeVoid(
  * Submit decryption share for community card reveal.
  * V2 Security Fix: Player decrypts LOCALLY and sends the RESULT, not their private key.
  */
-function submitDecryptedShare(
+export function submitDecryptedShare(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId: string,
@@ -1130,15 +1234,74 @@ function submitDecryptedShare(
       r.cardIndices.includes(cardIndex),
   );
   if (!request) return INVALID_MOVE;
-  if (request.approvals[playerId]) return INVALID_MOVE;
+  if (request.approvals[playerId] && request.decryptionShares[playerId]) {
+    return INVALID_MOVE;
+  }
 
   request.approvals[playerId] = true;
-  request.decryptionShares[playerId] = decryptedCard;
+  // Parallel to cardIndices (usually length 1 for community)
+  const shares = request.cardIndices.map((idx) =>
+    idx === cardIndex ? decryptedCard : G.crypto.encryptedZones[zoneId]?.[idx] ?? decryptedCard,
+  );
+  request.decryptionShares[playerId] = shares;
+
+  // Progressive zone update
+  const zone = G.crypto.encryptedZones[zoneId];
+  if (zone && decryptedCard.layers < zone[cardIndex].layers) {
+    zone[cardIndex] = { ...decryptedCard };
+  }
 
   const allApproved = G.playerOrder.every((pid) => request.approvals[pid]);
-  if (allApproved) {
+  const allShares = G.playerOrder.every(
+    (pid) => !!request.decryptionShares[pid]?.length,
+  );
+  if (allApproved && allShares && zone?.[cardIndex]?.layers === 0) {
     request.status = "completed";
     processCommunityCardDecrypt(G);
+  }
+
+  return G;
+}
+
+/**
+ * Abort stalled cooperative decrypt requests (liveness).
+ * Marks pending requests rejected, tags non-approvers as abortedDecrypt, voids the hand.
+ */
+export function voteAbortDecrypt(
+  G: CryptoPokerState,
+  ctx: Ctx,
+  playerId: string,
+): CryptoPokerState | typeof INVALID_MOVE {
+  if (!validatePlayerIdentity(ctx.playerID, playerId)) return INVALID_MOVE;
+  if (!canAbortDecryptNow(G, ctx)) return INVALID_MOVE;
+
+  const refusingPlayers: string[] = [];
+  G.decryptRequests.forEach((r) => {
+    if (r.status === "pending") {
+      r.status = "rejected";
+      G.playerOrder.forEach((pid) => {
+        if (!r.approvals[pid]) {
+          refusingPlayers.push(pid);
+          if (G.players[pid]) {
+            (G.players[pid] as any).abortedDecrypt = true;
+          }
+        }
+      });
+    }
+  });
+
+  console.log(
+    "[CryptoPoker] Decrypt requests aborted due to stall by",
+    playerId,
+    "refusers:",
+    refusingPlayers,
+  );
+
+  if (
+    ["preflop", "flop", "turn", "river", "showdown"].includes(G.phase) &&
+    G.decryptRequests.some((r) => r.status === "rejected")
+  ) {
+    G.phase = "voided";
   }
 
   return G;
@@ -1151,7 +1314,7 @@ function submitDecryptedShare(
 /**
  * Fold move.
  */
-function fold(
+export function fold(
   G: CryptoPokerState,
   ctx: Ctx,
   playerId?: string,
@@ -1313,7 +1476,7 @@ function allIn(
 /**
  * Advance to next phase after betting round.
  */
-function advancePhase(G: CryptoPokerState, ctx: Ctx): void {
+export function advancePhase(G: CryptoPokerState, ctx: Ctx): void {
   // Reset bets for next round
   for (const player of Object.values(G.players)) {
     player.bet = 0;
@@ -1508,9 +1671,15 @@ export const CryptoPokerGame: Game<CryptoPokerState> = {
   // Improved stub for security (Phase 4): basic presence check.
   // In pure P2P, the boardgameIO-p2p layer + move-level validatePlayerIdentity provide the real binding.
   // TODO: integrate real credentials (e.g. signed player tokens) when relay is added.
-  authenticateCredentials: (credentials: any, playerMetadata?: any) => {
-    // At minimum require some credential shape in non-P2P; always true for now to not break existing P2P.
-    return true;
+  authenticateCredentials: (credentials: any, _playerMetadata?: any) => {
+    // Production-hardening: require non-empty credentials when the multiplayer
+    // layer supplies them. Pure local/single-player may pass undefined.
+    if (credentials === undefined || credentials === null) return true;
+    if (typeof credentials === "string") return credentials.length > 0;
+    if (typeof credentials === "object") {
+      return Object.keys(credentials as object).length > 0;
+    }
+    return Boolean(credentials);
   },
 
   setup: async (ctx): Promise<CryptoPokerState> => {
@@ -1636,38 +1805,7 @@ export const CryptoPokerGame: Game<CryptoPokerState> = {
         },
         // Minimal liveness: allow aborting stalled decrypt requests (see canAbortDecryptNow)
         voteAbortDecrypt: {
-          move: ({ G, ctx }, playerId: string) => {
-            if (!validatePlayerIdentity(ctx.playerID, playerId)) return INVALID_MOVE;
-            if (!canAbortDecryptNow(G, ctx)) return INVALID_MOVE;
-
-            const refusingPlayers: string[] = [];
-            G.decryptRequests.forEach((r) => {
-              if (r.status === "pending") {
-                r.status = "rejected";
-                // Record players who did not approve as refusers
-                G.playerOrder.forEach((pid) => {
-                  if (!r.approvals[pid]) {
-                    refusingPlayers.push(pid);
-                    if (G.players[pid]) {
-                      // Mark for potential settlement impact (e.g. in buildHandResult)
-                      (G.players[pid] as any).abortedDecrypt = true;
-                    }
-                  }
-                });
-              }
-            });
-
-            // If any pending decrypts were aborted, consider voiding or forcing phase advance
-            // For now, log and let game continue (UI or higher logic can void)
-            console.log("[CryptoPoker] Decrypt requests aborted due to stall by", playerId, "refusers:", refusingPlayers);
-
-            // Trigger voided state for stalled reveals (liveness protection)
-            if (["preflop", "flop", "turn", "river", "showdown"].includes(G.phase) && G.decryptRequests.some(r => r.status === 'rejected')) {
-              G.phase = 'voided';
-            }
-
-            return G;
-          },
+          move: ({ G, ctx }, playerId: string) => voteAbortDecrypt(G, ctx, playerId),
           client: false,
         },
         dismissNotification: {
@@ -1807,12 +1945,44 @@ export function buildHandResult(G: CryptoPokerState): {
 // Move Validation
 // =============================================================================
 
+/**
+ * When tests (or callers) pass a mock ctx `{ playerID }` among args, enforce that
+ * the claimed `playerId` matches the authenticated context — same binding as
+ * production moves via `validatePlayerIdentity`.
+ */
+function identityMismatchFromArgs(playerId: string, args: unknown[]): MoveValidation | null {
+  const mockCtx = args.find(
+    (a: unknown) => a && typeof a === "object" && a !== null && "playerID" in (a as object),
+  ) as { playerID?: string } | undefined;
+  if (mockCtx && mockCtx.playerID !== undefined && mockCtx.playerID !== playerId) {
+    return { valid: false, error: "Player ID mismatch" };
+  }
+  return null;
+}
+
 export function validateCryptoMove(
   state: CryptoPokerState,
   move: string,
   playerId: string,
   ...args: unknown[]
 ): MoveValidation {
+  // C1: identity spoof rejection for all crypto-sensitive moves when ctx is supplied.
+  const cryptoMovesWithIdentity = new Set([
+    "submitPublicKey",
+    "encryptDeck",
+    "shuffleDeck",
+    "peekHoleCards",
+    "requestDecrypt",
+    "approveDecrypt",
+    "submitDecryptedShare",
+    "releaseKey",
+    "voteAbortDecrypt",
+  ]);
+  if (cryptoMovesWithIdentity.has(move)) {
+    const idFail = identityMismatchFromArgs(playerId, args);
+    if (idFail) return idFail;
+  }
+
   switch (move) {
     case "submitPublicKey":
       if (state.phase !== "keyExchange") {
@@ -1848,12 +2018,6 @@ export function validateCryptoMove(
       if (state.players[playerId]?.hasPeeked) {
         return { valid: false, error: "Already peeked" };
       }
-      // Support test mocks that pass {playerID} as extra arg for identity simulation
-      const peekMockCtx = args.find((a: any) => a && typeof a === 'object' && 'playerID' in a) as any;
-      const peekEffective = peekMockCtx?.playerID ?? playerId;
-      if (playerId !== peekEffective) {
-        return { valid: false, error: 'Player ID mismatch' };
-      }
       if (state.phase !== "showdown") {
         const bettingComplete =
           state.bettingRound.isComplete ||
@@ -1886,6 +2050,7 @@ export function validateCryptoMove(
       return { valid: true };
 
     case "approveDecrypt":
+    case "submitDecryptedShare":
       return { valid: true };
 
     case "voteAbortDecrypt":

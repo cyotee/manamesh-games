@@ -45,5 +45,17 @@ library PokerHandSettlerErrors {
     /// @notice A function reserved for a later implementation phase was called.
     /// @custom:signature NotImplemented()
     error NotImplemented();
+
+    /// @notice Player count is outside the allowed range `[MIN_PLAYERS, MAX_PLAYERS]`.
+    /// @custom:signature InvalidPlayerCount(uint256)
+    error InvalidPlayerCount(uint256 count);
+
+    /// @notice `HandInit.players` is not strictly sorted ascending by address (§11.8).
+    /// @custom:signature PlayersNotSorted()
+    error PlayersNotSorted();
+
+    /// @notice `HandInit.vault` does not match this settler instance.
+    /// @custom:signature InvalidVault(address,address)
+    error InvalidVault(address expected, address supplied);
 }
 // end::PokerHandSettlerErrors[]

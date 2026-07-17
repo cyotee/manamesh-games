@@ -53,15 +53,15 @@ No external MM- task dependencies (this is the integration/deployment capstone f
 As a poker integrator, I want a real (non-mock) implementation of `BlockchainService` that performs on-chain settlement using the existing poker signing and contract helpers so that hand outcomes move real escrowed value.
 
 **Acceptance Criteria:**
-- [ ] Create `packages/manamesh/packages/frontend/src/blockchain/live-service.ts` (or extend the abstraction) that implements `settlePot(handResult)`.
-- [ ] `settlePot` takes the internal `PokerHandResult` (from `buildHandResult(G)` in the game) and calls `buildSettlement(state, opts)` from `@manamesh/poker` to produce on-chain `HandOutcome`.
-- [ ] Uses existing wallet signing hooks (`useSignHandResult`, `useSignFoldAuth`, `createHandResultData`, etc. from `src/wallet/signing`).
-- [ ] Obtains player wallet addresses (via `useWallet` / `useGameKeys` or equivalent) and maps boardgame.io playerIDs to addresses.
-- [ ] Submits `settleHand` (or equivalent) to the deployed `PokerHandSettler` via viem.
-- [ ] Handles both full unanimous settlement and FoldAuth + partial signature paths.
-- [ ] Returns transaction hash, updated balances (fetched from chain or event), and success status.
-- [ ] Supports configurable mode: "mock" (current behavior) vs "live" (uses real contracts + RPC).
-- [ ] Graceful error handling and user-visible messages for failed txs, insufficient signatures, etc.
+- [x] Create `packages/manamesh/packages/frontend/src/blockchain/live-service.ts` (or extend the abstraction) that implements live settlement (S9: `LiveBlockchainService` + `@manamesh/poker` `LiveSettlementClient`; `settlePot(HandResult)` remains mock-only — live requires `settleFromState` / `settleHand`).
+- [x] Live path calls `buildSettlement` / `prepareSettlementPayload` from `@manamesh/poker` to produce on-chain `HandOutcome` (unit-tested with mocked viem ports).
+- [ ] Uses existing wallet signing hooks (`useSignHandResult`, `useSignFoldAuth`, `createHandResultData`, etc. from `src/wallet/signing`) — residual: wire winner EIP-712 HandOutcome sigs from connected wallets into `settleHand`.
+- [x] playerID → address map required on live client (`requirePlayerAddresses` / `setPlayerAddresses`); missing map errors clearly.
+- [x] Submits `assertHandMembership` / `settleHand` via injected viem-like write port (mocked tests green; real RPC residual).
+- [ ] Handles both full unanimous settlement and FoldAuth + partial signature paths (force-timeout path not yet in client).
+- [x] Returns transaction hash, updated balances (fetched after confirmed write only — no optimistic credit), and success status.
+- [x] Supports configurable mode: "mock" vs "live" (`createBlockchainService` / `VITE_POKER_SETTLEMENT_MODE`).
+- [x] Graceful error handling for failed txs / user reject without double-credit (S9 tests).
 
 #### US-PD.1.2: Integrate Settlement into Poker Flows
 

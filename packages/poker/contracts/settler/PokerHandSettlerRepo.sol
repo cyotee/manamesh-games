@@ -13,9 +13,16 @@ import {IBettingConfigOracle} from "../oracle/IBettingConfigOracle.sol";
  *      storage + initialization only.
  */
 library PokerHandSettlerRepo {
-    // tag::STORAGE_SLOT[]
-    bytes32 internal constant STORAGE_SLOT = keccak256(abi.encode("manamesh.poker.hand-settler"));
-    // end::STORAGE_SLOT[]
+    // tag::DEFAULT_SLOT[]
+    /// @dev ERC1967-style diamond storage slot (Crane LR-6): `keccak256(abi.encode(name)) - 1`.
+    bytes32 internal constant DEFAULT_SLOT =
+        bytes32(uint256(keccak256(abi.encode("manamesh.poker.hand-settler"))) - 1);
+    /// @dev Legacy alias kept for call-site readability.
+    bytes32 internal constant STORAGE_SLOT = DEFAULT_SLOT;
+    // end::DEFAULT_SLOT[]
+
+    uint256 internal constant MIN_PLAYERS = 2;
+    uint256 internal constant MAX_PLAYERS = 9;
 
     /// @dev Hand lifecycle states.
     enum HandStatus {
@@ -41,17 +48,30 @@ library PokerHandSettlerRepo {
     }
     // end::Storage[]
 
-    // tag::_layout(bytes32)[]
-    function _layout(bytes32 slot) internal pure returns (Storage storage layout) {
+    // tag::_layoutStruct(bytes32)[]
+    function _layoutStruct(bytes32 slot) internal pure returns (Storage storage layoutStruct) {
         assembly {
-            layout.slot := slot
+            layoutStruct.slot := slot
         }
+    }
+    // end::_layoutStruct(bytes32)[]
+
+    // tag::_layoutStruct()[]
+    function _layoutStruct() internal pure returns (Storage storage) {
+        return _layoutStruct(DEFAULT_SLOT);
+    }
+    // end::_layoutStruct()[]
+
+    // tag::_layout(bytes32)[]
+    /// @dev Alias for {_layoutStruct(bytes32)} (historical call-site name).
+    function _layout(bytes32 slot) internal pure returns (Storage storage layout) {
+        return _layoutStruct(slot);
     }
     // end::_layout(bytes32)[]
 
     // tag::_layout()[]
     function _layout() internal pure returns (Storage storage) {
-        return _layout(STORAGE_SLOT);
+        return _layoutStruct();
     }
     // end::_layout()[]
 

@@ -71,9 +71,27 @@ describe("CryptoPlugin", () => {
       await api.init(["card1"], ["playerA", "playerB"]);
       api.submitPublicKey("playerA", playerA.keyPair.publicKey);
 
+      // Stored in canonical compressed form via keychain policy.
+      const { normalizeSecp256k1PublicKey } = await import("../keychain");
       expect(gameState.crypto.publicKeys["playerA"]).toBe(
-        playerA.keyPair.publicKey,
+        normalizeSecp256k1PublicKey(playerA.keyPair.publicKey),
       );
+    });
+
+    it("rejects invalid and duplicate public keys", async () => {
+      const api = CryptoPlugin.api({
+        G: gameState,
+        ctx,
+        data: gameState.crypto,
+      });
+      await api.init(["card1"], ["playerA", "playerB"]);
+      expect(() => api.submitPublicKey("playerA", "not-a-point")).toThrow(
+        /keychain_reject/,
+      );
+      api.submitPublicKey("playerA", playerA.keyPair.publicKey);
+      expect(() =>
+        api.submitPublicKey("playerB", playerA.keyPair.publicKey),
+      ).toThrow(/keychain_reject:duplicate_key/);
     });
   });
 

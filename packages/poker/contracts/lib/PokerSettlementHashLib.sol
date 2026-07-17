@@ -3,6 +3,10 @@ pragma solidity 0.8.30;
 
 import {HandInit, HAND_INIT_TYPEHASH} from "../types/HandInit.sol";
 import {HandOutcome, HAND_OUTCOME_TYPEHASH} from "../types/HandOutcome.sol";
+import {
+    RoundStateTransition,
+    ROUND_STATE_TRANSITION_TYPEHASH
+} from "../types/RoundStateTransition.sol";
 
 // tag::PokerSettlementHashLib[]
 /**
@@ -69,6 +73,22 @@ library PokerSettlementHashLib {
         );
     }
     // end::hashHandOutcome(HandOutcome)[]
+
+    // tag::hashRoundStateTransition(RoundStateTransition)[]
+    /// @dev EIP-712 struct hash of a RoundStateTransition (force-timeout proof of pot).
+    function hashRoundStateTransition(RoundStateTransition memory state) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                ROUND_STATE_TRANSITION_TYPEHASH,
+                state.handId,
+                state.roundNumber,
+                state.currentPot,
+                keccak256(abi.encodePacked(state.playerStacks)),
+                state.actionHash
+            )
+        );
+    }
+    // end::hashRoundStateTransition(RoundStateTransition)[]
 
     /// @dev Hash of `uint8[2][]`: keccak of the concatenation of each inner
     ///      pair's hash (each inner element widened to a 32-byte word).

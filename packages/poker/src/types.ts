@@ -349,7 +349,12 @@ export interface DecryptRequest {
   status: "pending" | "approved" | "completed" | "rejected";
   /** Players who have approved */
   approvals: Record<string, boolean>;
-  decryptionShares: Record<string, EncryptedCard>;
+  /**
+   * Per-player decrypt peels parallel to `cardIndices`.
+   * Progressive protocol: each share should be a one-layer peel of the *current*
+   * zone card; the zone is updated toward layers===0 as peels arrive.
+   */
+  decryptionShares: Record<string, EncryptedCard[]>;
 }
 
 /**

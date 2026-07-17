@@ -1,0 +1,84 @@
+{
+  "packing": {
+    "format": "uint8 card = (rank << 4) | suit",
+    "rank": "2..14 inclusive (14 = Ace). Same as RANK_VALUES / Solidity evaluator.",
+    "suit": "0 = clubs, 1 = diamonds, 2 = hearts, 3 = spades. Matches SUIT_VALUES and encodeCard() in handOutcome.ts.",
+    "notes": [
+      "TS PokerCard ids are '${suit}-${rank}' (e.g. spades-A); packing is only for on-chain / cross-stack vectors.",
+      "Solidity PokerHandEvaluator.evaluate(uint8[7]) scores best-of-5; higher score wins.",
+      "TS evaluateHand + compareHands decide winners; royal flush is HandRank 9 (Solidity folds royal into category 8 straight-flush with high=14 — relative order still matches)."
+    ]
+  },
+  "vectors": [
+    {
+      "id": "royal_vs_junk",
+      "description": "Royal flush (spades A-K-Q-J-T) beats ace-high junk",
+      "handA": [227, 211, 195, 179, 163, 32, 49],
+      "handB": [224, 193, 162, 131, 96, 65, 34],
+      "expected": "A_wins"
+    },
+    {
+      "id": "wheel_vs_broadway",
+      "description": "Wheel straight (A-2-3-4-5) loses to Broadway (T-J-Q-K-A)",
+      "handA": [224, 33, 50, 67, 80, 129, 162],
+      "handB": [160, 177, 194, 211, 225, 34, 48],
+      "expected": "B_wins"
+    },
+    {
+      "id": "wheel_vs_junk",
+      "description": "Wheel straight beats ace-high junk (not a straight)",
+      "handA": [224, 33, 50, 67, 80, 129, 162],
+      "handB": [224, 193, 162, 131, 96, 65, 34],
+      "expected": "A_wins"
+    },
+    {
+      "id": "three_pair_collapse",
+      "description": "Three pair collapses to best two pair with third pair as kicker (beats KK QQ + low kicker)",
+      "handA": [208, 209, 194, 195, 176, 177, 34],
+      "handB": [208, 209, 194, 195, 64, 49, 34],
+      "expected": "A_wins"
+    },
+    {
+      "id": "identical_tie",
+      "description": "Identical rank/kicker structure (different suits) ties",
+      "handA": [224, 225, 210, 211, 144, 81, 34],
+      "handB": [226, 227, 208, 209, 146, 83, 32],
+      "expected": "tie"
+    },
+    {
+      "id": "pair_ace_kicker_vs_pair_king_kicker",
+      "description": "Pair of fives: Ace kicker beats King kicker",
+      "handA": [80, 81, 226, 211, 192, 49, 34],
+      "handB": [80, 81, 210, 195, 176, 49, 34],
+      "expected": "A_wins"
+    },
+    {
+      "id": "pair_aces_vs_pair_kings",
+      "description": "Pair of Aces beats pair of Kings (same kickers)",
+      "handA": [224, 225, 162, 131, 48, 65, 34],
+      "handB": [208, 209, 162, 131, 48, 65, 34],
+      "expected": "A_wins"
+    },
+    {
+      "id": "quads_vs_full_house",
+      "description": "Four of a kind beats full house",
+      "handA": [144, 145, 146, 147, 32, 49, 66],
+      "handB": [208, 209, 210, 192, 193, 32, 49],
+      "expected": "A_wins"
+    },
+    {
+      "id": "full_house_vs_flush",
+      "description": "Full house beats flush",
+      "handA": [208, 209, 210, 192, 193, 32, 49],
+      "handB": [226, 162, 114, 82, 50, 32, 65],
+      "expected": "A_wins"
+    },
+    {
+      "id": "quads_vs_flush",
+      "description": "Four of a kind beats flush (category order quads > FH > flush)",
+      "handA": [144, 145, 146, 147, 32, 49, 66],
+      "handB": [226, 162, 114, 82, 50, 32, 65],
+      "expected": "A_wins"
+    }
+  ]
+}

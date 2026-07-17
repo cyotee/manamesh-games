@@ -20,6 +20,7 @@ export {
   peelDecryptShare,
   enqueueNextDrawIfNeeded,
   buildEncryptionLayer,
+  prepareEncryptionLayer,
   startSearchDeckReveal,
   completeSearchDeckPick,
   hasActiveDeckOp,
@@ -28,6 +29,7 @@ export {
   revealDeckOpSeed,
   submitDeckOpReencrypt,
   buildDeckOpReencryptLayer,
+  prepareDeckOpReencryptLayer,
 } from "./crypto";
 export { createPlaceholderDeck, createCardFromManifest, createDeckFromPack, timestreamsCardSchema } from "./deck";
 export { resolveDeck, resolveDeckFromPack, resolveDecksFromPack as resolveDecksForPlayers, getDeckSizeFromPack, materializeHomeEraDecks } from "./deckResolver";

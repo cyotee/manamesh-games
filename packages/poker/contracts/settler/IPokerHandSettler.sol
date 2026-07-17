@@ -77,15 +77,20 @@ interface IPokerHandSettler {
 
     /**
      * @notice Force-settles a timed-out hand.
-     * @dev Supports partial winner signatures; unsigned winners forfeit to the operator.
-     *      lastRoundState is bound by handId (full signature verification on lastRoundState
-     *      may be added in a future hardening pass).
+     * @dev Supports partial winner signatures; unsigned winners forfeit to the operator (§11.10).
+     *      `lastRoundState` must be signed by **all** `init.players` (§11.9) and is bound by handId.
+     * @param init Original hand initialization (handId recomputed).
+     * @param outcome Proposed outcome; may have partial winner signatures.
+     * @param partialSignatures Parallel to `outcome.winners` (empty/invalid → forfeit that winner).
+     * @param lastRoundState Latest signed betting-round state (proof of pot at cutoff).
+     * @param lastRoundSignatures EIP-712 signatures over `lastRoundState`, parallel to `init.players`.
      */
     function forceTimeoutSettlement(
         HandInit calldata init,
         HandOutcome calldata outcome,
         bytes[] calldata partialSignatures,
-        RoundStateTransition calldata lastRoundState
+        RoundStateTransition calldata lastRoundState,
+        bytes[] calldata lastRoundSignatures
     ) external;
 }
 // end::IPokerHandSettler[]

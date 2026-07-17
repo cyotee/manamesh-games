@@ -13,8 +13,8 @@ import { ERA_ORDER, composeCardText, formatCardCaption } from '../types';
 import {
   hashSeedCommit,
   peelDecryptShare,
-  buildEncryptionLayer,
-  buildDeckOpReencryptLayer,
+  prepareEncryptionLayer,
+  prepareDeckOpReencryptLayer,
   resolveCardIdFromPoint,
 } from '../crypto';
 import { generateKeyPair } from '@manamesh/boardgameio-crypto/mental-poker';
@@ -405,18 +405,18 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
       void (async () => {
         try {
           await yieldToMain();
-          const preEncrypted = buildEncryptionLayer(G, kp.privateKey);
+          // sk stays local: bind + encrypt here, submit ciphertexts only.
+          const preEncrypted = prepareEncryptionLayer(
+            G,
+            playerID!,
+            kp.privateKey,
+          );
           await yieldToMain();
-          // Preferred: pre-encrypted decks (null privateKey). Master stays responsive.
+          // First arg null = no private key on the multiplayer wire.
           moves.encryptDeck(null, preEncrypted);
         } catch (err) {
-          console.error('[TimestreamsBoard] encrypt failed, retrying with privateKey', err);
-          try {
-            moves.encryptDeck(kp.privateKey, null);
-          } catch (err2) {
-            console.error('[TimestreamsBoard] encrypt fallback failed', err2);
-            setupAttemptRef.current.delete(actionKey);
-          }
+          console.error('[TimestreamsBoard] encrypt failed', err);
+          setupAttemptRef.current.delete(actionKey);
         } finally {
           encryptBusyRef.current = false;
         }
@@ -657,7 +657,12 @@ export const TimestreamsBoard: React.FC<TimestreamsBoardProps> = ({
               try {
                 await yieldToMain();
                 if (!kp) throw new Error('no keys');
-                const layer = buildDeckOpReencryptLayer(G, kp.privateKey);
+                // sk stays local; move carries only preEncrypted layer.
+                const layer = prepareDeckOpReencryptLayer(
+                  G,
+                  playerID!,
+                  kp.privateKey,
+                );
                 await yieldToMain();
                 moves.submitDeckOpReencrypt(null, layer);
               } catch (err) {

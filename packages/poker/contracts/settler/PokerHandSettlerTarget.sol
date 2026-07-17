@@ -82,9 +82,8 @@ contract PokerHandSettlerTarget is IPokerHandSettler {
     /// @inheritdoc IPokerHandSettler
     function assertHandMembership(HandInit calldata init, bytes[] calldata signatures) external {
         uint256 n = init.players.length;
-        if (init.buyIns.length != n || init.playerHandNonces.length != n || signatures.length != n) {
-            revert PokerHandSettlerErrors.ArrayLengthMismatch();
-        }
+        _validateHandInitShape(init, n);
+        if (signatures.length != n) revert PokerHandSettlerErrors.ArrayLengthMismatch();
 
         bytes32 handId = HandIdLib.handIdOf(init);
         PokerHandSettlerRepo.Storage storage s = PokerHandSettlerRepo._layout();
@@ -101,6 +100,7 @@ contract PokerHandSettlerTarget is IPokerHandSettler {
         for (uint256 i = 0; i < n; ++i) {
             address player = init.players[i];
             uint256 buyIn = init.buyIns[i];
+            if (buyIn == 0) revert PokerHandSettlerErrors.ZeroAmount();
             uint256 free = s.balanceOf[player] - s.lockedOf[player];
             if (buyIn > free) revert PokerHandSettlerErrors.InsufficientUnlockedBalance(free, buyIn);
             s.lockedOf[player] += buyIn;
@@ -183,19 +183,30 @@ contract PokerHandSettlerTarget is IPokerHandSettler {
     /// @dev Same finalStacks-direct accounting as {settleHand}, but the verifier
     ///      is skipped (§11.11) and any declared winner without a valid signature
     ///      forfeits their entire share to the operator (§11.10). `lastRoundState`
-    ///      is bound by handId. Full signature verification on lastRoundState is
-    ///      currently limited (see IPokerHandSettler).
+    ///      must be signed by all players (§11.9) and is bound by handId.
     function forceTimeoutSettlement(
         HandInit calldata init,
         HandOutcome calldata outcome,
         bytes[] calldata partialSignatures,
-        RoundStateTransition calldata lastRoundState
+        RoundStateTransition calldata lastRoundState,
+        bytes[] calldata lastRoundSignatures
     ) external {
         _validateForceTimeoutArgs(init, outcome, partialSignatures);
+        if (lastRoundSignatures.length != init.players.length) {
+            revert PokerHandSettlerErrors.ArrayLengthMismatch();
+        }
 
         bytes32 handId = HandIdLib.handIdOf(init);
         PokerHandSettlerRepo.Storage storage s = PokerHandSettlerRepo._layout();
         _requireForceTimeoutReady(s, init, outcome, lastRoundState, handId);
+
+        // §11.9: lastRoundState is the on-chain pot proof; all original players signed it in-play.
+        SignatureLib.requireSignedByAll(
+            PokerSettlementHashLib.domainSeparator(),
+            PokerSettlementHashLib.hashRoundStateTransition(lastRoundState),
+            init.players,
+            lastRoundSignatures
+        );
 
         (uint256 pot, uint256 rake, address operator) = _potRakeWithConservation(s, init, outcome);
         uint256 forfeited = _distributeForceTimeout(s, init, outcome, partialSignatures, handId);
@@ -206,6 +217,26 @@ contract PokerHandSettlerTarget is IPokerHandSettler {
 
         s.hands[handId].status = PokerHandSettlerRepo.HandStatus.Settled;
         emit ForceTimeoutSettled(handId, pot, rake, forfeited, operator);
+    }
+
+    /// @dev Validates HandInit structural constraints from PRD §11.4 / §11.8.
+    function _validateHandInitShape(HandInit calldata init, uint256 n) private view {
+        if (n < PokerHandSettlerRepo.MIN_PLAYERS || n > PokerHandSettlerRepo.MAX_PLAYERS) {
+            revert PokerHandSettlerErrors.InvalidPlayerCount(n);
+        }
+        if (init.buyIns.length != n || init.playerHandNonces.length != n) {
+            revert PokerHandSettlerErrors.ArrayLengthMismatch();
+        }
+        if (init.vault != address(this)) {
+            revert PokerHandSettlerErrors.InvalidVault(address(this), init.vault);
+        }
+        // Strictly ascending address order (§11.8) — also rejects zero / duplicates.
+        for (uint256 i = 1; i < n; ++i) {
+            if (init.players[i] <= init.players[i - 1]) {
+                revert PokerHandSettlerErrors.PlayersNotSorted();
+            }
+        }
+        if (init.players[0] == address(0)) revert PokerHandSettlerErrors.PlayersNotSorted();
     }
 
     /// @dev Length-consistency checks for the force-timeout arrays.

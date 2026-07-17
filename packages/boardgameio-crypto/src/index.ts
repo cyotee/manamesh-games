@@ -7,6 +7,9 @@
 // Mental Poker primitives
 export * from "./mental-poker";
 
+// Keychain — GPG-style public-key registry + admission policy
+export * from "./keychain";
+
 // boardgame.io plugin
 export * from "./plugin";
 

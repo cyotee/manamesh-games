@@ -50,6 +50,10 @@ contract FtHarness is PokerHandSettlerTarget {
     function hashHandOutcome(HandOutcome calldata outcome) external pure returns (bytes32) {
         return PokerSettlementHashLib.hashHandOutcome(outcome);
     }
+
+    function hashRoundStateTransition(RoundStateTransition calldata state) external pure returns (bytes32) {
+        return PokerSettlementHashLib.hashRoundStateTransition(state);
+    }
 }
 
 contract PokerHandSettlerForceTimeoutTest is Test {
@@ -69,6 +73,7 @@ contract PokerHandSettlerForceTimeoutTest is Test {
     function setUp() public {
         alice = vm.addr(alicePk);
         bob = vm.addr(bobPk);
+        assertTrue(bob < alice, "fixture order");
         chip = new ERC20Mock("Chip", "CHIP");
         settler = new FtHarness();
         settler.initSettler(address(chip), new FtMockOracle(operator));
@@ -88,8 +93,8 @@ contract PokerHandSettlerForceTimeoutTest is Test {
 
     function _init() internal view returns (HandInit memory init) {
         init.players = new address[](2);
-        init.players[0] = alice;
-        init.players[1] = bob;
+        init.players[0] = bob;
+        init.players[1] = alice;
         init.buyIns = new uint256[](2);
         init.buyIns[0] = BUY_IN;
         init.buyIns[1] = BUY_IN;
@@ -112,12 +117,13 @@ contract PokerHandSettlerForceTimeoutTest is Test {
     function _assertHand() internal {
         HandInit memory init = _init();
         bytes[] memory sigs = new bytes[](2);
-        sigs[0] = _sign(alicePk, settler.hashHandInit(init));
-        sigs[1] = _sign(bobPk, settler.hashHandInit(init));
+        sigs[0] = _sign(bobPk, settler.hashHandInit(init));
+        sigs[1] = _sign(alicePk, settler.hashHandInit(init));
         settler.assertHandMembership(init, sigs);
     }
 
-    function _outcome(address[] memory winners, uint256 aliceStack, uint256 bobStack)
+    /// @dev finalStacks parallel to [bob, alice].
+    function _outcome(address[] memory winners, uint256 bobStack, uint256 aliceStack)
         internal
         view
         returns (HandOutcome memory o)
@@ -127,8 +133,8 @@ contract PokerHandSettlerForceTimeoutTest is Test {
         o.winners = winners;
         o.payouts = new uint256[](winners.length);
         o.finalStacks = new uint256[](2);
-        o.finalStacks[0] = aliceStack;
-        o.finalStacks[1] = bobStack;
+        o.finalStacks[0] = bobStack;
+        o.finalStacks[1] = aliceStack;
         o.finalStateHash = keccak256("final");
         o.holeCards = new uint8[2][](2);
         o.communityCards = [uint8(0), 0, 0, 0, 0];
@@ -142,6 +148,14 @@ contract PokerHandSettlerForceTimeoutTest is Test {
         r.actionHash = keccak256("actions");
     }
 
+    function _lastRoundSigs() internal view returns (bytes[] memory sigs) {
+        RoundStateTransition memory r = _lastRound();
+        bytes32 sh = settler.hashRoundStateTransition(r);
+        sigs = new bytes[](2);
+        sigs[0] = _sign(bobPk, sh);
+        sigs[1] = _sign(alicePk, sh);
+    }
+
     function _warpPastTimeout() internal {
         vm.warp(startTime + TIMEOUT + 1);
     }
@@ -149,26 +163,34 @@ contract PokerHandSettlerForceTimeoutTest is Test {
     function test_forceTimeout_revertsBeforeTimeout() public {
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _outcome(winners, 195e18, 0);
+        HandOutcome memory o = _outcome(winners, 0, 195e18);
         bytes[] memory sigs = new bytes[](1);
         sigs[0] = _sign(alicePk, settler.hashHandOutcome(o));
+        // Precompute args before expectRevert — external staticcalls during arg
+        // evaluation would otherwise consume the expectRevert (Foundry pitfall).
+        HandInit memory init = _init();
+        RoundStateTransition memory rst = _lastRound();
+        bytes[] memory lrSigs = _lastRoundSigs();
         vm.expectRevert(
             abi.encodeWithSelector(
                 PokerHandSettlerErrors.TimeoutNotElapsed.selector, block.timestamp, startTime + TIMEOUT
             )
         );
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
     }
 
     function test_forceTimeout_signedWinnerPaid() public {
         _warpPastTimeout();
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _outcome(winners, 195e18, 0);
+        HandOutcome memory o = _outcome(winners, 0, 195e18);
         bytes[] memory sigs = new bytes[](1);
         sigs[0] = _sign(alicePk, settler.hashHandOutcome(o));
+        HandInit memory init = _init();
+        RoundStateTransition memory rst = _lastRound();
+        bytes[] memory lrSigs = _lastRoundSigs();
 
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
 
         assertEq(settler.balanceOf(alice), 1_095e18);
         assertEq(settler.balanceOf(bob), 900e18);
@@ -179,13 +201,16 @@ contract PokerHandSettlerForceTimeoutTest is Test {
         _warpPastTimeout();
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _outcome(winners, 195e18, 0);
+        HandOutcome memory o = _outcome(winners, 0, 195e18);
         bytes[] memory sigs = new bytes[](1);
         sigs[0] = ""; // alice did NOT sign -> her 195e18 share forfeits
+        HandInit memory init = _init();
+        RoundStateTransition memory rst = _lastRound();
+        bytes[] memory lrSigs = _lastRoundSigs();
 
         vm.expectEmit(true, true, false, true);
-        emit IPokerHandSettler.PlayerForfeited(HandIdLib.handIdOf(_init()), alice, 195e18);
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
+        emit IPokerHandSettler.PlayerForfeited(HandIdLib.handIdOf(init), alice, 195e18);
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
 
         assertEq(settler.balanceOf(alice), 900e18); // lost buy-in, share forfeited
         assertEq(settler.balanceOf(bob), 900e18);
@@ -198,8 +223,11 @@ contract PokerHandSettlerForceTimeoutTest is Test {
         address[] memory winners = new address[](0);
         HandOutcome memory o = _outcome(winners, 97.5e18, 97.5e18);
         bytes[] memory sigs = new bytes[](0);
+        HandInit memory init = _init();
+        RoundStateTransition memory rst = _lastRound();
+        bytes[] memory lrSigs = _lastRoundSigs();
 
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
 
         assertEq(settler.balanceOf(alice), 997.5e18);
         assertEq(settler.balanceOf(bob), 997.5e18);
@@ -210,28 +238,31 @@ contract PokerHandSettlerForceTimeoutTest is Test {
         _warpPastTimeout();
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _outcome(winners, 200e18, 0); // sum 200 != pot-rake 195
+        HandOutcome memory o = _outcome(winners, 0, 200e18); // sum 200 != pot-rake 195
         bytes[] memory sigs = new bytes[](1);
         sigs[0] = _sign(alicePk, settler.hashHandOutcome(o));
+        HandInit memory init = _init();
+        RoundStateTransition memory rst = _lastRound();
+        bytes[] memory lrSigs = _lastRoundSigs();
         vm.expectRevert(
             abi.encodeWithSelector(PokerHandSettlerErrors.ConservationViolation.selector, 195e18, 200e18)
         );
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
     }
 
     function test_forceTimeout_revertsWhenNotActive() public {
         _warpPastTimeout();
         address[] memory winners = new address[](1);
         winners[0] = alice;
-        HandOutcome memory o = _outcome(winners, 195e18, 0);
+        HandOutcome memory o = _outcome(winners, 0, 195e18);
         bytes[] memory sigs = new bytes[](1);
         sigs[0] = _sign(alicePk, settler.hashHandOutcome(o));
-        // settle once...
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
-        // ...second time reverts (no longer Active)
-        vm.expectRevert(
-            abi.encodeWithSelector(PokerHandSettlerErrors.HandNotActive.selector, HandIdLib.handIdOf(_init()))
-        );
-        settler.forceTimeoutSettlement(_init(), o, sigs, _lastRound());
+        HandInit memory init = _init();
+        RoundStateTransition memory rst = _lastRound();
+        bytes[] memory lrSigs = _lastRoundSigs();
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
+        bytes32 handId = HandIdLib.handIdOf(init);
+        vm.expectRevert(abi.encodeWithSelector(PokerHandSettlerErrors.HandNotActive.selector, handId));
+        settler.forceTimeoutSettlement(init, o, sigs, rst, lrSigs);
     }
 }
