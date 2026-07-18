@@ -16,3 +16,6 @@
 [submodule "packages/poker/lib/crane"]
 	path = packages/poker/lib/crane
 	url = https://github.com/cyotee/crane
+[submodule "packages/fairplay-crypto"]
+	path = packages/fairplay-crypto
+	url = https://github.com/cyotee/fairplay-crypto.git
