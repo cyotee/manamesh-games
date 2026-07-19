@@ -39,7 +39,7 @@ import type {
   GameConfig,
   GameModule,
   MoveValidation,
-} from "@manamesh/frontend/src/game/modules/types";
+} from "@cyotee/manamesh/src/game/modules/types";
 import { TIMESTREAMS_ZONES, ZONE_IDS, getZoneById } from "./zones";
 import {
   createCryptoInitialState,
@@ -60,7 +60,7 @@ import {
   revealDeckOpSeed,
   submitDeckOpReencrypt,
 } from "./crypto";
-import { resetSetupPlayer } from "@manamesh/boardgameio-crypto";
+import { resetSetupPlayer } from "@cyotee/boardgameio-crypto";
 import { createTimeline } from "./timeline";
 import { initializeCardVisibility } from "./visibility";
 import { createProof, appendProof } from "./proofChain";

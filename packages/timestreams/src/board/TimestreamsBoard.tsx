@@ -17,7 +17,7 @@ import {
   prepareDeckOpReencryptLayer,
   resolveCardIdFromPoint,
 } from '../crypto';
-import { generateKeyPair } from '@manamesh/boardgameio-crypto/mental-poker';
+import { generateKeyPair } from '@cyotee/boardgameio-crypto/mental-poker';
 import { canPlayCard } from '../effects/gates';
 import { describeChoiceOption } from '../effects/executors/choice';
 import {

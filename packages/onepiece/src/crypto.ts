@@ -11,7 +11,7 @@
 
 import type { Game, Ctx } from "boardgame.io";
 import { INVALID_MOVE } from "boardgame.io/core";
-import type { GameConfig } from "@manamesh/frontend/src/game/modules/types";
+import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
 import type {
   OnePieceCard,
   OnePieceDonCard,
@@ -27,15 +27,15 @@ import {
   reencryptDeck,
   buildCardPointLookup,
   type EncryptedCard,
-} from "@manamesh/boardgameio-crypto/mental-poker";
-import { sha256Hex, stableStringify } from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto/mental-poker";
+import { sha256Hex, stableStringify } from "@cyotee/boardgameio-crypto";
 import {
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
   lookupCardIdFromPoint,
   deterministicShuffle,
-} from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto";
 
 // =============================================================================
 // Constants
@@ -102,7 +102,7 @@ export {
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
-} from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto";
 
 // =============================================================================
 // Initial State

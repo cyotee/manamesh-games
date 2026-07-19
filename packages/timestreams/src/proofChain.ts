@@ -12,12 +12,12 @@
  */
 
 import type { CryptographicProof, TimestreamsState } from "./types";
-import { sha256Hex } from "@manamesh/boardgameio-crypto/sha256";
-import { stableStringify } from "@manamesh/boardgameio-crypto/stable-json";
+import { sha256Hex } from "@cyotee/boardgameio-crypto/sha256";
+import { stableStringify } from "@cyotee/boardgameio-crypto/stable-json";
 import {
   ecdsaSignDigestHex,
   ecdsaVerifyDigestHex,
-} from "@manamesh/boardgameio-crypto/ecdsa";
+} from "@cyotee/boardgameio-crypto/ecdsa";
 
 // =============================================================================
 // Proof Creation

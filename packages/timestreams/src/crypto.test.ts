@@ -11,8 +11,8 @@ import {
   shuffleEncryptedDeck,
   hashSeedCommit,
 } from "./crypto";
-import { generateKeyPair } from "@manamesh/boardgameio-crypto/mental-poker";
-import { normalizeSecp256k1PublicKey } from "@manamesh/boardgameio-crypto/keychain";
+import { generateKeyPair } from "@cyotee/boardgameio-crypto/mental-poker";
+import { normalizeSecp256k1PublicKey } from "@cyotee/boardgameio-crypto/keychain";
 
 function ctx(player = "0", phase = "keyExchange"): Ctx {
   return { currentPlayer: player, numPlayers: 2, playOrder: ["0", "1"], phase, turn: 0, numMoves: 0 } as unknown as Ctx;

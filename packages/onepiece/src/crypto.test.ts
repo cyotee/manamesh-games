@@ -12,8 +12,8 @@ import {
   getCurrentSetupPlayer,
 } from "./boardgameio-crypto";
 
-import { generateKeyPair } from "@manamesh/boardgameio-crypto/mental-poker";
-import { sha256Hex } from "@manamesh/boardgameio-crypto";
+import { generateKeyPair } from "@cyotee/boardgameio-crypto/mental-poker";
+import { sha256Hex } from "@cyotee/boardgameio-crypto";
 
 // Helpers
 function createMockCtx(

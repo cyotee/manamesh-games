@@ -1,6 +1,6 @@
 import type { EraId, TimestreamsState } from "./types";
 import { ERA_ORDER } from "./types";
-import { deterministicShuffle, sha256Hex } from "@manamesh/boardgameio-crypto";
+import { deterministicShuffle, sha256Hex } from "@cyotee/boardgameio-crypto";
 
 /**
  * Selectable mode: claim a home era.

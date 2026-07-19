@@ -10,14 +10,14 @@ import {
   encrypt,
   generateKeyPair,
   buildCardPointLookup,
-} from "@manamesh/boardgameio-crypto/mental-poker";
+} from "@cyotee/boardgameio-crypto/mental-poker";
 import {
   splitSecret,
   reconstructSecret,
   createKeyShares,
   reconstructKeyFromShares,
   canReconstruct,
-} from "@manamesh/boardgameio-crypto/shamirs";
+} from "@cyotee/boardgameio-crypto/shamirs";
 import {
   runMentalPokerSetup,
   progressiveCoopPeekHand,

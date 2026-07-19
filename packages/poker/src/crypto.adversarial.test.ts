@@ -20,7 +20,7 @@ import {
   voteAbortDecrypt,
   type CryptoPokerState,
 } from "./crypto";
-import type { GameConfig } from "@manamesh/frontend/src/game/modules/types";
+import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
 
 function createTestGameConfig(numPlayers: number = 2): GameConfig {
   const playerIDs = Array.from({ length: numPlayers }, (_, i) => `${i}`);

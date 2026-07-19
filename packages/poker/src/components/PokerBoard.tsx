@@ -12,17 +12,17 @@ import type { PokerState, PokerCard, PokerPhase, CryptoPokerPhase, PokerHandResu
 import type { CryptoPokerState, CryptoPokerPlayerState } from '../types';
 
 const POKER_DECRYPT_STALL_WINDOW_MOVES = 12; // keep in sync with crypto.ts
-import { CryptoTransparencyPanel } from '@manamesh/frontend/src/components/CryptoTransparencyPanel';
-import type { CryptoPluginState } from '@manamesh/boardgameio-crypto/plugin/crypto-plugin';
-import { generateKeyPair, decrypt } from '@manamesh/boardgameio-crypto/mental-poker';
-import type { CryptoKeyPair, EncryptedCard } from '@manamesh/boardgameio-crypto/mental-poker';
-import { useGameKeys } from '@manamesh/frontend/src/blockchain/wallet';
-import { useAssetPack } from '@manamesh/frontend/src/hooks/useAssetPack';
-import { useCardImage } from '@manamesh/frontend/src/hooks/useCardImage';
-import { useCardSettings } from '@manamesh/frontend/src/hooks/useCardSettings';
-import { CARD_BACK_ID } from '@manamesh/frontend/src/assets/packs/standard-cards';
-import type { IPFSZipSource } from '@manamesh/frontend/src/assets/loader/types';
-import { CardSettingsPanel } from '@manamesh/frontend/src/components/CardSettingsPanel';
+import { CryptoTransparencyPanel } from '@cyotee/manamesh/src/components/CryptoTransparencyPanel';
+import type { CryptoPluginState } from '@cyotee/boardgameio-crypto/plugin/crypto-plugin';
+import { generateKeyPair, decrypt } from '@cyotee/boardgameio-crypto/mental-poker';
+import type { CryptoKeyPair, EncryptedCard } from '@cyotee/boardgameio-crypto/mental-poker';
+import { useGameKeys } from '@cyotee/manamesh/src/blockchain/wallet';
+import { useAssetPack } from '@cyotee/manamesh/src/hooks/useAssetPack';
+import { useCardImage } from '@cyotee/manamesh/src/hooks/useCardImage';
+import { useCardSettings } from '@cyotee/manamesh/src/hooks/useCardSettings';
+import { CARD_BACK_ID } from '@cyotee/manamesh/src/assets/packs/standard-cards';
+import type { IPFSZipSource } from '@cyotee/manamesh/src/assets/loader/types';
+import { CardSettingsPanel } from '@cyotee/manamesh/src/components/CardSettingsPanel';
 
 interface PokerBoardProps extends BoardProps<PokerState> {
   /**

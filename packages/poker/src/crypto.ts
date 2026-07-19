@@ -7,7 +7,7 @@
 
 import type { Game, Ctx } from "boardgame.io";
 import { INVALID_MOVE } from "boardgame.io/core";
-import type { CardSchema, GameConfig, MoveValidation } from "@manamesh/frontend/src/game/modules/types";
+import type { CardSchema, GameConfig, MoveValidation } from "@cyotee/manamesh/src/game/modules/types";
 import {
   PokerCard,
   CryptoPokerState,
@@ -52,8 +52,8 @@ import {
 import type {
   CryptoPluginState,
   CryptoPluginApi,
-} from "@manamesh/boardgameio-crypto/plugin/crypto-plugin";
-import { CryptoPlugin } from "@manamesh/boardgameio-crypto/plugin/crypto-plugin";
+} from "@cyotee/boardgameio-crypto/plugin/crypto-plugin";
+import { CryptoPlugin } from "@cyotee/boardgameio-crypto/plugin/crypto-plugin";
 import {
   generateKeyPair,
   encryptDeck as encryptDeckCrypto,
@@ -61,21 +61,21 @@ import {
   quickShuffle,
   buildCardPointLookup,
   type EncryptedCard,
-} from "@manamesh/boardgameio-crypto/mental-poker";
-import { secpIsValidPointHex, validateEncryptedCard, validatePlayerIdentity } from "@manamesh/boardgameio-crypto/secp256k1";
+} from "@cyotee/boardgameio-crypto/mental-poker";
+import { secpIsValidPointHex, validateEncryptedCard, validatePlayerIdentity } from "@cyotee/boardgameio-crypto/secp256k1";
 import {
   keychainAdd,
   keychainFromRecord,
   MENTAL_POKER_KEYCHAIN_POLICY,
   requirePrivateKeyMatchesPublished,
-} from "@manamesh/boardgameio-crypto/keychain";
+} from "@cyotee/boardgameio-crypto/keychain";
 import {
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
   lookupCardIdFromPoint,
   getLogicalMoveCount,
-} from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto";
 
 // =============================================================================
 // Constants
@@ -96,7 +96,7 @@ export {
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
-} from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto";
 
 export function canAbortDecryptNow(G: CryptoPokerState, ctx: Ctx): boolean {
   const pending = G.decryptRequests.filter((r) => r.status === "pending");

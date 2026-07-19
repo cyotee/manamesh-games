@@ -1,7 +1,7 @@
 /**
  * Mistborn mental-poker crypto layer.
  *
- * Key exchange uses `@manamesh/boardgameio-crypto` keychain + MENTAL_POKER policy.
+ * Key exchange uses `@cyotee/boardgameio-crypto` keychain + MENTAL_POKER policy.
  * Encrypt requires private key matching the published public key (sk↔pk binding).
  *
  * Full deck encrypt/shuffle/deal can expand later; admission + binding are enforced now.
@@ -14,19 +14,19 @@ import {
   encryptDeck as encryptDeckLib,
   reencryptDeck,
   type EncryptedCard,
-} from "@manamesh/boardgameio-crypto/mental-poker";
+} from "@cyotee/boardgameio-crypto/mental-poker";
 import {
   keychainAdd,
   keychainFromRecord,
   MENTAL_POKER_KEYCHAIN_POLICY,
   publicKeysEqual,
   requirePrivateKeyMatchesPublished,
-} from "@manamesh/boardgameio-crypto/keychain";
+} from "@cyotee/boardgameio-crypto/keychain";
 import {
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
-} from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto";
 import type { MistbornState, MistbornPhase } from "./types";
 
 const INVALID = INVALID_MOVE;

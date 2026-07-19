@@ -11,7 +11,7 @@
  * - DON!! Area: Public — active DON!! cards
  */
 
-import type { ZoneDefinition } from '@manamesh/frontend/src/game/modules/types';
+import type { ZoneDefinition } from '@cyotee/manamesh/src/game/modules/types';
 
 export const ONEPIECE_ZONES: ZoneDefinition[] = [
   {

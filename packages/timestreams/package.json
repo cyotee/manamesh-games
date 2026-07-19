@@ -23,8 +23,8 @@
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
-    "@manamesh/boardgameio-crypto": "workspace:*",
-    "@manamesh/frontend": "workspace:*",
+    "@cyotee/boardgameio-crypto": "workspace:*",
+    "@cyotee/manamesh": "workspace:*",
     "boardgame.io": "^0.50.2"
   },
   "devDependencies": {

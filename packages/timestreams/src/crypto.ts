@@ -11,7 +11,7 @@ import type { Ctx } from "boardgame.io";
 // boardgame.io/core is the workspace source package which lacks a built dist/
 // in this monorepo. Define INVALID_MOVE locally (it is just this string constant).
 const INVALID_MOVE = "INVALID_MOVE" as const;
-import type { GameConfig } from "@manamesh/frontend/src/game/modules/types";
+import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
 import type {
   TimestreamsState,
   TimestreamsPlayerState,
@@ -33,21 +33,21 @@ import {
   hashToPoint,
   secpPointNormalizeHex,
   type EncryptedCard,
-} from "@manamesh/boardgameio-crypto/mental-poker";
+} from "@cyotee/boardgameio-crypto/mental-poker";
 import {
   keychainAdd,
   keychainFromRecord,
   MENTAL_POKER_KEYCHAIN_POLICY,
   publicKeysEqual,
   requirePrivateKeyMatchesPublished,
-} from "@manamesh/boardgameio-crypto/keychain";
+} from "@cyotee/boardgameio-crypto/keychain";
 import {
   sha256Hex,
   deterministicShuffle,
   getCurrentSetupPlayer,
   advanceSetupPlayer,
   resetSetupPlayer,
-} from "@manamesh/boardgameio-crypto";
+} from "@cyotee/boardgameio-crypto";
 import { assignRandomHomeEras } from "./homeEra";
 import { hydrateCardFromPack, registerCard } from "./effects/state";
 

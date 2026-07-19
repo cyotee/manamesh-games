@@ -1,72 +1,123 @@
-# npm Trusted Publishing (GitHub Actions)
+# npm publishing from GitHub (what actually works)
 
-Automated publish runs on **successful builds** of `main` / `master` (and `latest` for `boardgameIO-p2p`) in each **package repo**.
+**`manamesh-games` does not publish.** Only the five package repos do.
 
-**`manamesh-games` does not publish to npm.** It is a monorepo development host only.
+## The constraint (why token + “just push” failed)
 
-## Repos and workflows
+| Method | Result we hit |
+|--------|----------------|
+| `NPM_TOKEN` in shell / `~/.zshenv` + `npm publish` | **403** — registry rejects that token for **direct publish** (npm 12 + GAT “bypass 2FA” policy noise) |
+| Same token as GitHub Actions `secrets.NPM_TOKEN` | **Same 403** after build (provenance may still be signed; package does not appear) |
+| OIDC Trusted Publisher alone on a **new** name | **Impossible** — npm only lets you configure Trusted Publisher **after the package already exists** |
 
-| npm package | GitHub repo | Workflow file | Default branch |
-|-------------|-------------|---------------|----------------|
-| `@cyotee/boardgame.io` | [cyotee/boardgame.io](https://github.com/cyotee/boardgame.io) | `publish-npm.yml` | `main` |
-| `@cyotee/boardgameio-p2p` | [cyotee/boardgameIO-p2p](https://github.com/cyotee/boardgameIO-p2p) | `publish-npm.yml` | `latest` (+ `main`) |
-| `@cyotee/boardgameio-crypto` | [cyotee/boardgameio-crypto](https://github.com/cyotee/boardgameio-crypto) | `publish-npm.yml` | `main` |
-| `@cyotee/manamesh` | [cyotee/manamesh](https://github.com/cyotee/manamesh) | `publish-npm.yml` | `main` |
-| `@cyotee/manamesh-asset-pack-builder` | [cyotee/manamesh-asset-pack-builder](https://github.com/cyotee/manamesh-asset-pack-builder) | `publish-npm.yml` | `main` |
+So: **GitHub Actions OIDC is the right long-term path**, but **first version of each package cannot be created by OIDC**.  
+And **the write token we have is not a working bootstrap**.
 
-Each workflow:
+Do **not** rely on “put NPM_TOKEN in GitHub and push.” That path already failed.
 
-1. Runs tests (where applicable)
-2. Builds the package
-3. Publishes **only if** that `name@version` is not already on the registry
-4. Uses **OIDC** (`permissions: id-token: write`) and optional `secrets.NPM_TOKEN` fallback
+---
 
-## One-time setup on npmjs.com (required for OIDC)
+## Working setup (two phases)
 
-npm only lets you attach a Trusted Publisher **after the package exists**. Bootstrap once per package (see below), then:
+### Phase A — Bootstrap (once per package, **on your machine**, interactive)
 
-For each package page → **Settings** → **Trusted Publisher**:
+This is the only reliable first-publish path when long-lived write tokens fail.
 
-| Field | Value |
-|-------|--------|
-| Provider | GitHub Actions |
-| Organization or user | `cyotee` |
-| Repository | matching package repo name above |
-| Workflow filename | `publish-npm.yml` (filename only) |
-| Environment | *(leave empty)* |
-| Allowed actions | **npm publish** (and optionally stage) |
+1. **Use browser login** (creates a session credential, not the broken GAT-in-env):
 
-Point each package’s Trusted Publisher at **that package’s own repo**, not at `manamesh-games`.
+   ```bash
+   npm logout   # clear the failing token from this shell’s view of ~/.npmrc if needed
+   npm login    # default auth-type is "web" — opens browser, log in as cyotee
+   npm whoami   # must print: cyotee
+   ```
 
-## Bootstrap (first version)
+2. **Publish the first version** of each package (from a clean clone of that package repo, or the monorepo path if you prefer). Example for one package:
 
-Today, **first publish** of a new name usually cannot use OIDC until the package exists. Options:
+   ```bash
+   cd /path/to/boardgameio-crypto   # or packages/boardgameio-crypto in monorepo
+   npm install
+   npm test
+   npm run build || true
+   # ensure package.json has no private:true, no workspace:/portal: deps
+   npm publish --access public
+   ```
 
-1. **Interactive local publish** once you can authenticate with npm (session login / OTP if required).
-2. **`NPM_TOKEN` repo secret** on the package repos. If your token is rejected for direct publish (npm 12 + GAT bypass policy), use option 1 or npm’s staged flow after the package exists.
-3. After the first version is on the registry, configure Trusted Publisher and prefer OIDC (you can revoke long-lived write tokens).
+   Repeat for:
 
-## Secrets
+   | Package | Repo |
+   |---------|------|
+   | `@cyotee/boardgame.io` | https://github.com/cyotee/boardgame.io |
+   | `@cyotee/boardgameio-p2p` | https://github.com/cyotee/boardgameIO-p2p |
+   | `@cyotee/boardgameio-crypto` | https://github.com/cyotee/boardgameio-crypto |
+   | `@cyotee/manamesh` | https://github.com/cyotee/manamesh (`packages/frontend`) |
+   | `@cyotee/manamesh-asset-pack-builder` | https://github.com/cyotee/manamesh-asset-pack-builder |
 
-| Secret | Where | Purpose |
-|--------|--------|---------|
-| `NPM_TOKEN` | Each **package** repo only | Fallback auth when OIDC is not configured |
+3. Confirm:
 
-OIDC does **not** need a write token once Trusted Publisher is set.
+   ```bash
+   npm view @cyotee/boardgameio-crypto version
+   ```
 
-## Manual re-run
+If `npm login` + `npm publish` still fails, fix **account** settings on npmjs.com (2FA / “require 2FA for write”) before anything on GitHub can work. No CI config can bypass that.
+
+---
+
+### Phase B — Ongoing publish from GitHub (OIDC) — **after** Phase A
+
+Workflows already exist: `.github/workflows/publish-npm.yml` on each package repo  
+(triggers: successful path on `main` / `master`, and `latest` for p2p).
+
+**For each package that now exists on the registry:**
+
+1. Open  
+   `https://www.npmjs.com/package/<full-package-name>/access`  
+   (package → access / trusted publishing settings)
+2. **Trusted Publisher** → **GitHub Actions**
+3. Set **exactly**:
+
+   | Field | Value |
+   |-------|--------|
+   | Organization or user | `cyotee` |
+   | Repository | that package’s repo only (e.g. `boardgameio-crypto`) — **not** `manamesh-games` |
+   | Workflow filename | `publish-npm.yml` |
+   | Environment | leave empty |
+   | Allowed actions | **npm publish** |
+
+4. **Remove** `NPM_TOKEN` from that GitHub repo secrets when OIDC works (optional hygiene). Do **not** expect `NPM_TOKEN` to be the primary path.
+
+5. Day-to-day:
+
+   - Bump `version` in that package’s `package.json`
+   - Push to that package repo’s release branch
+   - Workflow runs test → build → `npm publish` via **OIDC** (no token)
+   - Skips if that version is already published
+
+Manual re-run:
 
 ```bash
 gh workflow run publish-npm.yml -R cyotee/boardgameio-crypto
-gh workflow run publish-npm.yml -R cyotee/boardgameIO-p2p
 ```
 
-## Verify
+---
 
-```bash
-npm view @cyotee/boardgame.io version
-npm view @cyotee/boardgameio-p2p version
-npm view @cyotee/boardgameio-crypto version
-npm view @cyotee/manamesh version
-npm view @cyotee/manamesh-asset-pack-builder version
-```
+## What is already done on GitHub
+
+- Per-package `publish-npm.yml` with `id-token: write`
+- Publish only if version not already on registry
+- **Not** publishing from `manamesh-games`
+
+## What is not done (and blocks “push → live package”)
+
+- No package has a successful registry publish yet  
+- Trusted Publisher cannot be saved on npm until each name exists  
+- `NPM_TOKEN` is not a working bootstrap for this account/token type  
+
+---
+
+## Checklist
+
+- [ ] `npm login` (web) on your machine → `npm whoami` = `cyotee`
+- [ ] First `npm publish --access public` for each of the five packages
+- [ ] `npm view <name> version` succeeds for each
+- [ ] Trusted Publisher on each package → matching repo + `publish-npm.yml`
+- [ ] Push a version bump → Actions publish succeeds without relying on `NPM_TOKEN`

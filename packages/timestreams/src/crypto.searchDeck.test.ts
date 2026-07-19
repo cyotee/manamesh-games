@@ -9,7 +9,7 @@ import {
   submitDeckOpReencrypt,
   buildDeckOpReencryptLayer,
 } from "./crypto";
-import { generateKeyPair } from "@manamesh/boardgameio-crypto/mental-poker";
+import { generateKeyPair } from "@cyotee/boardgameio-crypto/mental-poker";
 import { playAction } from "./play";
 import { makeCard, putInHand } from "./effects/testFixtures";
 

@@ -5,8 +5,8 @@
 
 import { describe, it, expect } from "vitest";
 import { INVALID_MOVE } from "boardgame.io/core";
-import { decrypt } from "@manamesh/boardgameio-crypto/mental-poker";
-import { normalizeSecp256k1PublicKey } from "@manamesh/boardgameio-crypto/keychain";
+import { decrypt } from "@cyotee/boardgameio-crypto/mental-poker";
+import { normalizeSecp256k1PublicKey } from "@cyotee/boardgameio-crypto/keychain";
 import {
   runMentalPokerSetup,
   assertNoPrivateKeysInSharedState,

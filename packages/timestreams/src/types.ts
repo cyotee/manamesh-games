@@ -8,8 +8,8 @@
  * the system prevents cheating on deck operations.
  */
 
-import type { CoreCard } from "@manamesh/frontend/src/game/modules/types";
-import type { EncryptedCard } from "@manamesh/boardgameio-crypto/mental-poker";
+import type { CoreCard } from "@cyotee/manamesh/src/game/modules/types";
+import type { EncryptedCard } from "@cyotee/boardgameio-crypto/mental-poker";
 
 // =============================================================================
 // Era Constants

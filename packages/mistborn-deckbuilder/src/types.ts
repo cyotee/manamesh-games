@@ -8,9 +8,9 @@
 import type {
   CoreCard,
   ZoneDefinition,
-} from '@manamesh/frontend/src/game/modules/types';
-import type { CryptoPluginState } from '@manamesh/boardgameio-crypto/plugin/crypto-plugin';
-import type { EncryptedCard } from '@manamesh/boardgameio-crypto/mental-poker';
+} from '@cyotee/manamesh/src/game/modules/types';
+import type { CryptoPluginState } from '@cyotee/boardgameio-crypto/plugin/crypto-plugin';
+import type { EncryptedCard } from '@cyotee/boardgameio-crypto/mental-poker';
 
 // =============================================================================
 // Metals
@@ -270,4 +270,4 @@ export interface MissionData {
 }
 
 // Re-export for convenience
-export type { CoreCard, ZoneDefinition } from '@manamesh/frontend/src/game/modules/types';
+export type { CoreCard, ZoneDefinition } from '@cyotee/manamesh/src/game/modules/types';

@@ -2,8 +2,8 @@
  * Mistborn keychain admission + sk↔pk encrypt binding.
  */
 import { describe, it, expect } from "vitest";
-import { generateKeyPair } from "@manamesh/boardgameio-crypto/mental-poker";
-import { normalizeSecp256k1PublicKey } from "@manamesh/boardgameio-crypto/keychain";
+import { generateKeyPair } from "@cyotee/boardgameio-crypto/mental-poker";
+import { normalizeSecp256k1PublicKey } from "@cyotee/boardgameio-crypto/keychain";
 import { submitPublicKey, encryptDeck, createCryptoInitialState } from "./crypto";
 import type { MistbornState } from "./types";
 import type { Ctx } from "boardgame.io";

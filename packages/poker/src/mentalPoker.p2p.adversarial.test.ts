@@ -8,8 +8,8 @@
 
 import { describe, it, expect } from "vitest";
 import { INVALID_MOVE } from "boardgame.io/core";
-import { validatePlayerIdentity } from "@manamesh/boardgameio-crypto/secp256k1";
-import { decrypt } from "@manamesh/boardgameio-crypto/mental-poker";
+import { validatePlayerIdentity } from "@cyotee/boardgameio-crypto/secp256k1";
+import { decrypt } from "@cyotee/boardgameio-crypto/mental-poker";
 import {
   runMentalPokerSetup,
   progressiveCoopPeekHand,

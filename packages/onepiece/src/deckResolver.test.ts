@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { enrichedToOnePieceCard, resolveDeckList } from './deckResolver';
 import type { ResolvedDeck } from './deckResolver';
-import type { EnrichedCard } from '@manamesh/frontend/src/deck/types';
-import type { DeckList } from '@manamesh/frontend/src/deck/types';
+import type { EnrichedCard } from '@cyotee/manamesh/src/deck/types';
+import type { DeckList } from '@cyotee/manamesh/src/deck/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

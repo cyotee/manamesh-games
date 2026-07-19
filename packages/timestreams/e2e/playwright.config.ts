@@ -21,7 +21,7 @@ export default defineConfig({
   // Prefer an already-running `yarn dev:frontend`. Set E2E_START_SERVER=1 to spawn Vite.
   webServer: process.env.E2E_START_SERVER
     ? {
-        command: "yarn workspace @manamesh/frontend dev --port 3000 --strictPort",
+        command: "yarn workspace @cyotee/manamesh dev --port 3000 --strictPort",
         url: baseURL,
         reuseExistingServer: true,
         timeout: 180_000,

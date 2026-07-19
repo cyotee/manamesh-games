@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { INVALID_MOVE } from "boardgame.io/core";
-import { decrypt } from "@manamesh/boardgameio-crypto/mental-poker";
+import { decrypt } from "@cyotee/boardgameio-crypto/mental-poker";
 import {
   runMentalPokerSetup,
   progressiveCoopPeekHand,

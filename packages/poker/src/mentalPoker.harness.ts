@@ -12,8 +12,8 @@ import {
   buildCardPointLookup,
   type CryptoKeyPair,
   type EncryptedCard,
-} from "@manamesh/boardgameio-crypto/mental-poker";
-import type { GameConfig } from "@manamesh/frontend/src/game/modules/types";
+} from "@cyotee/boardgameio-crypto/mental-poker";
+import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
 import type { CryptoPokerState } from "./types";
 import {
   createCryptoInitialState,

@@ -9,7 +9,7 @@ import {
   buildHandResult,
   type CryptoPokerState,
 } from './crypto';
-import type { GameConfig } from '@manamesh/frontend/src/game/modules/types';
+import type { GameConfig } from '@cyotee/manamesh/src/game/modules/types';
 import type { PokerCard } from './types';
 
 // Helper to create a test state
@@ -423,7 +423,7 @@ describe('Security: encrypted card validation', () => {
   // Note: validateEncryptedCard is re-exported via the lib; we test behavior via move validation
   it('should reject invalid point in decrypted shares (via combine paths)', async () => {
     // This is exercised in real flows; here we assert the helper rejects bad data
-    const { validateEncryptedCard } = await import('@manamesh/boardgameio-crypto/secp256k1');
+    const { validateEncryptedCard } = await import('@cyotee/boardgameio-crypto/secp256k1');
     expect(validateEncryptedCard(null)).toBe(false);
     expect(validateEncryptedCard({ ciphertext: 'not-a-point', layers: 1 })).toBe(false);
     expect(validateEncryptedCard({ ciphertext: '00', layers: -1 })).toBe(false);

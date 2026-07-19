@@ -2,7 +2,7 @@
  * Mistborn: The Deck Building Game — ManaMesh Module
  *
  * Phase 1: Rules-free board + card management with full mental-poker crypto.
- * Follows GameModule contract from @manamesh/frontend.
+ * Follows GameModule contract from @cyotee/manamesh.
  */
 
 export * from './types';

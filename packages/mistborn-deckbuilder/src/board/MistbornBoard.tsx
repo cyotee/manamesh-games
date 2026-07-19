@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAssetPack } from '@manamesh/frontend/src/hooks/useAssetPack';
-import { useCardImage } from '@manamesh/frontend/src/hooks/useCardImage';
+import { useAssetPack } from '@cyotee/manamesh/src/hooks/useAssetPack';
+import { useCardImage } from '@cyotee/manamesh/src/hooks/useCardImage';
 import { DEFAULT_MISTBORN_PACK_SOURCE, getEnrichedCardsForSet, MISTBORN_SETS, getLocalAssetUrl } from '../assets';
 import { TrainingTrack } from './TrainingTrack';
 import { computeCoins } from '../game';

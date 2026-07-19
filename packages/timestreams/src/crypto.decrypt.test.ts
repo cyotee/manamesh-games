@@ -14,7 +14,7 @@ import {
   hashSeedCommit,
   peelDecryptShare,
 } from "./crypto";
-import { generateKeyPair } from "@manamesh/boardgameio-crypto/mental-poker";
+import { generateKeyPair } from "@cyotee/boardgameio-crypto/mental-poker";
 import type { Ctx } from "boardgame.io";
 
 function ctx(player: string, phase = "play"): Ctx {

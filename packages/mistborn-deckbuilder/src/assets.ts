@@ -11,7 +11,7 @@
  * The pack is loaded once; sets map to board elements (market row, player starters, etc.).
  */
 
-import type { AssetPackManifest, CardManifestEntry } from '@manamesh/frontend/src/assets/manifest/types';
+import type { AssetPackManifest, CardManifestEntry } from '@cyotee/manamesh/src/assets/manifest/types';
 import type { MistbornSet, DeckType } from './types';
 import { MISTBORN_SETS, DECK_SET_MAPPING } from './types';
 

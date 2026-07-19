@@ -24,9 +24,9 @@
     "react-dom": "^18.2.0"
   },
   "dependencies": {
-    "@manamesh/boardgameio-crypto": "workspace:*",
-    "@manamesh/frontend": "workspace:*",
-    "boardgame.io": "workspace:*",
+    "@cyotee/boardgameio-crypto": "workspace:*",
+    "@cyotee/manamesh": "workspace:*",
+    "boardgame.io": "portal:../boardgame.io",
     "elliptic": "^6.5.5",
     "viem": "^2.0.0"
   },

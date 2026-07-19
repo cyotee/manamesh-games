@@ -36,6 +36,7 @@ jobs:
       - run: npm run build
       - name: Publish if new version
         env:
+          # Prefer OIDC trusted publishing; token fallback only if secret set and OIDC not configured
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
         run: |
