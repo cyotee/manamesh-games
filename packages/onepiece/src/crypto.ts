@@ -36,6 +36,14 @@ import {
   lookupCardIdFromPoint,
   deterministicShuffle,
 } from "@cyotee/boardgameio-crypto";
+import {
+  keychainFromRecord,
+  keychainAdd,
+  MENTAL_POKER_KEYCHAIN_POLICY,
+  requirePrivateKeyMatchesPublished,
+  publicKeysEqual,
+} from "@cyotee/boardgameio-crypto/keychain";
+import { validatePlayerIdentity } from "@cyotee/boardgameio-crypto/secp256k1";
 
 // =============================================================================
 // Constants
@@ -226,6 +234,8 @@ export function createCryptoInitialState(
 
 /**
  * Submit public key during key exchange phase.
+ * Admits under MENTAL_POKER_KEYCHAIN_POLICY (valid finite points, unique seats/keys).
+ * Stores canonical compressed public keys only — never private keys.
  */
 export function submitPublicKey(
   G: OnePieceCryptoState,
@@ -248,12 +258,39 @@ export function submitPublicKey(
     return INVALID_MOVE;
   }
 
+  if (!validatePlayerIdentity(ctx.playerID, playerId)) {
+    return INVALID_MOVE;
+  }
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
-  if (player.publicKey) return INVALID_MOVE; // Already submitted
+  if (player.publicKey) {
+    if (publicKeysEqual(player.publicKey, publicKey)) return G; // idempotent same key
+    return INVALID_MOVE;
+  }
 
-  player.publicKey = publicKey;
-  G.crypto.publicKeys[playerId] = publicKey;
+  // Rebuild keychain from committed publicKeys + admit under mental-poker policy.
+  const prior = keychainFromRecord(
+    G.crypto.publicKeys ?? {},
+    MENTAL_POKER_KEYCHAIN_POLICY,
+  );
+  const admitted = keychainAdd(
+    prior,
+    playerId,
+    publicKey,
+    MENTAL_POKER_KEYCHAIN_POLICY,
+  );
+  if (!admitted.ok) {
+    console.log(
+      "[OnePieceCrypto] submitPublicKey INVALID_MOVE: keychain reject",
+      admitted.reason,
+    );
+    return INVALID_MOVE;
+  }
+
+  const canonical = admitted.entry.publicKey;
+  player.publicKey = canonical;
+  G.crypto.publicKeys[playerId] = canonical;
+  G.crypto.keychain = admitted.keychain;
 
   // Check if all players have submitted
   const allSubmitted = G.playerOrder.every(
@@ -273,6 +310,10 @@ export function submitPublicKey(
 /**
  * Encrypt deck during encrypt phase.
  * Both main deck and life deck are encrypted.
+ *
+ * NOTE: privateKey is accepted for offline/unit-test paths only (same as Poker).
+ * Production multiplayer should prepare layers client-side and submit ciphertexts only.
+ * Never stores privateKey on G or player state.
  */
 export function encryptDeck(
   G: OnePieceCryptoState,
@@ -282,12 +323,25 @@ export function encryptDeck(
 ): OnePieceCryptoState | typeof INVALID_MOVE {
   if (G.phase !== "encrypt") return INVALID_MOVE;
 
+  if (!validatePlayerIdentity(ctx.playerID, playerId)) {
+    return INVALID_MOVE;
+  }
   const currentPlayer = getCurrentSetupPlayer(G);
   if (playerId !== currentPlayer) return INVALID_MOVE;
 
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
   if (player.hasEncrypted) return INVALID_MOVE;
+
+  // sk must derive the public key admitted to the keychain at key exchange
+  const published =
+    player.publicKey ?? G.crypto.publicKeys[playerId] ?? null;
+  if (!requirePrivateKeyMatchesPublished(privateKey, published)) {
+    console.log(
+      "[OnePieceCrypto] encryptDeck INVALID_MOVE: private key does not match published public key",
+    );
+    return INVALID_MOVE;
+  }
 
   // Encrypt main deck
   const existingMainDeck = G.encryptedZones[MAIN_DECK_ZONE];

@@ -10,10 +10,11 @@ import {
   revealShuffleSeed,
   shuffleEncryptedDeck,
   getCurrentSetupPlayer,
-} from "./boardgameio-crypto";
+} from "./crypto";
 
 import { generateKeyPair } from "@cyotee/boardgameio-crypto/mental-poker";
 import { sha256Hex } from "@cyotee/boardgameio-crypto";
+import { normalizeSecp256k1PublicKey } from "@cyotee/boardgameio-crypto/keychain";
 
 // Helpers
 function createMockCtx(
@@ -22,6 +23,7 @@ function createMockCtx(
 ): Ctx {
   return {
     currentPlayer: playerIndex,
+    playerID: playerIndex,
     numPlayers: 2,
     playOrder: ["0", "1"],
     phase,
@@ -64,17 +66,21 @@ describe("OnePieceCryptoGame (crypto setup)", () => {
       // Player 0 submits
       let res = submitPublicKey(G, ctx, "0", pub0);
       expect(res).toBe(G);
-      expect(G.players["0"].publicKey).toBe(pub0);
+      expect(G.players["0"].publicKey).toBe(
+        normalizeSecp256k1PublicKey(pub0),
+      );
       expect(G.phase).toBe("keyExchange");
 
       // Player 1 submits - should transition
-      res = submitPublicKey(G, ctx, "1", pub1);
+      res = submitPublicKey(G, createMockCtx("1", "keyExchange"), "1", pub1);
       expect(res).toBe(G);
-      expect(G.players["1"].publicKey).toBe(pub1);
+      expect(G.players["1"].publicKey).toBe(
+        normalizeSecp256k1PublicKey(pub1),
+      );
       expect(G.phase).toBe("encrypt");
     });
 
-    it("rejects submitPublicKey when not in keyExchange or duplicate", () => {
+    it("rejects submitPublicKey when not in keyExchange or different key for seat", () => {
       const ctx = createMockCtx("0", "encrypt");
       const { publicKey: pub0 } = generateKeyPair();
 
@@ -93,12 +99,21 @@ describe("OnePieceCryptoGame (crypto setup)", () => {
         pubA,
       );
       expect(ok).toBe(G);
-      // Duplicate submit should be rejected
-      const dup = submitPublicKey(
+      // Same key resubmit is idempotent
+      const same = submitPublicKey(
         G,
         createMockCtx("0", "keyExchange"),
         "0",
         pubA,
+      );
+      expect(same).toBe(G);
+      // Different key for same seat is rejected
+      const { publicKey: pubB } = generateKeyPair();
+      const dup = submitPublicKey(
+        G,
+        createMockCtx("0", "keyExchange"),
+        "0",
+        pubB,
       );
       expect(dup).toBe(INVALID_MOVE);
     });
@@ -293,5 +308,68 @@ describe("OnePieceCryptoGame (crypto setup)", () => {
       expect(G.encryptedZones[`hand:0`].length).toBe(G.config.startingHand);
       expect(G.encryptedZones[`hand:1`].length).toBe(G.config.startingHand);
     });
+  });
+});
+
+describe("OnePiece keychain admission", () => {
+  it("rejects invalid public key", () => {
+    const G = createCryptoState();
+    const res = submitPublicKey(
+      G,
+      createMockCtx("0", "keyExchange"),
+      "0",
+      "not-a-point",
+    );
+    expect(res).toBe(INVALID_MOVE);
+    expect(G.players["0"].publicKey).toBeNull();
+  });
+
+  it("rejects duplicate public key across seats", () => {
+    const G = createCryptoState();
+    const { publicKey } = generateKeyPair();
+    expect(
+      submitPublicKey(G, createMockCtx("0", "keyExchange"), "0", publicKey),
+    ).toBe(G);
+    const dup = submitPublicKey(
+      G,
+      createMockCtx("1", "keyExchange"),
+      "1",
+      publicKey,
+    );
+    expect(dup).toBe(INVALID_MOVE);
+  });
+
+  it("stores canonical compressed public key", () => {
+    const G = createCryptoState();
+    const { publicKey } = generateKeyPair();
+    submitPublicKey(G, createMockCtx("0", "keyExchange"), "0", publicKey);
+    const canonical = normalizeSecp256k1PublicKey(publicKey);
+    expect(G.players["0"].publicKey).toBe(canonical);
+    expect(G.crypto.publicKeys["0"]).toBe(canonical);
+  });
+
+  it("encryptDeck rejects sk that does not match published pk", () => {
+    const G = createCryptoState();
+    const k0 = generateKeyPair();
+    const k1 = generateKeyPair();
+    const bad = generateKeyPair();
+    submitPublicKey(G, createMockCtx("0", "keyExchange"), "0", k0.publicKey);
+    submitPublicKey(G, createMockCtx("1", "keyExchange"), "1", k1.publicKey);
+    G.deckCardIds["0"] = ["c0"];
+    G.deckCardIds["1"] = ["c1"];
+    G.lifeDeckIds["0"] = ["l0"];
+    G.lifeDeckIds["1"] = ["l1"];
+
+    expect(
+      encryptDeck(G, createMockCtx("0", "encrypt"), "0", k0.privateKey),
+    ).toBe(G);
+    const rejected = encryptDeck(
+      G,
+      createMockCtx("1", "encrypt"),
+      "1",
+      bad.privateKey,
+    );
+    expect(rejected).toBe(INVALID_MOVE);
+    expect(G.players["1"].hasEncrypted).toBeFalsy();
   });
 });
