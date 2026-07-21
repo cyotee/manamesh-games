@@ -22,3 +22,6 @@
 [submodule "packages/fairplay-crypto-godot"]
 	path = packages/fairplay-crypto-godot
 	url = https://github.com/cyotee/fairplay-crypto-godot.git
+[submodule "packages/game-godot-liars-dice"]
+	path = packages/game-godot-liars-dice
+	url = https://github.com/cyotee/game-godot-liars-dice.git
