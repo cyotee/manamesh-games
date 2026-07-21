@@ -1,93 +1,77 @@
-# Task 3 Report: Placeholder Deck Factory & Card Schema
+# Task 3 Report: Mistborn early rules engine — green tests
+
+**Status:** DONE  
+**Date:** 2026-07-21  
+**Commit:** `5ded071` — `fix(mistborn): burn-limit/sideways and coin validation for early rules tests`
 
 ## Summary
 
-Successfully implemented the placeholder deck factory (`createPlaceholderDeck`) and card schema (`timestreamsCardSchema`) for the `@manamesh/timestreams` package using test-driven development. All 3 tests pass. Commit isolated correctly to avoid pre-staged crypto rename files.
+Green early rules-engine tests for `@manamesh/mistborn-deckbuilder` by fixing two confirmed root causes:
 
-## TDD Evidence
+1. **Buy cost false green** — default `boxingsAvailable: 14` and funding+coin double-count made cost-3 buys look affordable.
+2. **Sideways play false red** — burn-limit gate applied to all `playCard` before sideways short-circuit.
 
-### RED Phase (Failing Test)
-Command:
-```
-yarn workspace @manamesh/timestreams test src/deck.test.ts
-```
+Incomplete-pack hardening in `createInitialState` (filter null starters / market fallback) was already present as WIP and retained.
 
-Output:
-```
- FAIL  src/deck.test.ts [ src/deck.test.ts ]
-Error: Failed to load url ./deck (resolved id: ./deck) in /Users/cyotee/Development/github-cyotee/manamesh-games/packages/timestreams/src/deck.test.ts. Does the file exist?
+## Changes
 
- Test Files  1 failed (1)
-      Tests  no tests
-   Start at  09:48:24
-   Duration  6.16s
-```
+### `packages/mistborn-deckbuilder/src/game.test.ts`
 
-### GREEN Phase (Passing Tests)
-Command:
-```
-yarn workspace @manamesh/timestreams test src/deck.test.ts
-```
+Replaced weak / conditional assertions with fixtures that pin the bugs:
 
-Output:
-```
- RUN  v1.6.1 /Users/cyotee/Development/github-cyotee/manamesh-games/packages/timestreams
+| Test | Behavior locked in |
+|------|--------------------|
+| `computeCoins counts funding and coin tags without double-count` | funding-1 + coinshot + boxings=4 → exact total (no funding double-count) |
+| `validateMove blocks buy when not enough coins` | empty play, `boxingsAvailable=0` → cost-3 buy invalid with `/coin/i` error |
+| `buy respects coinsSpent against cost` | single funding (1 coin), coinsSpent 0 then 1 → both fail cost 3 |
+| `playCard sideways allowed when required metal already burned` | burnLimit=1 + pewter burned → sideways OK; vertical fails with metal/burn error |
 
- ✓ src/deck.test.ts  (3 tests) 48ms
+### `packages/mistborn-deckbuilder/src/game.ts`
 
- Test Files  1 passed (1)
-      Tests  3 passed (3)
-   Start at  09:49:06
-   Duration  6.80s
-```
+**`validateMove` burn-limit scope**
 
-All 3 tests pass:
-1. "creates owned cards titled 'Score 1 Point'" — validates deck generation, card ids, ownership, and uniqueness
-2. "includes a few inert action cards" — validates correct ratio of action cards (every `actionEvery`-th card)
-3. "schema validates and round-trips" — validates schema creation, validation logic, and asset key extraction
+- Before: `burnMetal || playCard || useAsMetal` all hit the burn-limit gate first.
+- After: only `burnMetal || useAsMetal`.
+- `playCard` with `sideways=true` returns valid without requiring unburned metal or free burn slots.
+- Vertical `playCard` still requires an unburned metal of the card’s type.
 
-## Files Changed
+**`computeCoins` no double-count**
 
-- **Created:** `packages/timestreams/src/deck.test.ts` (28 lines)
-  - Test suite for deck factory and schema
-  - 3 test cases covering generation, action card ratios, and schema validation
-  
-- **Created:** `packages/timestreams/src/deck.ts` (35 lines)
-  - `createPlaceholderDeck(ownerId, size, actionEvery=6)` function
-  - `timestreamsCardSchema` with `validate`, `create`, `getAssetKey` methods
+- Coin-tag / “gain coin” effects count once (`coinValue` or cost heuristic or 1).
+- Funding (+1) applies only when the card was not already counted as a coin card.
+- Boxings still contribute `Math.min(2, floor(boxings/2))`; tests zero them when asserting pure play-zone coins.
 
-## Self-Review
+**Kept:** incomplete-pack starter/market fallback in `createInitialState` (filter `Boolean`, fall back to raw pack entries).
 
-1. **Test Implementation**: Faithfully transcribed from brief; covers card generation, action card distribution, and schema round-tripping.
+## Test results
 
-2. **Implementation**: 
-   - Correctly generates card ids as `${ownerId}-card-${i}`
-   - Action cards placed at indices where `i > 0 && i % actionEvery === 0` (starts at card 6, skipping card 0)
-   - All cards default to `name: "Score 1 Point"` and `scoreEffect: "Score 1 Point"`
-   - Schema validates all required fields: `id`, `name`, `ownerId`, `cardType` (must be "invention" or "action")
-   - Schema creates cards with sensible defaults for optional fields
-   - `getAssetKey` returns `card.id` as specified
+```text
+yarn workspace @manamesh/mistborn-deckbuilder test
 
-3. **Imports**: Correctly imports `TimestreamsCard` from `./types` and `CardSchema` from `@manamesh/frontend/src/game/modules/types`
-
-4. **Commit Isolation**: Initial attempt included pre-staged crypto rename (46 files). Corrected by resetting staging area and re-staging only the 2 new files. Final commit clean.
-
-## Commit Information
-
-```
-commit b076b3f0af585e882bc9914c59dde4ca59455823
-Author: cyotee <not_cyotee@proton.me>
-Date:   Fri Jun 26 09:50:22 2026 -0700
-
-    feat(timestreams): placeholder deck factory and card schema
-    
-    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-
- packages/timestreams/src/deck.test.ts | 28 ++++++++++++++++++++++++++++
- packages/timestreams/src/deck.ts      | 35 +++++++++++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
+Test Files  2 passed (2)
+Tests       8 passed (8)
+  - src/game.test.ts   (6)
+  - src/crypto.test.ts (2)
 ```
 
-## Concerns
+Crypto tests remained green (Task 2 keychain path unchanged).
 
-None. Implementation is complete, tested, committed cleanly, and ready for integration.
+## Coin semantics note
+
+Mock `coinshot` has `cost: 2` and a coin tag. Without `coinValue`, the heuristic uses cost → 2 coins. With boxings=4 (+2) and funding-1 as coin-only (+1, no extra funding), total is **5**, not 4. Tests assert that exact total.
+
+## Out of scope (not done)
+
+- One Piece keychain (Task 4)
+- Full Mistborn rules engine / production buy/burn move logic beyond validation
+- Changing default `boxingsAvailable: 14` in initial state (tests zero it explicitly)
+
+## Commit
+
+```bash
+git add packages/mistborn-deckbuilder/src/game.ts packages/mistborn-deckbuilder/src/game.test.ts
+git commit -m "fix(mistborn): burn-limit/sideways and coin validation for early rules tests"
+# → 5ded071
+```
+
+Only mistborn-deckbuilder source files were committed (vitest `results.json` left unstaged).

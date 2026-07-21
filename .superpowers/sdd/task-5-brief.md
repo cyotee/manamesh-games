@@ -1,101 +1,95 @@
-### Task 5: Visibility & proof-chain helpers (adapt from onepiece)
+### Task 5: Cross-package verification gate
 
-**Files:**
-- Create: `packages/timestreams/src/visibility.ts`
-- Create: `packages/timestreams/src/proofChain.ts`
-- Test: `packages/timestreams/src/visibility.test.ts`
-- Test: `packages/timestreams/src/proofChain.test.ts`
+**Files:** none (verification only)
 
-**Interfaces:**
-- Consumes: `TimestreamsState`, `CardVisibilityState`, `CryptographicProof` from `./types`.
-- Produces:
-  - `visibility.ts`: `initializeCardVisibility(state, cardIds, initial?)`, `transitionCardVisibility(state, cardId, to, initiatedBy, action, data?)`, `getCardVisibility(state, cardId)`, `isCardVisibleTo(visibility, viewerIsOwner)`, `isValidTransition(from, to)`.
-  - `proofChain.ts`: `createProof(action, data, previousProofHash)`, `appendProof(state, proof)`, `getLatestProofHash(state)`, `verifyProofChain(state)`.
-
-Adapt from `packages/onepiece/src/visibility.ts` and `packages/onepiece/src/proofChain.ts` with these exact changes:
-1. Replace `OnePieceState` with `TimestreamsState` throughout.
-2. Reduce `CardVisibilityState` to `"encrypted" | "owner-known" | "public"`; allowed transitions: `encrypted → owner-known`, `encrypted → public`, `owner-known → public`. Drop `secret`/`opponent-known`/`all-known` branches.
-3. Keep `createProof`/`appendProof`/`getLatestProofHash`/`verifyProofChain` signatures identical (they only touch `state.proofChain` and pure hashing).
-
-- [ ] **Step 1: Write the failing tests**
-
-`packages/timestreams/src/visibility.test.ts`:
-```ts
-import { describe, it, expect } from "vitest";
-import {
-  initializeCardVisibility, transitionCardVisibility, getCardVisibility,
-  isCardVisibleTo, isValidTransition,
-} from "./visibility";
-
-function blankState(): any {
-  return { cardVisibility: {}, proofChain: [] };
-}
-
-describe("visibility state machine", () => {
-  it("initializes cards as encrypted", () => {
-    const s = blankState();
-    initializeCardVisibility(s, ["a", "b"]);
-    expect(getCardVisibility(s, "a")).toBe("encrypted");
-  });
-  it("allows encrypted -> owner-known -> public", () => {
-    expect(isValidTransition("encrypted", "owner-known")).toBe(true);
-    expect(isValidTransition("owner-known", "public")).toBe(true);
-    expect(isValidTransition("public", "encrypted")).toBe(false);
-  });
-  it("transitions and records visibility", () => {
-    const s = blankState();
-    initializeCardVisibility(s, ["a"]);
-    transitionCardVisibility(s, "a", "owner-known", "0", "draw");
-    expect(getCardVisibility(s, "a")).toBe("owner-known");
-  });
-  it("computes viewer visibility", () => {
-    expect(isCardVisibleTo("public", false)).toBe(true);
-    expect(isCardVisibleTo("owner-known", true)).toBe(true);
-    expect(isCardVisibleTo("owner-known", false)).toBe(false);
-    expect(isCardVisibleTo("encrypted", true)).toBe(false);
-  });
-});
-```
-
-`packages/timestreams/src/proofChain.test.ts`:
-```ts
-import { describe, it, expect } from "vitest";
-import { createProof, appendProof, getLatestProofHash, verifyProofChain } from "./proofChain";
-
-describe("proof chain", () => {
-  it("links proofs by previous hash and verifies", () => {
-    const s: any = { proofChain: [] };
-    const p1 = createProof("draw", { card: "a" }, null);
-    appendProof(s, p1);
-    const p2 = createProof("play", { card: "b" }, getLatestProofHash(s));
-    appendProof(s, p2);
-    expect(s.proofChain).toHaveLength(2);
-    expect(p2.previousProofHash).toBe(p1.hash);
-    expect(verifyProofChain(s).valid).toBe(true);
-  });
-});
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `yarn workspace @manamesh/timestreams test src/visibility.test.ts src/proofChain.test.ts`
-Expected: FAIL — modules not found.
-
-- [ ] **Step 3: Write `src/visibility.ts` and `src/proofChain.ts`**
-
-Copy the two onepiece files and apply the three adaptation changes above. Ensure `verifyProofChain` returns an object with a `valid: boolean` field (match onepiece's `ProofChainVerification` shape).
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `yarn workspace @manamesh/timestreams test src/visibility.test.ts src/proofChain.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 1: Run dependency and game suites**
 
 ```bash
-git add packages/timestreams/src/visibility.ts packages/timestreams/src/proofChain.ts packages/timestreams/src/visibility.test.ts packages/timestreams/src/proofChain.test.ts
-git commit -m "feat(timestreams): visibility state machine and proof chain"
+yarn workspace @cyotee/boardgameio-crypto test
+yarn workspace @manamesh/poker test
+yarn workspace @manamesh/timestreams test
+yarn workspace @manamesh/onepiece test
+yarn workspace @manamesh/mistborn-deckbuilder test
 ```
+
+Expected all exit 0.
+
+- [ ] **Step 2: Regression greps**
+
+```bash
+# No deep src imports in game packages
+rg -n "from ['\"]@cyotee/manamesh/src/" \
+  packages/poker packages/timestreams packages/onepiece packages/mistborn-deckbuilder \
+  --glob '**/*.{ts,tsx}'
+
+# One Piece uses keychain APIs
+rg -n "keychainAdd|requirePrivateKeyMatchesPublished|MENTAL_POKER_KEYCHAIN_POLICY" \
+  packages/onepiece/src/crypto.ts
+```
+
+Expected: first command empty; second command ≥ 1 hit each pattern.
+
+- [ ] **Step 3: Optional frontend smoke (only if export changes break SPA)**
+
+```bash
+yarn workspace @cyotee/manamesh test:run
+# or a single targeted vitest if full suite is heavy
+```
+
+If SPA build is required for publish readiness:
+
+```bash
+yarn workspace @cyotee/manamesh build
+```
+
+Only run build if Task 1 touched dist generation; skip if source-only exports.
+
+- [ ] **Step 4: Final commit only if verification fixed stragglers; else stop**
+
+No empty commits. If greps/tests fail, fix in the owning task and re-run this gate.
 
 ---
 
+## Testing matrix (definition of done)
+
+| Check | Command | Pass criteria |
+|-------|---------|---------------|
+| Crypto leaf | `yarn workspace @cyotee/boardgameio-crypto test` | all pass |
+| Poker | `yarn workspace @manamesh/poker test` | all pass |
+| Timestreams | `yarn workspace @manamesh/timestreams test` | all pass |
+| One Piece | `yarn workspace @manamesh/onepiece test` | all pass, including deckResolver + keychain cases |
+| Mistborn | `yarn workspace @manamesh/mistborn-deckbuilder test` | all pass (crypto + rules) |
+| Import hygiene | grep `@cyotee/manamesh/src/` in four games | zero hits |
+| Keychain parity | grep keychain APIs in onepiece crypto | present |
+
+---
+
+## Risk notes
+
+| Risk | Mitigation |
+|------|------------|
+| Subpath exports work in monorepo but not in published `dist` | Task 1 can stay source-mapped for monorepo; follow-up publish task can dual-map `import`→dist and `types`→.d.ts without changing public specifier names |
+| PokerBoard deep imports pull React/UI into typecheck of pure packages | Prefer type-only imports where possible; do not move board files into crypto packages |
+| Canonical pubkey breaks equality checks in One Piece UI | Prefer `publicKeysEqual` / normalize at boundaries; update tests in Task 4 Step 5 |
+| Mistborn coin semantics change gameplay balance | Keep Phase 1 simple; document funding-vs-coin rule in comment; tests pin behavior |
+
+---
+
+## Self-review (plan quality)
+
+1. **Spec coverage:** Export surface + migration + Mistborn rules failures + One Piece keychain lag + final verification — each has a task.
+2. **Placeholders:** None intentional; export paths must be confirmed against real files in Task 1 Step 2 (adjust map if filenames differ).
+3. **Type consistency:** Keychain APIs use the same names as Poker/Mistborn (`keychainAdd`, `MENTAL_POKER_KEYCHAIN_POLICY`, `requirePrivateKeyMatchesPublished`). Manamesh subpaths use stable names without `/src/`.
+
+---
+
+## Execution handoff
+
+Plan saved to `docs/superpowers/plans/2026-07-21-game-packages-followup-fixes.md`.
+
+**Two execution options:**
+
+1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks, fast iteration (`superpowers:subagent-driven-development`)
+2. **Inline Execution** — execute tasks in this session with checkpoints (`superpowers:executing-plans`)
+
+**Suggested order if parallelizing humans/agents:** Task 3 (Mistborn) can run in parallel with Task 1; Task 2 waits on Task 1; Task 4 can start after Task 2’s One Piece import migration (or in parallel if imports already resolve); Task 5 last.

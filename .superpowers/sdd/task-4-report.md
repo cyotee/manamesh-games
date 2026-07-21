@@ -1,107 +1,89 @@
-# Task 4 Report: Zone definitions
+# Task 4 Report: One Piece mental-poker keychain + sk↔pk binding
+
+**Status:** DONE  
+**Date:** 2026-07-21  
+**Commit:** `c6ed8f6` — `feat(onepiece): keychain admission and encrypt sk binding`
+
+---
 
 ## Summary
 
-Successfully implemented zone definitions for the `@manamesh/timestreams` package using TDD methodology. All 3 tests pass. Implementation mirrors the `packages/onepiece/src/zones.ts` structure.
+Wired `@cyotee/boardgameio-crypto` keychain admission into One Piece crypto key exchange and bound encrypt-time private keys to published public keys. Invalid/duplicate pubkeys and mismatched sk are rejected with `INVALID_MOVE`. Canonical compressed pubkeys are stored on player + `G.crypto.publicKeys` (+ optional `G.crypto.keychain` snapshot). Private keys are never written to shared `G`.
 
-## TDD Process
+---
 
-### Step 1: RED — Write failing test
-Created `packages/timestreams/src/zones.test.ts` verbatim from task brief.
+## Files changed
 
-Command:
-```
-yarn workspace @manamesh/timestreams test src/zones.test.ts
-```
+| File | Change |
+|------|--------|
+| `packages/onepiece/src/crypto.ts` | Keychain imports; `submitPublicKey` admission + identity; `encryptDeck` sk↔pk binding + identity |
+| `packages/onepiece/src/crypto.test.ts` | Adversarial keychain suite; happy-path canonical key expectations; mock `playerID` |
+| `packages/onepiece/src/types.ts` | **No change** — `CryptoPluginState` already has optional `keychain?: KeychainState` |
 
-Output:
-```
-FAIL  src/zones.test.ts [ src/zones.test.ts ]
-Error: Failed to load url ./zones (resolved id: ./zones)
-Does the file exist?
-```
+---
 
-Status: **FAILED** (module not found, as expected)
+## Implementation details
 
-### Step 2: GREEN — Write implementation
-Created `packages/timestreams/src/zones.ts` with:
-- `TIMESTREAMS_ZONES` — array of 5 zone definitions
-- `getZoneById(id: string)` — utility function to look up zones by ID
-- `ZONE_IDS` — typed constants (DECK, HAND, TIMELINE, DISCARD, SCORE_PILE)
+### `submitPublicKey`
 
-Command:
-```
-yarn workspace @manamesh/timestreams test src/zones.test.ts
-```
+1. Phase gate: `keyExchange` only  
+2. `validatePlayerIdentity(ctx.playerID, playerId)`  
+3. Idempotent same-key resubmit via `publicKeysEqual` → return `G`; different key for seat → `INVALID_MOVE`  
+4. `keychainFromRecord` + `keychainAdd(..., MENTAL_POKER_KEYCHAIN_POLICY)`  
+5. On reject (`invalid_curve`, `duplicate_key`, …) → `INVALID_MOVE`  
+6. Store `admitted.entry.publicKey` (canonical compressed) on `player.publicKey`, `G.crypto.publicKeys[playerId]`, and `G.crypto.keychain`  
+7. When all seats submitted → phase `encrypt` + `resetSetupPlayer`
 
-Output:
-```
-✓ src/zones.test.ts  (3 tests) 17ms
+### `encryptDeck`
 
-Test Files  1 passed (1)
-Tests  3 passed (3)
-```
+1. Phase / turn-order / `hasEncrypted` checks (unchanged)  
+2. `validatePlayerIdentity`  
+3. `requirePrivateKeyMatchesPublished(privateKey, published)` where published is `player.publicKey ?? G.crypto.publicKeys[playerId]`  
+4. On mismatch → `INVALID_MOVE` without setting `hasEncrypted`  
+5. Encryption path unchanged; **does not store `privateKey` on G**
 
-Status: **PASSED** (all 3 tests)
+Documented in-code that sk-in-move is offline/unit-test path (same as Poker today). No `prepareEncryptionLayer` / preEncrypted overload added (YAGNI per brief).
 
-## Files Changed
+---
 
-```
-packages/timestreams/src/zones.ts
-packages/timestreams/src/zones.test.ts
-```
+## Tests
 
-## Implementation Details
+### Adversarial (new)
 
-### TIMESTREAMS_ZONES Definition
-Five zones defined with the following properties:
+- Rejects invalid public key (`"not-a-point"` → keychain `invalid_curve`)  
+- Rejects duplicate public key across seats (`duplicate_key`)  
+- Stores canonical compressed public key  
+- `encryptDeck` rejects sk that does not match published pk  
 
-| Zone | Visibility | Shared | Ordered | Features |
-|------|-----------|--------|---------|----------|
-| deck | hidden | false | true | shuffle, draw |
-| hand | owner-only | false | false | play, reveal |
-| timeline | public | true | true | play |
-| discard | public | false | true | search |
-| scorePile | public | false | false | (empty) |
+### Happy-path updates
 
-### ZONE_IDS Constants
-```ts
-{
-  DECK: 'deck',
-  HAND: 'hand',
-  TIMELINE: 'timeline',
-  DISCARD: 'discard',
-  SCORE_PILE: 'scorePile',
-}
+- Expect stored keys via `normalizeSecp256k1PublicKey(...)`  
+- Same-key resubmit is idempotent; different key for same seat rejected  
+- Mock `Ctx` includes `playerID` for identity binding  
+
+### Commands
+
+```bash
+yarn workspace @manamesh/onepiece test src/crypto.test.ts  # 11 passed
+yarn workspace @manamesh/onepiece test                      # 238 passed (8 files)
 ```
 
-## Self-Review
+---
 
-✓ Implementation mirrors `packages/onepiece/src/zones.ts` structure exactly  
-✓ All 5 zones defined with correct IDs, names, visibility, shared, ordered, and features  
-✓ `getZoneById` function properly searches TIMESTREAMS_ZONES array  
-✓ ZONE_IDS constants use UPPER_SNAKE_CASE keys mapping to camelCase IDs  
-✓ Test file imported and executed without errors  
-✓ All 3 test cases pass (zone count, zone properties, ZONE_IDS constants)  
+## Known follow-ups (out of scope)
 
-## Commit
+1. **Multiplayer sk on wire:** `encryptDeck` boardgame.io move still accepts `privateKey` with `client: false` (host/master path). Production should migrate to client-side `prepareEncryptionLayer` → `encryptDeck(null, preEncrypted)` when that overload exists. Documented same as Poker offline/test path; no refactor in this task.  
+2. **UI/board:** Any board that submits sk via moves remains a known offline/test path until client prepare lands.  
+3. **Noise:** Pre-existing vitest/web-worker stderr (`id` undefined) unrelated to this change.
 
-```
-commit 835d731bc4ed8a31983b52437736487307941924
-Author: cyotee <not_cyotee@proton.me>
-Date:   Fri Jun 26 10:03:50 2026 -0700
+---
 
-    feat(timestreams): zone definitions
-    
-    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+## Hard rules compliance
 
- packages/timestreams/src/zones.test.ts | 18 +++++++++
- packages/timestreams/src/zones.ts      | 73 ++++++++++++++++++++++++++++++++++
- 2 files changed, 91 insertions(+)
-```
-
-Verification: `git show --stat HEAD` confirms ONLY the 2 required files appear. No unrelated files in commit.
-
-## Concerns
-
-None. Implementation is complete, tested, and committed cleanly.
+| Rule | Status |
+|------|--------|
+| Never put private keys in shared G | ✅ |
+| Keychain admits public keys only under MENTAL_POKER_KEYCHAIN_POLICY | ✅ |
+| Use keychain + validatePlayerIdentity | ✅ |
+| Canonical compressed public keys stored | ✅ |
+| Only onepiece files in commit | ✅ (`crypto.ts`, `crypto.test.ts`) |

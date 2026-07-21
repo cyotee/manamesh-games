@@ -1,157 +1,136 @@
-# Task 2: Timeline helpers (pure) — Report
+# Task 2 Report: Migrate game packages off `@cyotee/manamesh/src/` deep imports
+
+**Status:** DONE_WITH_CONCERNS  
+**Commit:** `7c4a6ec` — `refactor(games): use stable @cyotee/manamesh subpath imports`  
+**Date:** 2026-07-21
+
+---
 
 ## Summary
 
-Successfully implemented pure timeline/era helper functions for the `@manamesh/timestreams` package. All 4 tests pass. Commit correctly isolates only the 2 target files (timeline.ts + timeline.test.ts), excluding pre-existing staged crypto rename.
+Migrated all `@cyotee/manamesh/src/...` deep imports in the four game packages onto the Task 1 stable subpath export map. Grep gate is **zero** matches under:
+
+- `packages/poker`
+- `packages/timestreams`
+- `packages/onepiece`
+- `packages/mistborn-deckbuilder`
 
 ---
 
-## TDD Process
+## Step results
 
-### Step 1: Write Failing Test ✓
+### Step 1 — Failing grep gate (before)
 
-Created `packages/timestreams/src/timeline.test.ts` verbatim from brief:
-- 4 test cases: `createTimeline`, `eraForDay`/`dayForEra`, `appendToEra`/`scoringSlotCardIds`, `isLastDay`
+Before migration, `rg` found **~41** deep imports across the four packages.
 
-### Step 2: Run Test — RED ✓
+### Step 2 — Mechanical renames
+
+Applied the brief’s exact old→new table:
+
+| Old | New |
+|-----|-----|
+| `@cyotee/manamesh/src/game/modules/types` | `@cyotee/manamesh/game/modules` |
+| `@cyotee/manamesh/src/deck/types` | `@cyotee/manamesh/deck` |
+| `@cyotee/manamesh/src/assets/manifest/types` | `@cyotee/manamesh/assets/manifest` |
+| `@cyotee/manamesh/src/assets/loader/{loader,local-loader,cache,types}` | `@cyotee/manamesh/assets/loader` |
+| `@cyotee/manamesh/src/hooks/useAssetPack` | `@cyotee/manamesh/hooks/useAssetPack` |
+| `@cyotee/manamesh/src/hooks/useCardImage` | `@cyotee/manamesh/hooks/useCardImage` |
+| `@cyotee/manamesh/src/hooks/useCardSettings` | `@cyotee/manamesh/hooks/useCardSettings` |
+| `@cyotee/manamesh/src/components/CryptoTransparencyPanel` | `@cyotee/manamesh/components/CryptoTransparencyPanel` |
+| `@cyotee/manamesh/src/components/CardSettingsPanel` | `@cyotee/manamesh/components/CardSettingsPanel` |
+| `@cyotee/manamesh/src/blockchain/wallet` | `@cyotee/manamesh/blockchain/wallet` |
+| `@cyotee/manamesh/src/assets/packs/standard-cards` | `@cyotee/manamesh/assets/packs/standard-cards` |
+
+**Extra correction (beyond pure path rename):** Timestreams had historically imported `CardManifestEntry` / `LoadedAssetPack` from `game/modules/types`, but those symbols live under:
+
+- `CardManifestEntry` → `@cyotee/manamesh/assets/manifest`
+- `LoadedAssetPack` → `@cyotee/manamesh/assets/loader`
+
+Updated:
+
+- `packages/timestreams/src/deck.ts`
+- `packages/timestreams/src/deckResolver.ts`
+
+**Loader consolidation:** One Piece `deckResolver.ts` now imports all loader APIs from a single `@cyotee/manamesh/assets/loader` barrel (and deck types consolidated onto `@cyotee/manamesh/deck`).
+
+**Test mock update (required for resolution to work in tests):**  
+`packages/onepiece/src/deckResolver.test.ts` previously mocked relative non-package paths (`../../../assets/loader/*`). After subpath migration those mocks no longer intercept real loader code (tests hit IndexedDB). Mocks were rewritten to:
+
+```ts
+vi.mock('@cyotee/manamesh/assets/loader', () => ({ ... }));
+```
+
+### Step 3 — One Piece tests (primary oracle)
+
+```
+yarn workspace @manamesh/onepiece test
+```
+
+**Result:** 8 files / **234 passed** (including `deckResolver.test.ts` 26/26). No `Missing "./src/..."` specifier errors.
+
+### Step 4 — Other packages
+
+| Package | Result |
+|---------|--------|
+| `@manamesh/onepiece` | **234/234 pass** (full suite) |
+| `@manamesh/poker` | Targeted (crypto, adversarial, game, hands, betting): **113/113 pass**. Full suite timed out at 5m while still green mid-run (mental-poker adversarial continuing). No import resolution failures observed. |
+| `@manamesh/timestreams` | Targeted (lifecycle, crypto, deck, types, deckResolver.pack): **all pass**. Full suite timed out mid-run after many greens; no import resolution failures. |
+| `@manamesh/mistborn-deckbuilder` | **6 pass / 2 fail** — rules assertion failures only (`buyCard` / sideways `playCard`). **No manamesh import resolution errors.** Expected residual for Task 3. |
+
+### Step 5 — Grep gate (after)
 
 ```bash
-$ yarn workspace @manamesh/timestreams test src/timeline.test.ts
+rg -n "from ['\"]@cyotee/manamesh/src/" \
+  packages/poker packages/timestreams packages/onepiece packages/mistborn-deckbuilder \
+  --glob '**/*.{ts,tsx}'
 ```
 
-**Output (FAIL):**
+**Result:** zero matches.
+
+### Step 6 — Commit
+
 ```
- FAIL  src/timeline.test.ts [ src/timeline.test.ts ]
-Error: Failed to load url ./timeline (resolved id: ./timeline) in /Users/cyotee/Development/github-cyotee/manamesh-games/packages/timestreams/src/timeline.test.ts. Does the file exist?
-
- Test Files  1 failed (1)
-      Tests  no tests
-```
-
-**Status:** Expected failure — implementation not yet written.
-
-### Step 3: Write Implementation ✓
-
-Created `packages/timestreams/src/timeline.ts` verbatim from brief:
-
-```typescript
-import { ERA_ORDER, type EraId, type EraState } from "./types";
-
-export function createTimeline(): Record<EraId, EraState> {
-  const t = {} as Record<EraId, EraState>;
-  for (const id of ERA_ORDER) t[id] = { id, stack: [] };
-  return t;
-}
-
-export function eraForDay(day: number): EraId {
-  if (day < 1 || day > ERA_ORDER.length) {
-    throw new RangeError(`day out of range: ${day}`);
-  }
-  return ERA_ORDER[day - 1];
-}
-
-export function dayForEra(era: EraId): number {
-  return ERA_ORDER.indexOf(era) + 1;
-}
-
-export function appendToEra(
-  timeline: Record<EraId, EraState>, era: EraId, cardId: string,
-): void {
-  timeline[era].stack.push(cardId);
-}
-
-export function scoringSlotCardIds(era: EraState, scoringSlots: number): string[] {
-  return era.stack.slice(0, scoringSlots);
-}
-
-export function isLastDay(day: number): boolean {
-  return day === ERA_ORDER.length;
-}
+7c4a6ec refactor(games): use stable @cyotee/manamesh subpath imports
 ```
 
-### Step 4: Run Test — GREEN ✓
+**23 files** staged (import migration only). Explicitly **not** committed:
 
-```bash
-$ yarn workspace @manamesh/timestreams test src/timeline.test.ts
-```
-
-**Output (PASS):**
-```
- RUN  v1.6.1 /Users/cyotee/Development/github-cyotee/manamesh-games/packages/timestreams
-
- ✓ src/timeline.test.ts  (4 tests) 52ms
-
- Test Files  1 passed (1)
-      Tests  4 passed (4)
- Start at  09:41:57
- Duration  9.01s (transform 348ms, setup 1ms, collect 345ms, tests 52ms, environment 1ms, prepare 1.55s)
-```
-
-**Status:** All 4 tests pass ✓
+- `packages/*/node_modules/.vite/vitest/results.json`
+- `packages/onepiece/src/crypto.test.ts` (prior-session WIP: `./boardgameio-crypto` → `./crypto`)
+- `packages/poker/src/mentalPoker.gaps.adversarial.test.ts` (prior-session keychain WIP)
+- Mistborn `createInitialState` pack-hardening WIP remains **unstaged** on `packages/mistborn-deckbuilder/src/game.ts` (index has import-only change; working tree still has WIP)
 
 ---
 
-## Files Changed
+## Files changed (committed)
 
-| File | Type | Status |
-|------|------|--------|
-| `packages/timestreams/src/timeline.ts` | Implementation | Created (32 lines) |
-| `packages/timestreams/src/timeline.test.ts` | Test | Created (33 lines) |
+### poker
+- `src/game.ts`, `src/crypto.ts`, `src/types.ts`, `src/crypto.test.ts`, `src/crypto.adversarial.test.ts`, `src/mentalPoker.harness.ts`, `src/components/PokerBoard.tsx`
 
----
+### timestreams
+- `src/game.ts`, `src/crypto.ts`, `src/types.ts`, `src/zones.ts`, `src/deck.ts`, `src/deckResolver.ts`
 
-## Self-Review
+### onepiece
+- `src/game.ts`, `src/crypto.ts`, `src/types.ts`, `src/zones.ts`, `src/deckResolver.ts`, `src/deckResolver.test.ts`
 
-**Correctness:**
-- ✓ `createTimeline()` initializes all 6 eras from `ERA_ORDER` with empty stacks
-- ✓ `eraForDay()` correctly maps 1-indexed days to eras; throws `RangeError` for invalid inputs (0, 7+)
-- ✓ `dayForEra()` is proper inverse of `eraForDay()`
-- ✓ `appendToEra()` mutates `timeline[era].stack` as side effect
-- ✓ `scoringSlotCardIds()` returns first N cards from stack via `slice(0, scoringSlots)`
-- ✓ `isLastDay()` correctly checks `day === ERA_ORDER.length` (6)
-
-**Dependencies:**
-- All functions import and use `ERA_ORDER`, `EraId`, `EraState` from `./types`
-- No external dependencies; pure functions (except `appendToEra` mutation)
-
-**Test Coverage:**
-- All 4 test blocks execute; all assertions pass
-- Edge cases tested: day 0, day 7, stack overflow (7 cards, 6 slots)
-
----
-
-## Commit Evidence
-
-**Commit SHA:** `eeff479`
-**Message:** `feat(timestreams): pure timeline/era helpers`
-
-```bash
-$ git show --stat HEAD
-```
-
-```
-commit eeff47924e343ee4dd078c95989ae613b17ec930
-Author: cyotee <not_cyotee@proton.me>
-Date:   Fri Jun 26 09:42:52 2026 -0700
-
-    feat(timestreams): pure timeline/era helpers
-    
-    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-
- packages/timestreams/src/timeline.test.ts | 33 +++++++++++++++++++++++++++++++
- packages/timestreams/src/timeline.ts      | 32 ++++++++++++++++++++++++++++++
- 2 files changed, 65 insertions(+)
-```
-
-**Verification:** ✓ Only 2 files (timeline.ts + timeline.test.ts) included; pre-existing staged crypto rename correctly excluded.
+### mistborn-deckbuilder
+- `src/game.ts` (import lines only in commit), `src/types.ts`, `src/assets.ts`, `src/board/MistbornBoard.tsx`
 
 ---
 
 ## Concerns
 
-None. Task requirements met:
-- Test written verbatim from brief
-- RED → GREEN TDD flow confirmed
-- Implementation written verbatim from brief
-- Commit isolated to target files only
-- All 4 tests pass
+1. **Mistborn rules failures** remain (Task 3): 2 tests in `game.test.ts` fail on coin/metal rules assertions; not import-related.
+2. **Full poker / timestreams suites** were not completed end-to-end (tool timeout ~5m). Import-sensitive subsets and mid-run full-suite progress showed no resolution errors. Recommend a full local run if CI does not cover them.
+3. **Pre-existing WIP left uncommitted** as instructed: onepiece `crypto.test.ts`, poker `mentalPoker.gaps.adversarial.test.ts`, mistborn `createInitialState` hardening (working tree only).
+4. **Timestreams symbol re-homing:** `CardManifestEntry` / `LoadedAssetPack` were never actually exported from `game/modules/types`; mapping them to manifest/loader subpaths is correct for Task 1 exports but is a slight deviation from pure string replace of that one table row.
+
+---
+
+## Acceptance checklist
+
+- [x] Zero `@cyotee/manamesh/src/` imports in four game packages
+- [x] Loader consumers use `@cyotee/manamesh/assets/loader`
+- [x] One Piece full suite green (primary deckResolver oracle)
+- [x] No manamesh resolution errors in poker / timestreams / mistborn exercised tests
+- [x] Migration-only commit; WIP/results.json excluded

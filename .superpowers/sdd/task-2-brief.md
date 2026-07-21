@@ -1,110 +1,102 @@
-### Task 2: Timeline helpers (pure)
+### Task 2: Migrate game packages off `@cyotee/manamesh/src/...`
 
 **Files:**
-- Create: `packages/timestreams/src/timeline.ts`
-- Test: `packages/timestreams/src/timeline.test.ts`
+- Modify (all deep-import hits from Task 1 inventory), at least:
+  - `packages/onepiece/src/deckResolver.ts`
+  - `packages/onepiece/src/deckResolver.test.ts`
+  - `packages/onepiece/src/{game,crypto,types,zones}.ts`
+  - `packages/poker/src/{game,crypto,types,crypto.test,crypto.adversarial,mentalPoker.harness}.ts`
+  - `packages/poker/src/components/PokerBoard.tsx`
+  - `packages/timestreams/src/{game,crypto,types,zones,deck,deckResolver}.ts`
+  - `packages/mistborn-deckbuilder/src/{game,types,assets}.ts`
+  - `packages/mistborn-deckbuilder/src/board/MistbornBoard.tsx`
+- Test:  
+  `yarn workspace @manamesh/onepiece test`  
+  `yarn workspace @manamesh/poker test`  
+  `yarn workspace @manamesh/timestreams test`  
+  `yarn workspace @manamesh/mistborn-deckbuilder test`
 
 **Interfaces:**
-- Consumes: `ERA_ORDER`, `EraId`, `EraState`, `TimestreamsState`, `TimestreamsConfig` from `./types`.
-- Produces:
-  - `createTimeline(): Record<EraId, EraState>` — every era with an empty `stack`.
-  - `eraForDay(day: number): EraId` — `day` is 1-indexed; throws `RangeError` if `day < 1 || day > 6`.
-  - `dayForEra(era: EraId): number` — inverse, 1-indexed.
-  - `appendToEra(timeline: Record<EraId, EraState>, era: EraId, cardId: string): void` — pushes onto `stack`.
-  - `scoringSlotCardIds(era: EraState, scoringSlots: number): string[]` — first `scoringSlots` ids of `stack`.
-  - `isLastDay(day: number): boolean` — `day === 6`.
+- Consumes: Task 1 export map
+- Produces: zero remaining `@cyotee/manamesh/src/` imports under `packages/{poker,timestreams,onepiece,mistborn-deckbuilder}`
 
-- [ ] **Step 1: Write the failing test**
-
-`packages/timestreams/src/timeline.test.ts`:
-```ts
-import { describe, it, expect } from "vitest";
-import {
-  createTimeline, eraForDay, dayForEra, appendToEra, scoringSlotCardIds, isLastDay,
-} from "./timeline";
-
-describe("timeline helpers", () => {
-  it("creates six empty era stacks", () => {
-    const t = createTimeline();
-    expect(Object.keys(t)).toHaveLength(6);
-    expect(t.stone.stack).toEqual([]);
-    expect(t.future.id).toBe("future");
-  });
-
-  it("maps days to eras 1-indexed", () => {
-    expect(eraForDay(1)).toBe("stone");
-    expect(eraForDay(6)).toBe("future");
-    expect(dayForEra("renaissance")).toBe(3);
-    expect(() => eraForDay(0)).toThrow(RangeError);
-    expect(() => eraForDay(7)).toThrow(RangeError);
-  });
-
-  it("appends cards and reads scoring slots", () => {
-    const t = createTimeline();
-    for (const id of ["a", "b", "c", "d", "e", "f", "g"]) appendToEra(t, "stone", id);
-    expect(t.stone.stack).toHaveLength(7);
-    expect(scoringSlotCardIds(t.stone, 6)).toEqual(["a", "b", "c", "d", "e", "f"]);
-  });
-
-  it("flags the last day", () => {
-    expect(isLastDay(6)).toBe(true);
-    expect(isLastDay(5)).toBe(false);
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `yarn workspace @manamesh/timestreams test src/timeline.test.ts`
-Expected: FAIL — cannot resolve `./timeline`.
-
-- [ ] **Step 3: Write `src/timeline.ts`**
-
-```ts
-import { ERA_ORDER, type EraId, type EraState } from "./types";
-
-export function createTimeline(): Record<EraId, EraState> {
-  const t = {} as Record<EraId, EraState>;
-  for (const id of ERA_ORDER) t[id] = { id, stack: [] };
-  return t;
-}
-
-export function eraForDay(day: number): EraId {
-  if (day < 1 || day > ERA_ORDER.length) {
-    throw new RangeError(`day out of range: ${day}`);
-  }
-  return ERA_ORDER[day - 1];
-}
-
-export function dayForEra(era: EraId): number {
-  return ERA_ORDER.indexOf(era) + 1;
-}
-
-export function appendToEra(
-  timeline: Record<EraId, EraState>, era: EraId, cardId: string,
-): void {
-  timeline[era].stack.push(cardId);
-}
-
-export function scoringSlotCardIds(era: EraState, scoringSlots: number): string[] {
-  return era.stack.slice(0, scoringSlots);
-}
-
-export function isLastDay(day: number): boolean {
-  return day === ERA_ORDER.length;
-}
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `yarn workspace @manamesh/timestreams test src/timeline.test.ts`
-Expected: PASS (4 tests).
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 1: Write a failing grep gate (document expected before/after)**
 
 ```bash
-git add packages/timestreams/src/timeline.ts packages/timestreams/src/timeline.test.ts
-git commit -m "feat(timestreams): pure timeline/era helpers"
+rg -n "from ['\"]@cyotee/manamesh/src/" packages --glob '**/*.{ts,tsx}' | wc -l
+```
+
+Expected before migration: count > 0. After Task 2: count `0` for the four game packages (frontend may still use relative imports internally).
+
+- [ ] **Step 2: Apply mechanical renames**
+
+Use these replacement rules (exact strings):
+
+| Old | New |
+|-----|-----|
+| `@cyotee/manamesh/src/game/modules/types` | `@cyotee/manamesh/game/modules` |
+| `@cyotee/manamesh/src/deck/types` | `@cyotee/manamesh/deck` |
+| `@cyotee/manamesh/src/assets/manifest/types` | `@cyotee/manamesh/assets/manifest` |
+| `@cyotee/manamesh/src/assets/loader/loader` | `@cyotee/manamesh/assets/loader` |
+| `@cyotee/manamesh/src/assets/loader/local-loader` | `@cyotee/manamesh/assets/loader` |
+| `@cyotee/manamesh/src/assets/loader/cache` | `@cyotee/manamesh/assets/loader` |
+| `@cyotee/manamesh/src/assets/loader/types` | `@cyotee/manamesh/assets/loader` |
+| `@cyotee/manamesh/src/hooks/useAssetPack` | `@cyotee/manamesh/hooks/useAssetPack` |
+| `@cyotee/manamesh/src/hooks/useCardImage` | `@cyotee/manamesh/hooks/useCardImage` |
+| `@cyotee/manamesh/src/hooks/useCardSettings` | `@cyotee/manamesh/hooks/useCardSettings` |
+| `@cyotee/manamesh/src/components/CryptoTransparencyPanel` | `@cyotee/manamesh/components/CryptoTransparencyPanel` |
+| `@cyotee/manamesh/src/components/CardSettingsPanel` | `@cyotee/manamesh/components/CardSettingsPanel` |
+| `@cyotee/manamesh/src/blockchain/wallet` | `@cyotee/manamesh/blockchain/wallet` |
+| `@cyotee/manamesh/src/assets/packs/standard-cards` | `@cyotee/manamesh/assets/packs/standard-cards` |
+
+Example (One Piece deckResolver):
+
+```ts
+// before
+import type { EnrichedCard } from "@cyotee/manamesh/src/deck/types";
+import { enrichCard } from "@cyotee/manamesh/src/deck/types";
+import type { DeckList } from "@cyotee/manamesh/src/deck/types";
+import { getLoadedPack, getAllLoadedPacks } from "@cyotee/manamesh/src/assets/loader/loader";
+
+// after
+import type { EnrichedCard, DeckList } from "@cyotee/manamesh/deck";
+import { enrichCard } from "@cyotee/manamesh/deck";
+import { getLoadedPack, getAllLoadedPacks } from "@cyotee/manamesh/assets/loader";
+```
+
+- [ ] **Step 3: Run One Piece tests (primary oracle for deckResolver)**
+
+```bash
+yarn workspace @manamesh/onepiece test
+```
+
+Expected: `deckResolver.test.ts` loads (no `Missing "./src/deck/types" specifier`); crypto suite still passes. Fix any missed export by returning to Task 1.
+
+- [ ] **Step 4: Run the other three game packages**
+
+```bash
+yarn workspace @manamesh/poker test
+yarn workspace @manamesh/timestreams test
+yarn workspace @manamesh/mistborn-deckbuilder test
+```
+
+Expected: no resolution errors on manamesh imports. Mistborn may still have rules assertion failures until Task 3.
+
+- [ ] **Step 5: Grep gate must be zero in game packages**
+
+```bash
+rg -n "from ['\"]@cyotee/manamesh/src/" \
+  packages/poker packages/timestreams packages/onepiece packages/mistborn-deckbuilder \
+  --glob '**/*.{ts,tsx}'
+```
+
+Expected: no matches.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/poker packages/timestreams packages/onepiece packages/mistborn-deckbuilder
+git commit -m "refactor(games): use stable @cyotee/manamesh subpath imports"
 ```
 
 ---
