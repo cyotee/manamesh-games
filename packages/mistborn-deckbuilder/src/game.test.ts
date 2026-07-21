@@ -26,7 +26,7 @@ describe('Mistborn rules engine (early)', () => {
     expect(state.market.length).toBeGreaterThan(0);
   });
 
-  it('computeCoins counts funding and coin tags', () => {
+  it('computeCoins counts funding and coin tags without double-count', () => {
     const state: MistbornState = {
       players: { p0: { trainingPosition: 0, burnLimit: 1 } as any },
       zones: {
@@ -41,60 +41,68 @@ describe('Mistborn rules engine (early)', () => {
     } as any;
 
     const coins = computeCoins(state, 'p0');
-    // 1 (funding) + 1 (coinshot tag) + 2 (from boxings) = 4
-    expect(coins).toBeGreaterThanOrEqual(3);
+    // funding-1 (coin tag → 1, no extra funding) + coinshot (cost heuristic 2) + boxings (2) = 5
+    expect(coins).toBe(5);
   });
 
   it('validateMove blocks buy when not enough coins', () => {
-    const state = createInitialState({ numPlayers: 2, playerIDs: ['p0', 'p1'], packCards: mockPackCards });
-    // force low coins
-    state.zones.play = { p0: [] };
+    const state = createInitialState({
+      numPlayers: 2,
+      playerIDs: ['p0', 'p1'],
+      packCards: mockPackCards as any,
+    });
+    state.zones.play = { p0: [], p1: [] };
     state.boxingsAvailable = 0;
-    // ensure the market contains something we can attempt to buy
-    if (!state.market || state.market.length === 0) state.market = ['market-foo'];
+    state.coinsSpent = { p0: 0, p1: 0 };
+    state.market = ['market-foo'];
+    state.currentPlayer = 'p0';
 
     const res = validateMove(state, 'buyCard', 'p0', 'market-foo');
-    // With 0 coins it should be invalid for a >0 cost card (or structural)
-    expect(res).toHaveProperty('valid');
-    if (res.valid === false) {
-      expect(res.error).toMatch(/coin|market/i);
-    }
+    expect(res.valid).toBe(false);
+    expect(res.error).toMatch(/coin/i);
   });
 
-  it('buy records coinsSpent and subsequent computeCoins / validate see reduced amount', () => {
-    // Use a state with some coins from funding
-    const state: any = createInitialState({ numPlayers: 1, playerIDs: ['p0'], packCards: mockPackCards });
-    state.zones.play.p0 = [{ id: 'funding-1' }]; // gives 1 coin
+  it('buy respects coinsSpent against cost', () => {
+    const state = createInitialState({
+      numPlayers: 1,
+      playerIDs: ['p0'],
+      packCards: mockPackCards as any,
+    });
+    state.boxingsAvailable = 0;
+    state.zones.play = { p0: [{ id: 'funding-1' }] };
     state.market = ['market-foo'];
-    (state as any).coinsSpent = { p0: 0 };
+    state.coinsSpent = { p0: 0 };
+    state.currentPlayer = 'p0';
 
-    // First buy of 3-cost should be blocked (only 1 coin)
+    // funding-1 alone must be < 3 after Task 3 computeCoins semantics
+    expect(computeCoins(state, 'p0')).toBeLessThan(3);
+
     let res = validateMove(state, 'buyCard', 'p0', 'market-foo');
     expect(res.valid).toBe(false);
 
-    // Simulate a successful buy of a cheap card by directly calling the move logic? 
-    // Instead, manually record as the move would:
-    (state as any).coinsSpent.p0 = 1;
+    state.coinsSpent.p0 = 1;
     res = validateMove(state, 'buyCard', 'p0', 'market-foo');
-    expect(res.valid).toBe(false); // still not enough for 3
+    expect(res.valid).toBe(false);
   });
 
-  it('playCard sideways is allowed without metal (uses card as metal)', () => {
-    const state: any = createInitialState({ numPlayers: 1, playerIDs: ['p0'], packCards: mockPackCards });
-    // put a metal-requiring card in hand
+  it('playCard sideways allowed when required metal already burned', () => {
+    const state = createInitialState({
+      numPlayers: 1,
+      playerIDs: ['p0'],
+      packCards: mockPackCards as any,
+    });
+    state.currentPlayer = 'p0';
     state.zones.hand.p0 = [{ id: 'pewter-card' }];
-
-    // Burn the pewter metal so normal play would require it
     const pewter = state.players.p0.metals.find((m: any) => m.metal === 'pewter');
-    if (pewter) pewter.burned = true;
+    pewter.burned = true;
+    // burnLimit stays 1; one metal burned
 
-    // sideways should pass even with the metal burned (card acts as the metal)
     const resSide = validateMove(state, 'playCard', 'p0', 'pewter-card', true);
     expect(resSide.valid).toBe(true);
 
-    // normal (vertical) play should now fail (no unburned pewter)
     const resNormal = validateMove(state, 'playCard', 'p0', 'pewter-card', false);
     expect(resNormal.valid).toBe(false);
+    expect(resNormal.error).toMatch(/metal|burn/i);
   });
 
   it('MistbornGame has expected shape', () => {

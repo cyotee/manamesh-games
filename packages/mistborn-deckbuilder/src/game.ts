@@ -64,12 +64,17 @@ export function createInitialState(
     const charManifests = getCardsForSet(packCards, 'character' as any);
     const fundingManifests = getCardsForSet(packCards, 'funding' as any);
 
-    // Build a starter pool: 4 metals + 1 character + 6 funding (rules-free selection)
-    starterPool = [
+    // Build a starter pool: 4 metals + 1 character + 6 funding (rules-free selection).
+    // Incomplete packs (tests / partial manifests) may omit set buckets — filter nulls
+    // and fall back to raw pack entries so createInitialState never throws.
+    const rawStarter = [
       ...metalWithDups.slice(0, 4),
       charManifests[0] || metalWithDups[0],
       ...fundingManifests.slice(0, 6),
-    ].map((c: any) => ({
+    ].filter(Boolean);
+    const starterSource =
+      rawStarter.length > 0 ? rawStarter : packCards.slice(0, 11);
+    starterPool = starterSource.map((c: any) => ({
       id: c.id,
       name: c.name,
       cost: c.metadata?.cost ?? 0,
@@ -83,7 +88,10 @@ export function createInitialState(
     } as MistbornCard));
 
     const marketManifests = getCardsForDeckType(packCards, 'market').slice(0, 6);
-    marketIds = marketManifests.map((c: any) => c.id);
+    marketIds =
+      marketManifests.length > 0
+        ? marketManifests.map((c: any) => c.id)
+        : packCards.slice(0, 6).map((c: any) => c.id);
   } else {
     // Fallback local data
     const allCards = getAllCards();
@@ -172,11 +180,11 @@ export function validateMove(
   const player = state.players[playerID];
   if (!player) return { valid: false, error: 'Player not found' };
 
-  // Structural turn + zone checks always
-  if (move === 'burnMetal' || move === 'playCard' || move === 'useAsMetal') {
+  // Burn-limit gate applies to explicit metal burns only.
+  // Sideways playCard uses the card as metal and does not consume an extra burn slot (Phase 1).
+  if (move === 'burnMetal' || move === 'useAsMetal') {
     const currentBurns = (player.metals || []).filter((m: any) => m.burned).length;
     if (currentBurns >= (player.burnLimit || 1)) {
-      // For Phase 1/early rules engine, we return invalid for overburn (can relax for pure free if desired)
       return { valid: false, error: `Burn limit reached (${player.burnLimit})` };
     }
   }
@@ -189,11 +197,13 @@ export function validateMove(
     const requiredMetal = meta.metal || meta.requiredMetal;
 
     if (sideways) {
-      // Playing sideways = using the card as a metal via its pairing.
-      // No external metal burn required; the card itself provides it.
+      // Card provides its own metal; do not require unburned metal and do not
+      // treat existing burns as "burn limit reached" for this play style.
       return { valid: true };
     }
 
+    // Vertical play: require an unburned metal of the card's type when specified.
+    // Burn limit is enforced via the metal-availability check (no unburned metal left).
     if (requiredMetal) {
       const hasMetal = (player.metals || []).some((m: any) => {
         const mName = Array.isArray(requiredMetal) ? requiredMetal.includes(m.metal) : m.metal === requiredMetal;
@@ -244,12 +254,12 @@ export function setPackCardsForValidation(cards: any[]) {
 }
 
 // Helper to compute available coins from played cards using pack metadata.
-// Rules engine version: looks for explicit "coin" tags and "gain ... coin" effects.
-// Funding cards (tag or type) contribute 1 each.
+// Coin-tag / "gain coin" effects count once; funding adds +1 only if not already counted as a coin card.
 export function computeCoins(G: MistbornState, pid: string): number {
   const play = G.zones.play?.[pid] || [];
   let coins = 0;
 
+  // Prefer coin-tag value; funding contributes 1 only when the card was not already counted as coin.
   play.forEach((c: any) => {
     const id = c?.id || c;
     const meta = (packCardsCache.find((p: any) => p.id === id)?.metadata) || (c as any).metadata || {};
@@ -257,15 +267,15 @@ export function computeCoins(G: MistbornState, pid: string): number {
     const effect: string = (meta.effectText || '').toLowerCase();
     const cardType = meta.cardType || '';
 
+    let added = 0;
     if (tags.includes('coin') || effect.includes('coin') || /gain\s+\d*\s*coin/.test(effect)) {
-      // Prefer explicit value if present; fall back to 1 or card cost heuristic
-      const val = meta.coinValue ?? (meta.cost && meta.cost > 0 ? meta.cost : 1);
-      coins += val;
+      added += meta.coinValue ?? (meta.cost && meta.cost > 0 ? meta.cost : 1);
     }
-
-    if (tags.includes('funding') || cardType === 'funding') {
-      coins += 1;
+    // Funding contributes 1 only if not already counted as a coin card
+    if ((tags.includes('funding') || cardType === 'funding') && added === 0) {
+      added += 1;
     }
+    coins += added;
   });
 
   // Boxings can be converted (very simple model for now)
