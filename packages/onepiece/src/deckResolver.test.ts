@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { enrichedToOnePieceCard, resolveDeckList } from './deckResolver';
 import type { ResolvedDeck } from './deckResolver';
-import type { EnrichedCard } from '@cyotee/manamesh/src/deck/types';
-import type { DeckList } from '@cyotee/manamesh/src/deck/types';
+import type { EnrichedCard } from '@cyotee/manamesh/deck';
+import type { DeckList } from '@cyotee/manamesh/deck';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -141,18 +141,12 @@ describe('enrichedToOnePieceCard', () => {
 // ---------------------------------------------------------------------------
 
 describe('resolveDeckList', () => {
-  // Mock the loader modules
-  vi.mock('../../../assets/loader/loader', () => ({
+  // Mock consolidated loader barrel (Task 2 subpath export)
+  vi.mock('@cyotee/manamesh/assets/loader', () => ({
     getLoadedPack: vi.fn(),
     getAllLoadedPacks: vi.fn().mockReturnValue([]),
-  }));
-
-  vi.mock('../../../assets/loader/local-loader', () => ({
     reloadLocalPack: vi.fn(),
     getAllLocalPacks: vi.fn().mockReturnValue([]),
-  }));
-
-  vi.mock('../../../assets/loader/cache', () => ({
     getAllPackMetadata: vi.fn().mockResolvedValue([]),
   }));
 
@@ -164,14 +158,12 @@ describe('resolveDeckList', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const loader = await import('../../../assets/loader/loader');
-    const localLoader = await import('../../../assets/loader/local-loader');
-    const cache = await import('../../../assets/loader/cache');
+    const loader = await import('@cyotee/manamesh/assets/loader');
     mockGetLoadedPack = loader.getLoadedPack as ReturnType<typeof vi.fn>;
-    mockReloadLocalPack = localLoader.reloadLocalPack as ReturnType<typeof vi.fn>;
-    mockGetAllLoadedPacks = (loader as Record<string, unknown>).getAllLoadedPacks as ReturnType<typeof vi.fn>;
-    mockGetAllLocalPacks = (localLoader as Record<string, unknown>).getAllLocalPacks as ReturnType<typeof vi.fn>;
-    mockGetAllPackMetadata = (cache as Record<string, unknown>).getAllPackMetadata as ReturnType<typeof vi.fn>;
+    mockReloadLocalPack = loader.reloadLocalPack as ReturnType<typeof vi.fn>;
+    mockGetAllLoadedPacks = loader.getAllLoadedPacks as ReturnType<typeof vi.fn>;
+    mockGetAllLocalPacks = loader.getAllLocalPacks as ReturnType<typeof vi.fn>;
+    mockGetAllPackMetadata = loader.getAllPackMetadata as ReturnType<typeof vi.fn>;
   });
 
   const mockPack = {

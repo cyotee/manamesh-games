@@ -25,8 +25,8 @@ import {
   DEFAULT_MISTBORN_PACK_SOURCE,
   IPFS_MISTBORN_PACK_SOURCE,
 } from './assets';
-import type { GameModule, GameConfig, MoveValidation } from '@cyotee/manamesh/src/game/modules/types';
-import type { CardManifestEntry } from '@cyotee/manamesh/src/assets/manifest/types';
+import type { GameModule, GameConfig, MoveValidation } from '@cyotee/manamesh/game/modules';
+import type { CardManifestEntry } from '@cyotee/manamesh/assets/manifest';
 import { cryptoMoves } from './crypto';
 
 // =============================================================================

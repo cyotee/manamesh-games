@@ -5,8 +5,8 @@
  * standard (trusted server) and crypto (mental poker) variants.
  */
 
-import type { ZoneDefinition } from "@cyotee/manamesh/src/game/modules/types";
-import type { StandardCard, CoreCard } from "@cyotee/manamesh/src/game/modules/types";
+import type { ZoneDefinition } from "@cyotee/manamesh/game/modules";
+import type { StandardCard, CoreCard } from "@cyotee/manamesh/game/modules";
 import type { CryptoPluginState } from "@cyotee/boardgameio-crypto/plugin/crypto-plugin";
 import type { EncryptedCard } from "@cyotee/boardgameio-crypto/mental-poker";
 

@@ -9,7 +9,7 @@ import {
   buildHandResult,
   type CryptoPokerState,
 } from './crypto';
-import type { GameConfig } from '@cyotee/manamesh/src/game/modules/types';
+import type { GameConfig } from '@cyotee/manamesh/game/modules';
 import type { PokerCard } from './types';
 
 // Helper to create a test state

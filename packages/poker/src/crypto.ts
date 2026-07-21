@@ -7,7 +7,7 @@
 
 import type { Game, Ctx } from "boardgame.io";
 import { INVALID_MOVE } from "boardgame.io/core";
-import type { CardSchema, GameConfig, MoveValidation } from "@cyotee/manamesh/src/game/modules/types";
+import type { CardSchema, GameConfig, MoveValidation } from "@cyotee/manamesh/game/modules";
 import {
   PokerCard,
   CryptoPokerState,

@@ -1,4 +1,5 @@
-import type { CardManifestEntry, LoadedAssetPack } from "@cyotee/manamesh/src/game/modules/types";
+import type { CardManifestEntry } from "@cyotee/manamesh/assets/manifest";
+import type { LoadedAssetPack } from "@cyotee/manamesh/assets/loader";
 import type { TimestreamsCard, TimestreamsState, EraId } from "./types";
 import { createCardFromManifest, createPlaceholderDeck } from "./deck";
 import { DEFAULT_CONFIG } from "./types";

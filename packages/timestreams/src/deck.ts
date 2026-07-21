@@ -1,4 +1,5 @@
-import type { CardSchema, CardManifestEntry } from "@cyotee/manamesh/src/game/modules/types";
+import type { CardSchema } from "@cyotee/manamesh/game/modules";
+import type { CardManifestEntry } from "@cyotee/manamesh/assets/manifest";
 import type { TimestreamsCard, TimestreamsDeckCardMetadata } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 

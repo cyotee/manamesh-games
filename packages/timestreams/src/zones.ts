@@ -9,7 +9,7 @@
  * - Score Pile: Public — no features
  */
 
-import type { ZoneDefinition } from '@cyotee/manamesh/src/game/modules/types';
+import type { ZoneDefinition } from '@cyotee/manamesh/game/modules';
 
 export const TIMESTREAMS_ZONES: ZoneDefinition[] = [
   {

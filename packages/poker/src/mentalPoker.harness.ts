@@ -13,7 +13,7 @@ import {
   type CryptoKeyPair,
   type EncryptedCard,
 } from "@cyotee/boardgameio-crypto/mental-poker";
-import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
+import type { GameConfig } from "@cyotee/manamesh/game/modules";
 import type { CryptoPokerState } from "./types";
 import {
   createCryptoInitialState,

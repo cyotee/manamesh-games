@@ -11,7 +11,7 @@
 
 import type { Game, Ctx } from "boardgame.io";
 import { INVALID_MOVE } from "boardgame.io/core";
-import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
+import type { GameConfig } from "@cyotee/manamesh/game/modules";
 import type {
   OnePieceCard,
   OnePieceDonCard,

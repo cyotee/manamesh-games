@@ -8,7 +8,7 @@
 import type {
   CoreCard,
   ZoneDefinition,
-} from '@cyotee/manamesh/src/game/modules/types';
+} from '@cyotee/manamesh/game/modules';
 import type { CryptoPluginState } from '@cyotee/boardgameio-crypto/plugin/crypto-plugin';
 import type { EncryptedCard } from '@cyotee/boardgameio-crypto/mental-poker';
 
@@ -270,4 +270,4 @@ export interface MissionData {
 }
 
 // Re-export for convenience
-export type { CoreCard, ZoneDefinition } from '@cyotee/manamesh/src/game/modules/types';
+export type { CoreCard, ZoneDefinition } from '@cyotee/manamesh/game/modules';

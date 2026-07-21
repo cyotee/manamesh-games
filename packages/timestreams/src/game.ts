@@ -39,7 +39,7 @@ import type {
   GameConfig,
   GameModule,
   MoveValidation,
-} from "@cyotee/manamesh/src/game/modules/types";
+} from "@cyotee/manamesh/game/modules";
 import { TIMESTREAMS_ZONES, ZONE_IDS, getZoneById } from "./zones";
 import {
   createCryptoInitialState,

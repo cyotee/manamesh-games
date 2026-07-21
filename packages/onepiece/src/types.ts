@@ -8,7 +8,7 @@
  * the system prevents cheating on deck operations.
  */
 
-import type { CoreCard, ZoneDefinition } from "@cyotee/manamesh/src/game/modules/types";
+import type { CoreCard, ZoneDefinition } from "@cyotee/manamesh/game/modules";
 import type { CryptoPluginState } from "@cyotee/boardgameio-crypto/plugin/crypto-plugin";
 import type { EncryptedCard } from "@cyotee/boardgameio-crypto/mental-poker";
 

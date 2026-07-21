@@ -11,7 +11,7 @@ import type { Ctx } from "boardgame.io";
 // boardgame.io/core is the workspace source package which lacks a built dist/
 // in this monorepo. Define INVALID_MOVE locally (it is just this string constant).
 const INVALID_MOVE = "INVALID_MOVE" as const;
-import type { GameConfig } from "@cyotee/manamesh/src/game/modules/types";
+import type { GameConfig } from "@cyotee/manamesh/game/modules";
 import type {
   TimestreamsState,
   TimestreamsPlayerState,

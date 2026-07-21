@@ -27,7 +27,7 @@ import type {
   PlayAreaSlot,
 } from "./types";
 import { DEFAULT_CONFIG } from "./types";
-import type { CardSchema, GameConfig, MoveValidation } from "@cyotee/manamesh/src/game/modules/types";
+import type { CardSchema, GameConfig, MoveValidation } from "@cyotee/manamesh/game/modules";
 import { ONEPIECE_ZONES } from "./zones";
 import {
   createPlayArea,
