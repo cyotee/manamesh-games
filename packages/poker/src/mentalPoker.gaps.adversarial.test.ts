@@ -170,11 +170,13 @@ describe.each([2, 3] as const)("Gap: shuffle integrity — %i players", (n) => {
 // Malicious encrypt (gap #4)
 // ---------------------------------------------------------------------------
 describe("Gap: malicious encrypt mid-setup", () => {
-  it("M-malicious-encrypt: wrong private key leaves deck unrecoverable with honest keys", async () => {
-    const { G, players, lookup, numPlayers } = await runMentalPokerSetup({
+  it("M-malicious-encrypt: wrong private key is rejected (sk must match keychain pk)", async () => {
+    // Keychain + requirePrivateKeyMatchesPublished bind encrypt sk to the
+    // public key admitted at key exchange. A mismatched sk is INVALID_MOVE —
+    // the deck is never poisoned with an unrecoverable wrong-key layer.
+    const { players } = await runMentalPokerSetup({
       numPlayers: 2,
     });
-    // Fresh setup but inject bad key for player 1 during encrypt — rebuild partial
     let state = createCryptoInitialState({
       numPlayers: 2,
       playerIDs: ["0", "1"],
@@ -195,22 +197,19 @@ describe("Gap: malicious encrypt mid-setup", () => {
     ) as typeof state;
 
     state = encryptDeck(state, mockCtx("0"), "0", p0.keys.privateKey) as typeof state;
-    // Player 1 encrypts with WRONG key (not matching any recovered path with honest sk1)
-    state = encryptDeck(state, mockCtx("1"), "1", bad.privateKey) as typeof state;
-    expect(state.phase).toBe("shuffle");
+    expect(state.phase).toBe("encrypt");
 
-    // Honest keys cannot recover
+    // Player 1 attempts encrypt with WRONG key (does not match published pk)
+    const rejected = encryptDeck(state, mockCtx("1"), "1", bad.privateKey);
+    expect(rejected).toBe(INVALID_MOVE);
+    // Setup remains on encrypt; player 1 has not marked hasEncrypted
+    expect(state.phase).toBe("encrypt");
+    expect(state.players["1"].hasEncrypted).toBe(false);
+    // Deck still has only player 0's honest layer
     const card = state.crypto.encryptedZones["deck"]![0];
+    expect(card.layers).toBe(1);
     expect(
-      tryRecoverWithKeys(
-        card,
-        [p0.keys.privateKey, players[1].keys.privateKey],
-        lookup2,
-      ),
-    ).toBeNull();
-    // Attacker key + p0 can recover (proves encryption used bad key)
-    expect(
-      tryRecoverWithKeys(card, [p0.keys.privateKey, bad.privateKey], lookup2),
+      tryRecoverWithKeys(card, [p0.keys.privateKey], lookup2),
     ).not.toBeNull();
   });
 });
