@@ -19,3 +19,6 @@
 [submodule "packages/fairplay-crypto"]
 	path = packages/fairplay-crypto
 	url = https://github.com/cyotee/fairplay-crypto.git
+[submodule "packages/fairplay-crypto-godot"]
+	path = packages/fairplay-crypto-godot
+	url = https://github.com/cyotee/fairplay-crypto-godot.git
