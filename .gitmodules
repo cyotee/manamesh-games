@@ -25,3 +25,6 @@
 [submodule "packages/game-godot-liars-dice"]
 	path = packages/game-godot-liars-dice
 	url = https://github.com/cyotee/game-godot-liars-dice.git
+[submodule "packages/timestreams"]
+	path = packages/timestreams
+	url = https://github.com/cyotee/timestreams.git
