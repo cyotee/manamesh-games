@@ -25,7 +25,7 @@ yarn test:frontend         # Vitest (frontend workspace)
 # Package-scoped tests
 yarn workspace @manamesh/timestreams test
 yarn workspace @manamesh/poker test
-yarn workspace @manamesh/boardgameio-crypto test
+yarn workspace @cyotee/boardgameio-crypto test
 yarn workspace @manamesh/onepiece test
 yarn workspace @manamesh/mistborn-deckbuilder test
 
@@ -40,6 +40,7 @@ yarn build:timestreams-vercel
 
 ```bash
 git submodule update --init --recursive
+git lfs install && git lfs pull   # scanned Timestreams card art (PNG/ZIP/PDF)
 ```
 
 | Submodule path | Upstream |
@@ -47,6 +48,7 @@ git submodule update --init --recursive
 | `packages/manamesh` | `github.com/cyotee/manamesh` |
 | `packages/boardgame.io` | boardgame.io fork |
 | `packages/boardgameIO-p2p` | P2P transport fork |
+| `packages/timestreams` | `github.com/cyotee/timestreams` (private; rules + scanned packs, Git LFS) |
 | `packages/poker/lib/*` | forge-std, OpenZeppelin, crane |
 
 ## Monorepo layout
@@ -64,9 +66,9 @@ manamesh-games/
 │   │   ├── AGENTS.md            # Deep game-module + crypto reference
 │   │   ├── PRD.md / docs/       # Product + architecture docs
 │   │   └── tasks/               # Task tickets (MM-*)
-│   ├── boardgameio-crypto/      # @manamesh/boardgameio-crypto — shared crypto primitives
+│   ├── boardgameio-crypto/      # @cyotee/boardgameio-crypto — shared crypto primitives
 │   ├── poker/                   # @manamesh/poker — Hold'em + Solidity settlement
-│   ├── timestreams/             # @manamesh/timestreams — rules engine + SPA focus
+│   ├── timestreams/             # @manamesh/timestreams submodule — rules + scanned packs
 │   ├── onepiece/                # @manamesh/onepiece — One Piece TCG module
 │   ├── mistborn-deckbuilder/    # @manamesh/mistborn-deckbuilder
 │   ├── manamesh-asset-pack-builder/  # Vite tool for asset packs
@@ -98,9 +100,9 @@ manamesh-games/
 | App shell, lobby, P2P, IPFS assets, Phaser, registry | `packages/manamesh/packages/frontend/src/` |
 | Demo / in-tree game modules (war, gofish, merkle-battleship, threshold-tally, he-battleship) | `…/frontend/src/game/modules/` |
 | Game registry (imports extracted packages + local modules) | `…/frontend/src/game/registry.ts` |
-| Shared crypto (SRA, Merkle, Paillier, Feldman DKG, DLEQ, plugin) | `packages/boardgameio-crypto/src/` |
+| Shared crypto (SRA, Merkle, Paillier, Feldman DKG, DLEQ, plugin) | `packages/boardgameio-crypto/src/` — npm: `@cyotee/boardgameio-crypto` |
 | Poker game + board + EIP-712 + Forge contracts | `packages/poker/` |
-| Timestreams rules engine, crypto deck ops, board, e2e | `packages/timestreams/` |
+| Timestreams rules engine, crypto deck ops, board, e2e, scanned packs | `packages/timestreams/` (submodule `cyotee/timestreams`) |
 | One Piece / Mistborn modules | `packages/onepiece/`, `packages/mistborn-deckbuilder/` |
 | Optional signaling server | `packages/manamesh/packages/backend/` |
 
@@ -109,7 +111,7 @@ manamesh-games/
 ```ts
 import { PokerBoard, CryptoPokerGame } from "@manamesh/poker";
 import { TimestreamsBoard, TimestreamsModule } from "@manamesh/timestreams";
-import { verifyMerkleProof } from "@manamesh/boardgameio-crypto";
+import { verifyMerkleProof } from "@cyotee/boardgameio-crypto";
 ```
 
 When changing a game, prefer editing its package (`packages/poker`, etc.) over the frontend shell unless the change is routing, lobby, or shared UI.
@@ -125,7 +127,7 @@ When changing a game, prefer editing its package (`packages/poker`, etc.) over t
 
 ### Three crypto paradigms
 
-1. **Mental poker (SRA + cooperative decrypt)** — hidden shuffled decks: War, Poker, Go Fish, Timestreams, One Piece deck ops. Primitives: `@manamesh/boardgameio-crypto` mental-poker + Shamir escrow.
+1. **Mental poker (SRA + cooperative decrypt)** — hidden shuffled decks: War, Poker, Go Fish, Timestreams, One Piece deck ops. Primitives: `@cyotee/boardgameio-crypto` mental-poker + Shamir escrow.
 2. **Merkle commitments** — binding board placement: Merkle Battleship.
 3. **Threshold HE** — private inputs, public aggregate: Threshold Tally (Feldman DKG + EC ElGamal + DLEQ).
 
@@ -157,7 +159,7 @@ Deep module-by-module notes: `packages/manamesh/AGENTS.md`.
 | `@manamesh/backend` | `yarn workspace @manamesh/backend dev` |
 | `@manamesh/timestreams` | `yarn workspace @manamesh/timestreams test` · e2e: `test:e2e` (Playwright) |
 | `@manamesh/poker` | `yarn workspace @manamesh/poker test` · `forge:test` (Foundry in package dir) |
-| `@manamesh/boardgameio-crypto` | `yarn workspace @manamesh/boardgameio-crypto test` |
+| `@cyotee/boardgameio-crypto` | `yarn workspace @cyotee/boardgameio-crypto test` |
 | `@manamesh/onepiece` | `yarn workspace @manamesh/onepiece test` |
 | `@manamesh/mistborn-deckbuilder` | `yarn workspace @manamesh/mistborn-deckbuilder test` |
 
@@ -179,7 +181,7 @@ yarn workspace @manamesh/frontend test src/game/modules/war/game.test.ts
 | `packages/timestreams/PRD.md`, `RULES.md`, `RULES_ENGINE_*.md` | Timestreams rules engine work |
 | `packages/poker/docs/*` | Poker settlement / deployment |
 | `.opencode/skills/*` | Domain skills (architecture, crypto, p2p, contracts, boardgame.io, …) |
-| `.grok/skills/boardgameio-crypto` | **How to use `@manamesh/boardgameio-crypto`** (keychain, no sk on wire, mental poker) — also `.opencode/skills/boardgameio-crypto` |
+| `.grok/skills/boardgameio-crypto` | **How to use `@cyotee/boardgameio-crypto`** (keychain, no sk on wire, mental poker) — also `.opencode/skills/boardgameio-crypto` |
 
 ## Conventions
 
@@ -194,7 +196,7 @@ yarn workspace @manamesh/frontend test src/game/modules/war/game.test.ts
 ## Gotchas
 
 1. **Dual tree confusion** — Platform shell is under `packages/manamesh/packages/frontend`, not `packages/frontend`. Paths in older docs/skills that say `packages/frontend` mean the nested frontend.
-2. **Stale nested CLAUDE/AGENTS** — `packages/manamesh/CLAUDE.md` and parts of `AGENTS.md` still describe crypto under `src/crypto/` and poker under frontend modules. Crypto is **`@manamesh/boardgameio-crypto`**; poker/timestreams/onepiece/mistborn are top-level packages. Prefer this root file + current imports.
+2. **Stale nested CLAUDE/AGENTS** — `packages/manamesh/CLAUDE.md` and parts of `AGENTS.md` still describe crypto under `src/crypto/` and poker under frontend modules. Crypto is **`@cyotee/boardgameio-crypto`** (npm `0.2.x+`); poker/timestreams/onepiece/mistborn are top-level packages. Prefer this root file + current imports.
 3. **`packages/manamesh` is a submodule** — Commits there may need a separate push/PR from the outer monorepo commit that only bumps the submodule pointer.
 4. **Workspace exclusion** — `!packages/manamesh` means you cannot `yarn workspace manamesh …`; use nested package names (`@manamesh/frontend`, etc.).
 5. **Timestreams P2P** — Production path is **manual join codes**, not libp2p DHT matchmaking (DHT path retired for Timestreams).
