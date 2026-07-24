@@ -7,15 +7,6 @@
 [submodule "packages/boardgameIO-p2p"]
 	path = packages/boardgameIO-p2p
 	url = https://github.com/cyotee/boardgameIO-p2p.git
-[submodule "packages/poker/lib/forge-std"]
-	path = packages/poker/lib/forge-std
-	url = https://github.com/foundry-rs/forge-std
-[submodule "packages/poker/lib/openzeppelin-contracts"]
-	path = packages/poker/lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "packages/poker/lib/crane"]
-	path = packages/poker/lib/crane
-	url = https://github.com/cyotee/crane
 [submodule "packages/fairplay-crypto"]
 	path = packages/fairplay-crypto
 	url = https://github.com/cyotee/fairplay-crypto.git
@@ -28,3 +19,9 @@
 [submodule "packages/timestreams"]
 	path = packages/timestreams
 	url = https://github.com/cyotee/timestreams.git
+[submodule "packages/poker"]
+	path = packages/poker
+	url = https://github.com/cyotee/game-poker.git
+[submodule "packages/game-battleship-merkle"]
+	path = packages/game-battleship-merkle
+	url = https://github.com/cyotee/game-battleship-merkle.git
