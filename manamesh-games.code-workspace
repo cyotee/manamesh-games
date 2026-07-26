@@ -6,6 +6,9 @@
         },
         {
             "path": "../manamesh"
+        },
+        {
+            "path": "../game-liars-dice"
         }
     ],
 	"settings": {}

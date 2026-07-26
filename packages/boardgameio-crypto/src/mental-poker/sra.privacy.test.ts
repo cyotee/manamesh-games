@@ -21,7 +21,7 @@ import {
   decryptToCardId,
   buildCardPointLookup,
   getCardPoint,
-} from "./sra";
+} from "./sra.js";
 
 describe("SRA privacy (adversarial)", () => {
   let keyA: ReturnType<typeof generateKeyPair>;

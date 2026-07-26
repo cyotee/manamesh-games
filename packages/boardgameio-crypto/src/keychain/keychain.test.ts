@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateKeyPair } from "../mental-poker/sra";
+import { generateKeyPair } from "../mental-poker/sra.js";
 import {
   createKeychain,
   keychainAdd,
@@ -18,7 +18,7 @@ import {
   MENTAL_POKER_KEYCHAIN_POLICY,
   PERMISSIVE_KEYCHAIN_POLICY,
   STRICT_KEYCHAIN_POLICY,
-} from "./index";
+} from "./index.js";
 
 describe("isValidSecp256k1PublicKey / normalize", () => {
   it("accepts keys from generateKeyPair", () => {

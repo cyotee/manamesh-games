@@ -6,7 +6,7 @@ import {
   paillierEncrypt,
   paillierGenerateKeypair,
   paillierScalarMul,
-} from "./paillier";
+} from "./paillier.js";
 
 describe("paillier (demo)", () => {
   it("encrypt/decrypt roundtrip", () => {

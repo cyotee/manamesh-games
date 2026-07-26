@@ -9,7 +9,7 @@
  * - Hiding: Commitment reveals nothing about deck without nonce
  */
 
-import type { DeckCommitment, EncryptedCard, EncryptedDeck } from './types';
+import type { DeckCommitment, EncryptedCard, EncryptedDeck } from './types.js';
 
 /**
  * Generate a cryptographic nonce for commitment.
@@ -152,7 +152,10 @@ export async function computeCommitmentHash(
  */
 export async function hashDeck(deck: EncryptedCard[]): Promise<Uint8Array> {
   const deckBytes = serializeDeck(deck);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', deckBytes);
+  // Copy into a concrete ArrayBuffer to satisfy DOM BufferSource typings (TS 5.x).
+  const ab = new ArrayBuffer(deckBytes.byteLength);
+  new Uint8Array(ab).set(deckBytes);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", ab);
   return new Uint8Array(hashBuffer);
 }
 

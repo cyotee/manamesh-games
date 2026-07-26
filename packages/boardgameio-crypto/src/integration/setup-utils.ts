@@ -1,4 +1,4 @@
-import { sha256Hex } from "../sha256";
+import { sha256Hex } from "../sha256.js";
 
 interface SetupPlayerState {
   playerOrder: string[];

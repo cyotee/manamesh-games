@@ -18,13 +18,13 @@ function normalize(value: unknown): unknown {
   }
   if (t === "bigint") {
     // Preserve numeric intent but keep JSON-safe.
-    return value.toString();
+    return (value as bigint).toString();
   }
   if (Array.isArray(value)) return value.map(normalize);
   if (isPlainObject(value)) {
     const out: Record<string, unknown> = {};
     const keys = Object.keys(value).sort();
-    for (const k of keys) out[k] = normalize(value[k]);
+    for (const k of keys) out[k] = normalize(value[k] as unknown);
     return out;
   }
   assert(false, `Cannot stable-stringify type: ${Object.prototype.toString.call(value)}`);

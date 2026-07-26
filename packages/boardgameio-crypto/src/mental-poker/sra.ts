@@ -6,38 +6,44 @@
  *
  * Key property: Enc_A(Enc_B(m)) can be decrypted as Dec_B(Dec_A(...)) or Dec_A(Dec_B(...))
  * This is achieved by using EC point multiplication: k1 * (k2 * G) = k2 * (k1 * G)
+ *
+ * Curve backend: @noble/curves secp256k1 (wire-compatible with the prior elliptic.js build).
  */
 
-import { ec as EC } from "elliptic";
-import type { CryptoKeyPair, EncryptedCard } from "./types";
-import { sha256 } from "../sha256";
-import { secpPointNormalizeHex } from "../secp256k1";
+import type { CryptoKeyPair, EncryptedCard } from "./types.js";
+import { sha256 } from "../sha256.js";
+import {
+  SecpProjectivePoint,
+  secpInvN,
+  secpPointNormalizeHex,
+  secpPrivateKeyBytesFromSeed,
+  secpPublicKeyFromPrivateHex,
+  secpRandomPrivateKeyBytes,
+  secpScalarFromHex,
+  secpBytesToHex,
+  type SecpPointHex,
+} from "../secp256k1.js";
 
-// Use secp256k1 curve (same as Bitcoin/Ethereum)
-const ec = new EC("secp256k1");
+const P = SecpProjectivePoint;
+const CURVE_P = // secp256k1 field prime
+  0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn;
+const CURVE_B = 7n;
 
 /**
  * Generate a new SRA key pair.
  * The private key is a random scalar, public key is the corresponding point.
  *
  * @param seed - Optional seed for deterministic key generation (for testing/replay)
- * @returns Key pair with hex-encoded keys
+ * @returns Key pair with hex-encoded keys (private: 32-byte hex; public: compressed)
  */
 export function generateKeyPair(seed?: Uint8Array): CryptoKeyPair {
-  let keyPair;
-
-  if (seed) {
-    // Deterministic generation from seed
-    // Hash the seed to get a valid scalar
-    keyPair = ec.keyFromPrivate(seed);
-  } else {
-    // Random generation
-    keyPair = ec.genKeyPair();
-  }
-
+  const skBytes = seed
+    ? secpPrivateKeyBytesFromSeed(seed)
+    : secpRandomPrivateKeyBytes();
+  const privateKey = secpBytesToHex(skBytes);
   return {
-    publicKey: keyPair.getPublic("hex"),
-    privateKey: keyPair.getPrivate("hex"),
+    publicKey: secpPublicKeyFromPrivateHex(privateKey),
+    privateKey,
   };
 }
 
@@ -58,33 +64,28 @@ export function encrypt(
   privateKey: string,
   cardPointLookup?: Map<string, string>,
 ): EncryptedCard {
-  const key = ec.keyFromPrivate(privateKey, "hex");
+  const k = secpScalarFromHex(privateKey);
+  if (k === 0n) throw new Error("private key cannot be zero");
 
-  let point: InstanceType<typeof EC>["curve"]["point"];
+  let point: InstanceType<typeof P>;
   let currentLayers: number;
 
   if (typeof card === "string") {
-    // First encryption: use lookup or hash card ID to a curve point
     if (cardPointLookup && cardPointLookup.has(card)) {
-      // Use pre-computed point from lookup
-      const pointHex = cardPointLookup.get(card)!;
-      point = ec.curve.decodePoint(pointHex, "hex");
+      point = P.fromHex(cardPointLookup.get(card)!);
     } else {
-      // Fallback: hash card ID (cardPointLookup should be provided)
-      point = hashToPoint(card);
+      point = pointFromHashToPoint(card);
     }
     currentLayers = 0;
   } else {
-    // Re-encryption: use existing ciphertext as point
-    point = ec.curve.decodePoint(card.ciphertext, "hex");
+    point = P.fromHex(card.ciphertext);
     currentLayers = card.layers;
   }
 
-  // Multiply point by private key scalar
-  const encrypted = point.mul(key.getPrivate());
+  const encrypted = point.multiply(k);
 
   return {
-    ciphertext: secpPointNormalizeHex(encrypted.encode("hex", false)),
+    ciphertext: secpPointNormalizeHex(encrypted.toHex(false)),
     layers: currentLayers + 1,
   };
 }
@@ -105,16 +106,14 @@ export function decrypt(
     throw new Error("Cannot decrypt a plaintext card");
   }
 
-  const key = ec.keyFromPrivate(privateKey, "hex");
-  const point = ec.curve.decodePoint(card.ciphertext, "hex");
-
-  // Multiply by modular inverse of private key
-  // Since encrypted = k * P, then decrypted = k^(-1) * encrypted = P
-  const inverse = key.getPrivate().invm(ec.curve.n);
-  const decrypted = point.mul(inverse);
+  const k = secpScalarFromHex(privateKey);
+  if (k === 0n) throw new Error("private key cannot be zero");
+  const point = P.fromHex(card.ciphertext);
+  const inverse = secpInvN(k);
+  const decrypted = point.multiply(inverse);
 
   return {
-    ciphertext: secpPointNormalizeHex(decrypted.encode("hex", false)),
+    ciphertext: secpPointNormalizeHex(decrypted.toHex(false)),
     layers: card.layers - 1,
   };
 }
@@ -140,7 +139,6 @@ export function decryptToCardId(
   const decrypted = decrypt(card, privateKey);
   const pointHex = secpPointNormalizeHex(decrypted.ciphertext);
 
-  // Look up the card ID from the point
   for (const [cardId, point] of cardIdToPoint) {
     if (secpPointNormalizeHex(point) === pointHex) {
       return cardId;
@@ -151,38 +149,57 @@ export function decryptToCardId(
 }
 
 /**
- * Hash a card ID to a curve point using try-and-increment.
- * This is deterministic: same card ID always maps to same point.
+ * Hash a card ID to a curve point using try-and-increment (even-y preference).
+ * Deterministic: same card ID always maps to same point.
  *
- * @param cardId - The card identifier
- * @returns Point on the curve (hex encoded)
+ * @returns Compressed point hex (no 0x)
+ *
+ * Wire-compatible with the previous elliptic.js `pointFromX(x, false)` path.
  */
-export function hashToPoint(
-  cardId: string,
-): InstanceType<typeof EC>["curve"]["point"] {
-  // Use a simple hash-to-curve approach
-  // In production, use a more robust method like hash_to_curve from RFC 9380
+export function hashToPoint(cardId: string): SecpPointHex {
+  return secpPointNormalizeHex(pointFromHashToPoint(cardId).toHex(false));
+}
+
+function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
+  let r = 1n;
+  let b = ((base % mod) + mod) % mod;
+  let e = exp;
+  while (e > 0n) {
+    if (e & 1n) r = (r * b) % mod;
+    b = (b * b) % mod;
+    e >>= 1n;
+  }
+  return r;
+}
+
+function pointFromHashToPoint(cardId: string): InstanceType<typeof P> {
   const encoder = new TextEncoder();
   const data = encoder.encode(cardId);
 
-  // Try incrementing a counter until we find a valid x-coordinate
   for (let counter = 0; counter < 256; counter++) {
     const input = new Uint8Array(data.length + 1);
     input.set(data);
     input[data.length] = counter;
 
-    // Hash to get x-coordinate candidate
-    const hash = sha256Sync(input);
-    const x = uint8ArrayToHex(hash);
+    const hash = sha256(input);
+    const xHex = Array.from(hash)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const x = BigInt("0x" + xHex);
+    if (x >= CURVE_P) continue;
+
+    // y^2 = x^3 + 7 (mod p); p ≡ 3 (mod 4) ⇒ sqrt via (p+1)/4
+    const y2 = (modPow(x, 3n, CURVE_P) + CURVE_B) % CURVE_P;
+    let y = modPow(y2, (CURVE_P + 1n) / 4n, CURVE_P);
+    if ((y * y) % CURVE_P !== y2) continue;
+    // even y (elliptic pointFromX(x, false))
+    if (y % 2n === 1n) y = CURVE_P - y;
 
     try {
-      // Try to construct point with this x-coordinate (even y)
-      const point = ec.curve.pointFromX(x, false);
-      if (point && point.validate()) {
-        return point;
-      }
+      const point = P.fromAffine({ x, y });
+      point.assertValidity();
+      return point;
     } catch {
-      // Not a valid x-coordinate, try next counter
       continue;
     }
   }
@@ -191,8 +208,7 @@ export function hashToPoint(
 }
 
 export async function getCardPoint(cardId: string): Promise<string> {
-  const point = await hashToPoint(cardId);
-  return secpPointNormalizeHex(point.encode("hex", false));
+  return hashToPoint(cardId);
 }
 
 export async function buildCardPointLookup(
@@ -214,19 +230,15 @@ export async function verifyCommutative(
 ): Promise<boolean> {
   const originalPoint = await getCardPoint(cardId);
 
-  // Encrypt with A then B
   const encA = encrypt(cardId, keyA.privateKey);
   const encAB = encrypt(encA, keyB.privateKey);
 
-  // Decrypt with A then B
   const decA = decrypt(encAB, keyA.privateKey);
   const decAB = decrypt(decA, keyB.privateKey);
 
-  // Decrypt with B then A
   const decB = decrypt(encAB, keyB.privateKey);
   const decBA = decrypt(decB, keyA.privateKey);
 
-  // Both should equal original
   return (
     decAB.ciphertext === originalPoint && decBA.ciphertext === originalPoint
   );
@@ -234,11 +246,6 @@ export async function verifyCommutative(
 
 /**
  * Encrypt an entire deck of cards.
- *
- * @param cardIds - Array of card IDs to encrypt
- * @param privateKey - Key to encrypt with
- * @param cardPointLookup - Pre-computed map of card ID to curve point
- * @returns Array of encrypted cards in same order
  */
 export function encryptDeck(
   cardIds: string[],
@@ -250,10 +257,6 @@ export function encryptDeck(
 
 /**
  * Re-encrypt an already-encrypted deck.
- *
- * @param deck - Array of encrypted cards
- * @param privateKey - Key to add encryption layer with
- * @returns Array of re-encrypted cards
  */
 export function reencryptDeck(
   deck: EncryptedCard[],
@@ -264,10 +267,6 @@ export function reencryptDeck(
 
 /**
  * Decrypt a layer from an entire deck.
- *
- * @param deck - Array of encrypted cards
- * @param privateKey - Key to decrypt with
- * @returns Array of partially decrypted cards
  */
 export function decryptDeck(
   deck: EncryptedCard[],
@@ -276,20 +275,3 @@ export function decryptDeck(
   return deck.map((card) => decrypt(card, privateKey));
 }
 
-// ============================================================================
-// Internal helpers
-// ============================================================================
-
-function uint8ArrayToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/**
- * SHA-256 for hash-to-curve.
- * Delegates to the audited synchronous implementation in sha256.ts.
- */
-function sha256Sync(data: Uint8Array): Uint8Array {
-  return sha256(data);
-}

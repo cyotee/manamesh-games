@@ -4,8 +4,8 @@
  * Reconstructs a secret from K or more shares using Lagrange interpolation.
  */
 
-import { PRIME, SecretShare, ReconstructionError, ShareValidationError } from './types';
-import { validateShare } from './split';
+import { PRIME, SecretShare, ReconstructionError, ShareValidationError } from './types.js';
+import { validateShare } from './split.js';
 
 /**
  * Convert a hex string to BigInt
@@ -174,7 +174,7 @@ export function canReconstruct(shares: SecretShare[], threshold: number): boolea
  * @returns The reconstructed private key, or null if not enough shares
  */
 export function reconstructKeyFromShares(
-  keyShares: import('./types').KeyShare[],
+  keyShares: import('./types.js').KeyShare[],
   threshold: number
 ): string | null {
   const shares = keyShares.map((ks) => ks.share);

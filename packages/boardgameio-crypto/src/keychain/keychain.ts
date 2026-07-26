@@ -5,13 +5,13 @@
  * admit under consumer-defined uniqueness rules. No game phases or move I/O.
  */
 
-import { hexToBytes, sha256Hex } from "../sha256";
+import { hexToBytes, sha256Hex } from "../sha256.js";
 import {
   secpIsValidPointHex,
   secpPointNormalizeHex,
-  secp256k1,
+  secpPublicKeyFromPrivateHex,
   type SecpPointHex,
-} from "../secp256k1";
+} from "../secp256k1.js";
 import type {
   KeychainAddResult,
   KeychainPolicy,
@@ -20,7 +20,7 @@ import type {
   KeyFingerprint,
   KeyOwnerId,
   PublicKeyHex,
-} from "./types";
+} from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Defaults & named policies
@@ -131,8 +131,7 @@ export function privateKeyMatchesPublicKey(
       ? privateKeyHex.slice(2)
       : privateKeyHex;
     if (!/^[0-9a-fA-F]+$/.test(skClean)) return false;
-    const kp = secp256k1.keyFromPrivate(skClean, "hex");
-    const derived = kp.getPublic(true, "hex") as SecpPointHex;
+    const derived = secpPublicKeyFromPrivateHex(skClean) as SecpPointHex;
     return publicKeysEqual(derived, publicKeyHex);
   } catch {
     return false;

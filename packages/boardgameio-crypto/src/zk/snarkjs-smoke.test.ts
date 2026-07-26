@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { verifyGroth16Proof } from "./verify";
+import { verifyGroth16Proof } from "./verify.js";
 
 describe("zk/snarkjs", () => {
   it("loads verifier wrapper", async () => {

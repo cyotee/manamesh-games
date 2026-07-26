@@ -37,8 +37,8 @@
  * Estimated effort for ZK upgrade: 2-4 weeks (circuit + setup + testing)
  */
 
-import type { EncryptedCard, ShuffleProof } from "./types";
-import { hashDeck, hashToHex, generateNonce } from "./commitment";
+import type { EncryptedCard, ShuffleProof } from "./types.js";
+import { hashDeck, hashToHex, generateNonce } from "./commitment.js";
 
 /**
  * A permutation represented as an array of indices.

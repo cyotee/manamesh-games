@@ -27,6 +27,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:packages/boardgameio-crypto"\
     },\
     {\
+      "name": "@manamesh/game-battleship-merkle",\
+      "reference": "workspace:packages/game-battleship-merkle"\
+    },\
+    {\
       "name": "@cyotee/manamesh-asset-pack-builder",\
       "reference": "workspace:packages/manamesh-asset-pack-builder"\
     },\
@@ -60,11 +64,12 @@ const RAW_RUNTIME_STATE =
   "pnpZipBackend": "libzip",\
   "fallbackExclusionList": [\
     ["@cyotee/boardgame.io", ["workspace:packages/boardgame.io"]],\
-    ["@cyotee/boardgameio-crypto", ["virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#workspace:packages/boardgameio-crypto", "virtual:7e96b9dae5f18f034e9a44865f63cc9ac9005c1a14a2650b16d27c2e8d4541f52955d394fb0fa233aacd78c394b4853ea2f8f259db4ebe6aa069e7c39fad862b#workspace:packages/boardgameio-crypto", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/boardgameio-crypto", "workspace:packages/boardgameio-crypto"]],\
+    ["@cyotee/boardgameio-crypto", ["virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#workspace:packages/boardgameio-crypto", "virtual:7e96b9dae5f18f034e9a44865f63cc9ac9005c1a14a2650b16d27c2e8d4541f52955d394fb0fa233aacd78c394b4853ea2f8f259db4ebe6aa069e7c39fad862b#workspace:packages/boardgameio-crypto", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/boardgameio-crypto", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#workspace:packages/boardgameio-crypto", "workspace:packages/boardgameio-crypto"]],\
     ["@cyotee/boardgameio-p2p", ["virtual:460ae0435c0880f54642fa954af09a5f090edfaa5481a02c409e9fea8b372ce668ff538e3ccf06479b00839dbe98d51ef2883fc035e6d964db05091fcc462866#workspace:packages/boardgameIO-p2p", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/boardgameIO-p2p", "workspace:packages/boardgameIO-p2p"]],\
     ["@cyotee/manamesh", ["workspace:packages/manamesh/packages/frontend"]],\
     ["@cyotee/manamesh-asset-pack-builder", ["workspace:packages/manamesh-asset-pack-builder"]],\
     ["@manamesh/fbackend", ["workspace:packages/manamesh/packages/backend"]],\
+    ["@manamesh/game-battleship-merkle", ["virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/game-battleship-merkle", "workspace:packages/game-battleship-merkle"]],\
     ["@manamesh/mistborn-deckbuilder", ["workspace:packages/mistborn-deckbuilder"]],\
     ["@manamesh/onepiece", ["workspace:packages/onepiece"]],\
     ["@manamesh/poker", ["virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/poker", "workspace:packages/poker"]],\
@@ -81,7 +86,8 @@ const RAW_RUNTIME_STATE =
           ["@cyotee/boardgame.io", "workspace:packages/boardgame.io"],\
           ["@cyotee/boardgameio-p2p", "virtual:460ae0435c0880f54642fa954af09a5f090edfaa5481a02c409e9fea8b372ce668ff538e3ccf06479b00839dbe98d51ef2883fc035e6d964db05091fcc462866#workspace:packages/boardgameIO-p2p"],\
           ["boardgame.io", "portal:./packages/boardgame.io::locator=manamesh-games%40workspace%3A."],\
-          ["manamesh-games", "workspace:."]\
+          ["manamesh-games", "workspace:."],\
+          ["node-gyp", "npm:13.0.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -3479,9 +3485,9 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./.yarn/__virtual__/@cyotee-boardgameio-crypto-virtual-d91484a1a9/1/packages/boardgameio-crypto/",\
         "packageDependencies": [\
           ["@cyotee/boardgameio-crypto", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#workspace:packages/boardgameio-crypto"],\
+          ["@noble/curves", "npm:1.9.7"],\
           ["@types/boardgame.io", null],\
           ["boardgame.io", "npm:0.50.2"],\
-          ["elliptic", "npm:6.6.1"],\
           ["snarkjs", "npm:0.7.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vitest", "virtual:1a47013d4371bcd35a59010ba04b0e84c75a28071f1b1785ecbc02fce317427288310904a069ad94e3f3dbc040a0a774979e296401475100db2c694c6e2cd256#npm:2.1.9"]\
@@ -3496,9 +3502,9 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./.yarn/__virtual__/@cyotee-boardgameio-crypto-virtual-18deba8caa/1/packages/boardgameio-crypto/",\
         "packageDependencies": [\
           ["@cyotee/boardgameio-crypto", "virtual:7e96b9dae5f18f034e9a44865f63cc9ac9005c1a14a2650b16d27c2e8d4541f52955d394fb0fa233aacd78c394b4853ea2f8f259db4ebe6aa069e7c39fad862b#workspace:packages/boardgameio-crypto"],\
+          ["@noble/curves", "npm:1.9.7"],\
           ["@types/boardgame.io", null],\
           ["boardgame.io", "portal:../boardgame.io::locator=%40manamesh%2Fpoker%40workspace%3Apackages%2Fpoker"],\
-          ["elliptic", "npm:6.6.1"],\
           ["snarkjs", "npm:0.7.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vitest", "virtual:1a47013d4371bcd35a59010ba04b0e84c75a28071f1b1785ecbc02fce317427288310904a069ad94e3f3dbc040a0a774979e296401475100db2c694c6e2cd256#npm:2.1.9"]\
@@ -3513,9 +3519,26 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./.yarn/__virtual__/@cyotee-boardgameio-crypto-virtual-fcd6ab8717/1/packages/boardgameio-crypto/",\
         "packageDependencies": [\
           ["@cyotee/boardgameio-crypto", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/boardgameio-crypto"],\
+          ["@noble/curves", "npm:1.9.7"],\
           ["@types/boardgame.io", null],\
           ["boardgame.io", "portal:../../../boardgame.io::locator=%40cyotee%2Fmanamesh%40workspace%3Apackages%2Fmanamesh%2Fpackages%2Ffrontend"],\
-          ["elliptic", "npm:6.6.1"],\
+          ["snarkjs", "npm:0.7.6"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["vitest", "virtual:1a47013d4371bcd35a59010ba04b0e84c75a28071f1b1785ecbc02fce317427288310904a069ad94e3f3dbc040a0a774979e296401475100db2c694c6e2cd256#npm:2.1.9"]\
+        ],\
+        "packagePeers": [\
+          "@types/boardgame.io",\
+          "boardgame.io"\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#workspace:packages/boardgameio-crypto", {\
+        "packageLocation": "./.yarn/__virtual__/@cyotee-boardgameio-crypto-virtual-2a67caf82b/1/packages/boardgameio-crypto/",\
+        "packageDependencies": [\
+          ["@cyotee/boardgameio-crypto", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#workspace:packages/boardgameio-crypto"],\
+          ["@noble/curves", "npm:1.9.7"],\
+          ["@types/boardgame.io", null],\
+          ["boardgame.io", "portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle"],\
           ["snarkjs", "npm:0.7.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vitest", "virtual:1a47013d4371bcd35a59010ba04b0e84c75a28071f1b1785ecbc02fce317427288310904a069ad94e3f3dbc040a0a774979e296401475100db2c694c6e2cd256#npm:2.1.9"]\
@@ -3530,8 +3553,8 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./packages/boardgameio-crypto/",\
         "packageDependencies": [\
           ["@cyotee/boardgameio-crypto", "workspace:packages/boardgameio-crypto"],\
+          ["@noble/curves", "npm:1.9.7"],\
           ["boardgame.io", "portal:../boardgame.io::locator=%40cyotee%2Fboardgameio-crypto%40workspace%3Apackages%2Fboardgameio-crypto"],\
-          ["elliptic", "npm:6.6.1"],\
           ["snarkjs", "npm:0.7.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vitest", "virtual:1a47013d4371bcd35a59010ba04b0e84c75a28071f1b1785ecbc02fce317427288310904a069ad94e3f3dbc040a0a774979e296401475100db2c694c6e2cd256#npm:2.1.9"]\
@@ -3547,6 +3570,7 @@ const RAW_RUNTIME_STATE =
           ["@types/boardgame.io", null],\
           ["@types/jest", "npm:27.5.2"],\
           ["@types/node", "npm:18.19.130"],\
+          ["@types/trystero", null],\
           ["@typescript-eslint/eslint-plugin", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:5.62.0"],\
           ["@typescript-eslint/parser", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:5.62.0"],\
           ["boardgame.io", "portal:./packages/boardgame.io::locator=manamesh-games%40workspace%3A."],\
@@ -3556,6 +3580,7 @@ const RAW_RUNTIME_STATE =
           ["peerjs", "npm:1.5.5"],\
           ["prettier", "npm:3.8.3"],\
           ["standard-version", "npm:9.5.0"],\
+          ["trystero", "npm:0.25.3"],\
           ["ts-jest", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:27.1.5"],\
           ["tweetnacl", "npm:1.0.3"],\
           ["tweetnacl-util", "npm:0.15.1"],\
@@ -3563,6 +3588,7 @@ const RAW_RUNTIME_STATE =
         ],\
         "packagePeers": [\
           "@types/boardgame.io",\
+          "@types/trystero",\
           "boardgame.io"\
         ],\
         "linkType": "SOFT"\
@@ -3574,6 +3600,7 @@ const RAW_RUNTIME_STATE =
           ["@types/boardgame.io", null],\
           ["@types/jest", "npm:27.5.2"],\
           ["@types/node", "npm:18.19.130"],\
+          ["@types/trystero", null],\
           ["@typescript-eslint/eslint-plugin", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:5.62.0"],\
           ["@typescript-eslint/parser", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:5.62.0"],\
           ["boardgame.io", "portal:../../../boardgame.io::locator=%40cyotee%2Fmanamesh%40workspace%3Apackages%2Fmanamesh%2Fpackages%2Ffrontend"],\
@@ -3583,6 +3610,7 @@ const RAW_RUNTIME_STATE =
           ["peerjs", "npm:1.5.5"],\
           ["prettier", "npm:3.8.3"],\
           ["standard-version", "npm:9.5.0"],\
+          ["trystero", "npm:0.25.3"],\
           ["ts-jest", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:27.1.5"],\
           ["tweetnacl", "npm:1.0.3"],\
           ["tweetnacl-util", "npm:0.15.1"],\
@@ -3590,7 +3618,9 @@ const RAW_RUNTIME_STATE =
         ],\
         "packagePeers": [\
           "@types/boardgame.io",\
-          "boardgame.io"\
+          "@types/trystero",\
+          "boardgame.io",\
+          "trystero"\
         ],\
         "linkType": "SOFT"\
       }],\
@@ -3602,13 +3632,14 @@ const RAW_RUNTIME_STATE =
           ["@types/node", "npm:18.19.130"],\
           ["@typescript-eslint/eslint-plugin", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:5.62.0"],\
           ["@typescript-eslint/parser", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:5.62.0"],\
-          ["boardgame.io", "portal:../boardgame.io::locator=%40cyotee%2Fboardgameio-p2p%40workspace%3Apackages%2FboardgameIO-p2p"],\
+          ["boardgame.io", "npm:0.50.2"],\
           ["eslint", "npm:8.57.1"],\
           ["eslint-config-prettier", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:9.1.2"],\
           ["jest", "virtual:a82a9eeb423fff466ba0b0d73b6e99ed7d004795a9da00aa216cd4e169ddabe072e74df69c9a7549c8e0ac732387a116bae6d4bcbab851b46f389da147f128a0#npm:27.5.1"],\
           ["peerjs", "npm:1.5.5"],\
           ["prettier", "npm:3.8.3"],\
           ["standard-version", "npm:9.5.0"],\
+          ["trystero", "npm:0.25.3"],\
           ["ts-jest", "virtual:51d05d84ecd843fc6054091806d5f3557d54def1ee186bc9e698b791116c006fde6e765c72684578641e028da0bbba285e3acc4fb5f78fe5684ee4402da93017#npm:27.1.5"],\
           ["tweetnacl", "npm:1.0.3"],\
           ["tweetnacl-util", "npm:0.15.1"],\
@@ -3634,6 +3665,7 @@ const RAW_RUNTIME_STATE =
           ["@libp2p/ping", "npm:3.1.5"],\
           ["@libp2p/webrtc", "npm:6.0.23"],\
           ["@libp2p/websockets", "npm:10.1.13"],\
+          ["@manamesh/game-battleship-merkle", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/game-battleship-merkle"],\
           ["@manamesh/mistborn-deckbuilder", "workspace:packages/mistborn-deckbuilder"],\
           ["@manamesh/onepiece", "workspace:packages/onepiece"],\
           ["@manamesh/poker", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/poker"],\
@@ -3664,6 +3696,7 @@ const RAW_RUNTIME_STATE =
           ["react-dom", "virtual:bf9515b1c815fb81fabec6712a971bad0c2e0b8c8b5ed16f6dc48c9927b531452a5ead30901796258848600f5a1dd4ffb3cddab126dfddc007c84603c33e616b#npm:18.3.1"],\
           ["smol-toml", "npm:1.6.1"],\
           ["snarkjs", "npm:0.7.6"],\
+          ["trystero", "npm:0.25.3"],\
           ["tsconfig-paths", "npm:4.2.0"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["viem", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#npm:2.50.4"],\
@@ -6935,6 +6968,40 @@ const RAW_RUNTIME_STATE =
         "linkType": "SOFT"\
       }]\
     ]],\
+    ["@manamesh/game-battleship-merkle", [\
+      ["virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/game-battleship-merkle", {\
+        "packageLocation": "./.yarn/__virtual__/@manamesh-game-battleship-merkle-virtual-c693aad010/1/packages/game-battleship-merkle/",\
+        "packageDependencies": [\
+          ["@cyotee/boardgameio-crypto", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#workspace:packages/boardgameio-crypto"],\
+          ["@manamesh/game-battleship-merkle", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#workspace:packages/game-battleship-merkle"],\
+          ["@types/react", "npm:18.3.29"],\
+          ["@types/react-dom", "virtual:bf9515b1c815fb81fabec6712a971bad0c2e0b8c8b5ed16f6dc48c9927b531452a5ead30901796258848600f5a1dd4ffb3cddab126dfddc007c84603c33e616b#npm:18.3.7"],\
+          ["boardgame.io", "portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle"],\
+          ["react", "npm:18.3.1"],\
+          ["react-dom", "virtual:bf9515b1c815fb81fabec6712a971bad0c2e0b8c8b5ed16f6dc48c9927b531452a5ead30901796258848600f5a1dd4ffb3cddab126dfddc007c84603c33e616b#npm:18.3.1"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
+        ],\
+        "packagePeers": [\
+          "@types/react-dom",\
+          "react-dom",\
+          "react"\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["workspace:packages/game-battleship-merkle", {\
+        "packageLocation": "./packages/game-battleship-merkle/",\
+        "packageDependencies": [\
+          ["@cyotee/boardgameio-crypto", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#workspace:packages/boardgameio-crypto"],\
+          ["@manamesh/game-battleship-merkle", "workspace:packages/game-battleship-merkle"],\
+          ["@types/react", "npm:18.3.29"],\
+          ["boardgame.io", "portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
     ["@manamesh/mistborn-deckbuilder", [\
       ["workspace:packages/mistborn-deckbuilder", {\
         "packageLocation": "./packages/mistborn-deckbuilder/",\
@@ -6944,7 +7011,7 @@ const RAW_RUNTIME_STATE =
           ["@manamesh/mistborn-deckbuilder", "workspace:packages/mistborn-deckbuilder"],\
           ["boardgame.io", "npm:0.50.2"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["vitest", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1"]\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -6958,7 +7025,7 @@ const RAW_RUNTIME_STATE =
           ["@manamesh/onepiece", "workspace:packages/onepiece"],\
           ["boardgame.io", "npm:0.50.2"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["vitest", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1"]\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -6979,7 +7046,7 @@ const RAW_RUNTIME_STATE =
           ["react-dom", "virtual:bf9515b1c815fb81fabec6712a971bad0c2e0b8c8b5ed16f6dc48c9927b531452a5ead30901796258848600f5a1dd4ffb3cddab126dfddc007c84603c33e616b#npm:18.3.1"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["viem", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#npm:2.50.4"],\
-          ["vitest", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1"]\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
         ],\
         "packagePeers": [\
           "@types/react-dom",\
@@ -7000,7 +7067,7 @@ const RAW_RUNTIME_STATE =
           ["elliptic", "npm:6.6.1"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["viem", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#npm:2.50.4"],\
-          ["vitest", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1"]\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -7017,7 +7084,7 @@ const RAW_RUNTIME_STATE =
           ["react", "npm:18.3.1"],\
           ["react-dom", "virtual:4d4f64bfc76919a077056f5d9871226905de0f8013f7205009c425fa58a95305892e629d1108de4743196c79fa28e31bdcd20878f27b0c30488679597a47fa87#npm:18.3.1"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["vitest", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1"]\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -7605,6 +7672,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/@noble-hashes-npm-2.2.0-edea701f99-10c0.zip/node_modules/@noble/hashes/",\
         "packageDependencies": [\
           ["@noble/hashes", "npm:2.2.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@noble/secp256k1", [\
+      ["npm:3.1.0", {\
+        "packageLocation": "../../../.yarn/berry/cache/@noble-secp256k1-npm-3.1.0-b38024b768-10c0.zip/node_modules/@noble/secp256k1/",\
+        "packageDependencies": [\
+          ["@noble/secp256k1", "npm:3.1.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -9758,6 +9834,26 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/@tootallnate-once-npm-1.1.2-0517220057-10c0.zip/node_modules/@tootallnate/once/",\
         "packageDependencies": [\
           ["@tootallnate/once", "npm:1.1.2"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@trystero-p2p/core", [\
+      ["npm:0.25.3", {\
+        "packageLocation": "../../../.yarn/berry/cache/@trystero-p2p-core-npm-0.25.3-fd0a64f740-10c0.zip/node_modules/@trystero-p2p/core/",\
+        "packageDependencies": [\
+          ["@trystero-p2p/core", "npm:0.25.3"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@trystero-p2p/nostr", [\
+      ["npm:0.25.3", {\
+        "packageLocation": "../../../.yarn/berry/cache/@trystero-p2p-nostr-npm-0.25.3-818f1896df-10c0.zip/node_modules/@trystero-p2p/nostr/",\
+        "packageDependencies": [\
+          ["@noble/secp256k1", "npm:3.1.0"],\
+          ["@trystero-p2p/core", "npm:0.25.3"],\
+          ["@trystero-p2p/nostr", "npm:0.25.3"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -12024,6 +12120,13 @@ const RAW_RUNTIME_STATE =
           ["abbrev", "npm:4.0.0"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["npm:5.0.0", {\
+        "packageLocation": "../../../.yarn/berry/cache/abbrev-npm-5.0.0-31d7ffe3c8-10c0.zip/node_modules/abbrev/",\
+        "packageDependencies": [\
+          ["abbrev", "npm:5.0.0"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["abitype", [\
@@ -13828,14 +13931,14 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["portal:../boardgame.io::locator=%40cyotee%2Fboardgameio-p2p%40workspace%3Apackages%2FboardgameIO-p2p", {\
+      ["portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle", {\
         "packageLocation": "./packages/boardgame.io/",\
         "packageDependencies": [\
           ["@koa/cors", "npm:3.4.3"],\
           ["@koa/router", "npm:10.1.1"],\
           ["@types/koa", "npm:2.15.2"],\
           ["@types/koa__router", "npm:8.0.11"],\
-          ["boardgame.io", "portal:../boardgame.io::locator=%40cyotee%2Fboardgameio-p2p%40workspace%3Apackages%2FboardgameIO-p2p"],\
+          ["boardgame.io", "portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle"],\
           ["flatted", "npm:3.4.2"],\
           ["immer", "npm:9.0.21"],\
           ["koa", "npm:2.16.4"],\
@@ -23734,7 +23837,8 @@ const RAW_RUNTIME_STATE =
           ["@cyotee/boardgame.io", "workspace:packages/boardgame.io"],\
           ["@cyotee/boardgameio-p2p", "virtual:460ae0435c0880f54642fa954af09a5f090edfaa5481a02c409e9fea8b372ce668ff538e3ccf06479b00839dbe98d51ef2883fc035e6d964db05091fcc462866#workspace:packages/boardgameIO-p2p"],\
           ["boardgame.io", "portal:./packages/boardgame.io::locator=manamesh-games%40workspace%3A."],\
-          ["manamesh-games", "workspace:."]\
+          ["manamesh-games", "workspace:."],\
+          ["node-gyp", "npm:13.0.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -24595,6 +24699,23 @@ const RAW_RUNTIME_STATE =
           ["which", "npm:6.0.1"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["npm:13.0.1", {\
+        "packageLocation": "./.yarn/unplugged/node-gyp-npm-13.0.1-b64b93933d/node_modules/node-gyp/",\
+        "packageDependencies": [\
+          ["env-paths", "npm:2.2.1"],\
+          ["exponential-backoff", "npm:3.1.3"],\
+          ["graceful-fs", "npm:4.2.11"],\
+          ["node-gyp", "npm:13.0.1"],\
+          ["nopt", "npm:10.0.1"],\
+          ["proc-log", "npm:7.0.0"],\
+          ["semver", "npm:7.8.0"],\
+          ["tar", "npm:7.5.15"],\
+          ["tinyglobby", "npm:0.2.16"],\
+          ["undici", "npm:8.8.0"],\
+          ["which", "npm:7.0.0"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["node-gyp-build", [\
@@ -24679,6 +24800,14 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["nopt", [\
+      ["npm:10.0.1", {\
+        "packageLocation": "../../../.yarn/berry/cache/nopt-npm-10.0.1-c09d426c63-10c0.zip/node_modules/nopt/",\
+        "packageDependencies": [\
+          ["abbrev", "npm:5.0.0"],\
+          ["nopt", "npm:10.0.1"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["npm:9.0.0", {\
         "packageLocation": "../../../.yarn/berry/cache/nopt-npm-9.0.0-81316ec15c-10c0.zip/node_modules/nopt/",\
         "packageDependencies": [\
@@ -26232,6 +26361,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/proc-log-npm-6.1.0-84e609b3f4-10c0.zip/node_modules/proc-log/",\
         "packageDependencies": [\
           ["proc-log", "npm:6.1.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:7.0.0", {\
+        "packageLocation": "../../../.yarn/berry/cache/proc-log-npm-7.0.0-d836af0493-10c0.zip/node_modules/proc-log/",\
+        "packageDependencies": [\
+          ["proc-log", "npm:7.0.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -29931,6 +30067,16 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["trystero", [\
+      ["npm:0.25.3", {\
+        "packageLocation": "../../../.yarn/berry/cache/trystero-npm-0.25.3-3add065840-10c0.zip/node_modules/trystero/",\
+        "packageDependencies": [\
+          ["@trystero-p2p/nostr", "npm:0.25.3"],\
+          ["trystero", "npm:0.25.3"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["ts-api-utils", [\
       ["npm:2.5.0", {\
         "packageLocation": "../../../.yarn/berry/cache/ts-api-utils-npm-2.5.0-6bde2b2eb9-10c0.zip/node_modules/ts-api-utils/",\
@@ -30693,6 +30839,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/undici-npm-7.25.0-06372b6dbc-10c0.zip/node_modules/undici/",\
         "packageDependencies": [\
           ["undici", "npm:7.25.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:8.8.0", {\
+        "packageLocation": "../../../.yarn/berry/cache/undici-npm-8.8.0-ee0a56cafc-10c0.zip/node_modules/undici/",\
+        "packageDependencies": [\
+          ["undici", "npm:8.8.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -31606,57 +31759,6 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1", {\
-        "packageLocation": "./.yarn/__virtual__/vitest-virtual-366001b898/4/.yarn/berry/cache/vitest-npm-1.6.1-d33201e97b-10c0.zip/node_modules/vitest/",\
-        "packageDependencies": [\
-          ["@edge-runtime/vm", null],\
-          ["@types/edge-runtime__vm", null],\
-          ["@types/happy-dom", null],\
-          ["@types/jsdom", null],\
-          ["@types/node", null],\
-          ["@types/vitest__browser", null],\
-          ["@types/vitest__ui", null],\
-          ["@vitest/browser", null],\
-          ["@vitest/expect", "npm:1.6.1"],\
-          ["@vitest/runner", "npm:1.6.1"],\
-          ["@vitest/snapshot", "npm:1.6.1"],\
-          ["@vitest/spy", "npm:1.6.1"],\
-          ["@vitest/ui", null],\
-          ["@vitest/utils", "npm:1.6.1"],\
-          ["acorn-walk", "npm:8.3.5"],\
-          ["chai", "npm:4.5.0"],\
-          ["debug", "virtual:85d5d916b6a745b2f8de0d4b1704b7084bdd4f7573c1ef5d1c877f2c866045a9b29fe2bc752d1b73e531c378a0518dd3f9fa187b31427fb9bacbe34b14715dde#npm:4.4.3"],\
-          ["execa", "npm:8.0.1"],\
-          ["happy-dom", null],\
-          ["jsdom", null],\
-          ["local-pkg", "npm:0.5.1"],\
-          ["magic-string", "npm:0.30.21"],\
-          ["pathe", "npm:1.1.2"],\
-          ["picocolors", "npm:1.1.1"],\
-          ["std-env", "npm:3.10.0"],\
-          ["strip-literal", "npm:2.1.1"],\
-          ["tinybench", "npm:2.9.0"],\
-          ["tinypool", "npm:0.8.4"],\
-          ["vite", "virtual:84dcff71db8be9cbe950d0756a4f7772695095a485baf88f1cc98436fdd0ea49e9c6ac7f535ec4b7b26fd24d60bd4323cc6ed6d8629d5b2015f92d4613c7ffb6#npm:5.4.21"],\
-          ["vite-node", "npm:1.6.1"],\
-          ["vitest", "virtual:5b8455abd53146e41e66fda265fcb0c8e05ff061b1d465043a2fe0984852044194fbc32762542b66a51984183689a156be6a31da0d03db779387f771016ba1dc#npm:1.6.1"],\
-          ["why-is-node-running", "npm:2.3.0"]\
-        ],\
-        "packagePeers": [\
-          "@edge-runtime/vm",\
-          "@types/edge-runtime__vm",\
-          "@types/happy-dom",\
-          "@types/jsdom",\
-          "@types/node",\
-          "@types/vitest__browser",\
-          "@types/vitest__ui",\
-          "@vitest/browser",\
-          "@vitest/ui",\
-          "happy-dom",\
-          "jsdom"\
-        ],\
-        "linkType": "HARD"\
-      }],\
       ["virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#npm:2.1.9", {\
         "packageLocation": "./.yarn/__virtual__/vitest-virtual-e4643c10b0/4/.yarn/berry/cache/vitest-npm-2.1.9-da245b091d-10c0.zip/node_modules/vitest/",\
         "packageDependencies": [\
@@ -31691,6 +31793,57 @@ const RAW_RUNTIME_STATE =
           ["vite", "virtual:bf9515b1c815fb81fabec6712a971bad0c2e0b8c8b5ed16f6dc48c9927b531452a5ead30901796258848600f5a1dd4ffb3cddab126dfddc007c84603c33e616b#npm:5.4.21"],\
           ["vite-node", "npm:2.1.9"],\
           ["vitest", "virtual:aa7434c7d01cbe5837a1054a770eca5795d8695e578b281f3c3379d46125b13156f330eda6130d4db359f6f95657a1026ea5eca999398ae8f3f1cc03d14b96f0#npm:2.1.9"],\
+          ["why-is-node-running", "npm:2.3.0"]\
+        ],\
+        "packagePeers": [\
+          "@edge-runtime/vm",\
+          "@types/edge-runtime__vm",\
+          "@types/happy-dom",\
+          "@types/jsdom",\
+          "@types/node",\
+          "@types/vitest__browser",\
+          "@types/vitest__ui",\
+          "@vitest/browser",\
+          "@vitest/ui",\
+          "happy-dom",\
+          "jsdom"\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1", {\
+        "packageLocation": "./.yarn/__virtual__/vitest-virtual-d2eddbd0c8/4/.yarn/berry/cache/vitest-npm-1.6.1-d33201e97b-10c0.zip/node_modules/vitest/",\
+        "packageDependencies": [\
+          ["@edge-runtime/vm", null],\
+          ["@types/edge-runtime__vm", null],\
+          ["@types/happy-dom", null],\
+          ["@types/jsdom", null],\
+          ["@types/node", null],\
+          ["@types/vitest__browser", null],\
+          ["@types/vitest__ui", null],\
+          ["@vitest/browser", null],\
+          ["@vitest/expect", "npm:1.6.1"],\
+          ["@vitest/runner", "npm:1.6.1"],\
+          ["@vitest/snapshot", "npm:1.6.1"],\
+          ["@vitest/spy", "npm:1.6.1"],\
+          ["@vitest/ui", null],\
+          ["@vitest/utils", "npm:1.6.1"],\
+          ["acorn-walk", "npm:8.3.5"],\
+          ["chai", "npm:4.5.0"],\
+          ["debug", "virtual:85d5d916b6a745b2f8de0d4b1704b7084bdd4f7573c1ef5d1c877f2c866045a9b29fe2bc752d1b73e531c378a0518dd3f9fa187b31427fb9bacbe34b14715dde#npm:4.4.3"],\
+          ["execa", "npm:8.0.1"],\
+          ["happy-dom", null],\
+          ["jsdom", null],\
+          ["local-pkg", "npm:0.5.1"],\
+          ["magic-string", "npm:0.30.21"],\
+          ["pathe", "npm:1.1.2"],\
+          ["picocolors", "npm:1.1.1"],\
+          ["std-env", "npm:3.10.0"],\
+          ["strip-literal", "npm:2.1.1"],\
+          ["tinybench", "npm:2.9.0"],\
+          ["tinypool", "npm:0.8.4"],\
+          ["vite", "virtual:84dcff71db8be9cbe950d0756a4f7772695095a485baf88f1cc98436fdd0ea49e9c6ac7f535ec4b7b26fd24d60bd4323cc6ed6d8629d5b2015f92d4613c7ffb6#npm:5.4.21"],\
+          ["vite-node", "npm:1.6.1"],\
+          ["vitest", "virtual:c04c974428d65900be91b30817160c220ffaae2f06c9254809de7a0d77f539cd9a5f6a5400329ea18d0534a06645742f79c248d9b8ab09c8503e1d7c553783e9#npm:1.6.1"],\
           ["why-is-node-running", "npm:2.3.0"]\
         ],\
         "packagePeers": [\
@@ -32033,6 +32186,14 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["isexe", "npm:4.0.0"],\
           ["which", "npm:6.0.1"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:7.0.0", {\
+        "packageLocation": "../../../.yarn/berry/cache/which-npm-7.0.0-638dd00e77-10c0.zip/node_modules/which/",\
+        "packageDependencies": [\
+          ["isexe", "npm:4.0.0"],\
+          ["which", "npm:7.0.0"]\
         ],\
         "linkType": "HARD"\
       }]\

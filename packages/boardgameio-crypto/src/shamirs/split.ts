@@ -1,12 +1,29 @@
-import { ec as EC } from "elliptic";
+/**
+ * Shamir's Secret Sharing — split + ECIES-encrypted share transport.
+ * ECDH for ECIES uses @noble/curves secp256k1.
+ *
+ * ECIES shared-secret KDF material is the **uncompressed** shared-point hex
+ * (legacy wire format — do not change without a version bump).
+ */
+
 import {
   PRIME,
   SecretShare,
   ShamirConfig,
   SplitResult,
   ShareValidationError,
-} from "./types";
-import { sha256Hex } from "../sha256";
+} from "./types.js";
+import { sha256Hex } from "../sha256.js";
+import {
+  SecpProjectivePoint,
+  secpRandomPrivateKeyBytes,
+  secpScalarFromHex,
+  secpBytesToHex,
+  secpHexToBytes,
+  secpStrip0x,
+} from "../secp256k1.js";
+
+const P = SecpProjectivePoint;
 
 function randomBigInt(max: bigint): bigint {
   const byteLength = Math.ceil(max.toString(16).length / 2);
@@ -47,7 +64,7 @@ function evaluatePolynomial(
 }
 
 function hexToBigInt(hex: string): bigint {
-  const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const cleanHex = secpStrip0x(hex);
   if (!/^[0-9a-fA-F]+$/.test(cleanHex)) {
     throw new ShareValidationError(`Invalid hex string: ${hex}`);
   }
@@ -120,7 +137,7 @@ export function createKeyShares(
   fromPlayer: string,
   otherPlayers: string[],
   threshold?: number,
-): import("./types").KeyShare[] {
+): import("./types.js").KeyShare[] {
   const totalShares = otherPlayers.length + 1;
   const k = threshold ?? Math.max(2, otherPlayers.length);
 
@@ -140,27 +157,15 @@ export async function encryptShare(
   shareValue: string,
   recipientPublicKey: string,
 ): Promise<string> {
-  const ec = new EC("secp256k1");
+  const ephemeralSk = secpRandomPrivateKeyBytes();
+  const ephemeralPoint = P.fromPrivateKey(ephemeralSk);
+  const ephemeralPublicKeyBytes = secpHexToBytes(ephemeralPoint.toHex(true));
 
-  const ephemeralKey = ec.genKeyPair();
-  const ephemeralPub = ephemeralKey.getPublic();
-  const pubX = ephemeralPub.getX().toBuffer(32);
-  const pubY = ephemeralPub.getY();
-  const prefix = pubY.isOdd() ? 0x03 : 0x02;
-  const ephemeralPublicKeyBytes = concat(new Uint8Array([prefix]), pubX);
-
-  let recipientPubKeyHex = recipientPublicKey;
-  if (
-    recipientPublicKey.startsWith("02") ||
-    recipientPublicKey.startsWith("03")
-  ) {
-    const pubKey = ec.curve.decodePoint(recipientPublicKey, "hex");
-    recipientPubKeyHex = pubKey.encode("hex", false);
-  }
-
-  const recipientPoint = ec.curve.decodePoint(recipientPubKeyHex, "hex");
-  const sharedPoint = recipientPoint.mul(ephemeralKey.getPrivate());
-  const sharedSecret = sharedPoint.encode("hex", false);
+  const recipientPoint = P.fromHex(secpStrip0x(recipientPublicKey));
+  const sk = secpScalarFromHex(secpBytesToHex(ephemeralSk));
+  const sharedPoint = recipientPoint.multiply(sk);
+  // Legacy KDF input: uncompressed point hex (not compressed)
+  const sharedSecret = sharedPoint.toHex(false);
   const sharedSecretBytes = hexToBytes(sharedSecret);
 
   const info = new TextEncoder().encode("shamir-share-v1");
@@ -176,18 +181,26 @@ export async function encryptShare(
 
   const plaintext = hexToBytes(shareValue);
 
+  // Concrete ArrayBuffers for DOM crypto typings (TS 5.x BufferSource).
+  const aesKeyAb = new ArrayBuffer(aesKey.byteLength);
+  new Uint8Array(aesKeyAb).set(aesKey);
+  const ivAb = new ArrayBuffer(iv.byteLength);
+  new Uint8Array(ivAb).set(iv);
+  const plainAb = new ArrayBuffer(plaintext.byteLength);
+  new Uint8Array(plainAb).set(plaintext);
+
   const aesKeyObj = await crypto.subtle.importKey(
     "raw",
-    aesKey,
+    aesKeyAb,
     { name: "AES-GCM" },
     false,
     ["encrypt"],
   );
 
   const encryptedBuf = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: ivAb },
     aesKeyObj,
-    plaintext,
+    plainAb,
   );
 
   const encryptedWithTag = new Uint8Array(encryptedBuf);
@@ -208,8 +221,6 @@ export async function decryptShare(
   encryptedShare: string,
   recipientPrivateKey: string,
 ): Promise<string> {
-  const ec = new EC("secp256k1");
-
   const encryptedBytes = hexToBytes(encryptedShare);
   const EPHEM_PUBKEY_LEN = 33;
   const MAC_LEN = 32;
@@ -225,11 +236,11 @@ export async function decryptShare(
   );
 
   const ephemeralPubKeyHex = bytesToHex(ephemeralPubKeyBytes);
-  const ephemeralPoint = ec.curve.decodePoint(ephemeralPubKeyHex, "hex");
+  const ephemeralPoint = P.fromHex(ephemeralPubKeyHex);
 
-  const recipientPrivate = ec.keyFromPrivate(recipientPrivateKey, "hex");
-  const sharedPoint = ephemeralPoint.mul(recipientPrivate.getPrivate());
-  const sharedSecret = sharedPoint.encode("hex", false);
+  const sk = secpScalarFromHex(recipientPrivateKey);
+  const sharedPoint = ephemeralPoint.multiply(sk);
+  const sharedSecret = sharedPoint.toHex(false);
 
   const sharedSecretBytes = hexToBytes(sharedSecret);
   const info = new TextEncoder().encode("shamir-share-v1");
@@ -252,18 +263,25 @@ export async function decryptShare(
   const iv = encryptedData.slice(0, 12);
   const ciphertextWithTag = encryptedData.slice(12);
 
+  const aesKeyAb = new ArrayBuffer(aesKey.byteLength);
+  new Uint8Array(aesKeyAb).set(aesKey);
+  const ivAb = new ArrayBuffer(iv.byteLength);
+  new Uint8Array(ivAb).set(iv);
+  const ctAb = new ArrayBuffer(ciphertextWithTag.byteLength);
+  new Uint8Array(ctAb).set(ciphertextWithTag);
+
   const aesKeyObj = await crypto.subtle.importKey(
     "raw",
-    aesKey,
+    aesKeyAb,
     { name: "AES-GCM" },
     false,
     ["decrypt"],
   );
 
   const decryptedBuf = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: ivAb },
     aesKeyObj,
-    ciphertextWithTag,
+    ctAb,
   );
 
   const decrypted = new Uint8Array(decryptedBuf);
@@ -271,10 +289,10 @@ export async function decryptShare(
 }
 
 function hexToBytes(hex: string): Uint8Array {
-  const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const cleanHex = secpStrip0x(hex);
   const bytes = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(cleanHex.substr(i * 2, 2), 16);
+    bytes[i] = parseInt(cleanHex.substr(i * 2, i * 2 + 2), 16);
   }
   return bytes;
 }
@@ -289,14 +307,6 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
   const out = new Uint8Array(a.length + b.length);
   out.set(a, 0);
   out.set(b, a.length);
-  return out;
-}
-
-function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const out = new Uint8Array(Math.max(a.length, b.length));
-  for (let i = 0; i < out.length; i++) {
-    out[i] = (a[i] ?? 0) ^ (b[i] ?? 0);
-  }
   return out;
 }
 

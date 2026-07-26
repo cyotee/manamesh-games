@@ -10,9 +10,9 @@ import {
   reconstructKeyFromShares,
   canReconstruct,
   validateShare,
-} from './index';
-import type { SecretShare, KeyShare, ShamirConfig } from './types';
-import { PRIME, ReconstructionError } from './types';
+} from './index.js';
+import type { SecretShare, KeyShare, ShamirConfig } from './types.js';
+import { PRIME, ReconstructionError } from './types.js';
 
 // Helper to normalize hex values for comparison
 function normalizeHex(hex: string): string {

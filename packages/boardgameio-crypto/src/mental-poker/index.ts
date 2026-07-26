@@ -17,11 +17,11 @@ export type {
   ProtocolEventHandler,
   RevealResult,
   ShuffleProof,
-} from './types';
+} from './types.js';
 
 // Point helpers used by mental-poker consumers (re-exported so Vite aliases
 // that only wire mental-poker still resolve normalize without a secp256k1 path).
-export { secpPointNormalizeHex } from '../secp256k1';
+export { secpPointNormalizeHex } from '../secp256k1.js';
 
 // SRA Commutative Encryption
 export {
@@ -36,7 +36,7 @@ export {
   hashToPoint,
   reencryptDeck,
   verifyCommutative,
-} from './sra';
+} from './sra.js';
 
 // Commitments
 export {
@@ -52,7 +52,7 @@ export {
   serializeEncryptedDeck,
   verifyCommitment,
   verifySelfCommitment,
-} from './commitment';
+} from './commitment.js';
 
 // Shuffle Proofs
 export {
@@ -68,6 +68,6 @@ export {
   shuffleWithProof,
   verifyPermutationCommitment,
   verifyShuffleProof,
-} from './shuffle-proof';
+} from './shuffle-proof.js';
 
-export type { Permutation } from './shuffle-proof';
+export type { Permutation } from './shuffle-proof.js';

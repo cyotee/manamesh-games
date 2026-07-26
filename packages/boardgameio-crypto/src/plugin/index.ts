@@ -8,7 +8,7 @@ export {
   CryptoPlugin,
   createPlayerCryptoContext,
   generateStandard52CardIds,
-} from './crypto-plugin';
+} from './crypto-plugin.js';
 
 export type {
   CryptoPluginApi,
@@ -18,4 +18,4 @@ export type {
   SerializedCommitment,
   SerializedShuffleProof,
   ZoneId,
-} from './crypto-plugin';
+} from './crypto-plugin.js';

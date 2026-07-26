@@ -12,9 +12,9 @@ import {
   verifyShuffleProof,
   shuffleWithProof,
   quickShuffle,
-} from './shuffle-proof';
-import { generateNonce } from './commitment';
-import type { EncryptedCard } from './types';
+} from './shuffle-proof.js';
+import { generateNonce } from './commitment.js';
+import type { EncryptedCard } from './types.js';
 
 describe('Shuffle Proof', () => {
   // Test deck

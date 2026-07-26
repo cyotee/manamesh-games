@@ -8,7 +8,11 @@
   ],
   "scripts": {
     "build": "yarn workspace @cyotee/manamesh build",
-    "dev:frontend": "yarn workspace @cyotee/manamesh dev",
+    "dev:frontend": "yarn dev:timestreams",
+    "dev:timestreams": "yarn workspace @cyotee/manamesh exec vite --open /src/pages/timestreams/",
+    "dev:poker": "yarn workspace @cyotee/manamesh exec vite --open /src/pages/poker/",
+    "dev:battleship": "yarn workspace @cyotee/manamesh exec vite --open /src/pages/merkle-battleship/",
+    "dev:onepiece": "yarn workspace @cyotee/manamesh exec vite --open /src/pages/onepiece/",
     "test:frontend": "yarn workspace @cyotee/manamesh test",
     "build:timestreams-vercel": "node packages/timestreams/scripts/build-vercel.mjs",
     "deploy:timestreams": "node packages/timestreams/scripts/build-vercel.mjs && cd deploy/timestreams && vercel deploy --prod --yes --name timestreams"
@@ -17,5 +21,8 @@
     "@cyotee/boardgame.io": "workspace:*",
     "@cyotee/boardgameio-p2p": "workspace:*",
     "boardgame.io": "portal:./packages/boardgame.io"
+  },
+  "devDependencies": {
+    "node-gyp": "^13.0.1"
   }
 }

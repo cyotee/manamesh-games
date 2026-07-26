@@ -204,6 +204,7 @@
         "scoreValue": null,
         "tags": [
           "react:discard",
+          "react:from:hand",
           "trigger:source:opponent",
           "trigger:target:own-inventions",
           "retaliate:discard",
@@ -693,6 +694,7 @@
         "scoreValue": null,
         "tags": [
           "react:invention-played",
+          "react:from:hand",
           "play:attach",
           "ongoing:trigger:invention-played",
           "trigger:scope:attached-era",

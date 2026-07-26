@@ -1929,13 +1929,16 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cyotee/boardgameio-crypto@workspace:packages/boardgameio-crypto"
   dependencies:
+    "@noble/curves": "npm:^1.9.7"
     boardgame.io: "portal:../boardgame.io"
-    elliptic: "npm:^6.5.5"
     snarkjs: "npm:^0.7.6"
     typescript: "npm:^5.6.2"
     vitest: "npm:^2.1.1"
   peerDependencies:
     boardgame.io: ^0.50.2
+  peerDependenciesMeta:
+    boardgame.io:
+      optional: true
   languageName: unknown
   linkType: soft
 
@@ -1947,19 +1950,24 @@ __metadata:
     "@types/node": "npm:^18.0.0"
     "@typescript-eslint/eslint-plugin": "npm:^5.4.0"
     "@typescript-eslint/parser": "npm:^5.4.0"
-    boardgame.io: "portal:../boardgame.io"
+    boardgame.io: "npm:^0.50.2"
     eslint: "npm:^8.2.0"
     eslint-config-prettier: "npm:^9.0.0"
     jest: "npm:^27.3.1"
     peerjs: "npm:^1.3.2"
     prettier: "npm:^3.0.3"
     standard-version: "npm:^9.3.1"
+    trystero: "npm:0.25.3"
     ts-jest: "npm:^27.0.7"
     tweetnacl: "npm:^1.0.3"
     tweetnacl-util: "npm:^0.15.1"
     typescript: "npm:^4.4.3"
   peerDependencies:
     boardgame.io: ">=0.49.1"
+    trystero: ^0.25.0
+  peerDependenciesMeta:
+    trystero:
+      optional: true
   languageName: unknown
   linkType: soft
 
@@ -2003,6 +2011,7 @@ __metadata:
     "@libp2p/ping": "npm:^3.0.10"
     "@libp2p/webrtc": "npm:^6.0.11"
     "@libp2p/websockets": "npm:^10.1.3"
+    "@manamesh/game-battleship-merkle": "workspace:*"
     "@manamesh/mistborn-deckbuilder": "workspace:*"
     "@manamesh/onepiece": "workspace:*"
     "@manamesh/poker": "workspace:*"
@@ -2033,6 +2042,7 @@ __metadata:
     react-dom: "npm:^18.2.0"
     smol-toml: "npm:^1.6.0"
     snarkjs: "npm:^0.7.6"
+    trystero: "npm:0.25.3"
     tsconfig-paths: "npm:^4.2.0"
     typescript: "npm:^5.6.2"
     viem: "npm:^2.17.0"
@@ -5078,6 +5088,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@manamesh/game-battleship-merkle@workspace:*, @manamesh/game-battleship-merkle@workspace:packages/game-battleship-merkle":
+  version: 0.0.0-use.local
+  resolution: "@manamesh/game-battleship-merkle@workspace:packages/game-battleship-merkle"
+  dependencies:
+    "@cyotee/boardgameio-crypto": "workspace:*"
+    "@types/react": "npm:^18.2.0"
+    boardgame.io: "portal:../boardgame.io"
+    typescript: "npm:^5.0.0"
+    vitest: "npm:^1.0.0"
+  peerDependencies:
+    react: ^18.2.0
+    react-dom: ^18.2.0
+  languageName: unknown
+  linkType: soft
+
 "@manamesh/mistborn-deckbuilder@workspace:*, @manamesh/mistborn-deckbuilder@workspace:packages/mistborn-deckbuilder":
   version: 0.0.0-use.local
   resolution: "@manamesh/mistborn-deckbuilder@workspace:packages/mistborn-deckbuilder"
@@ -5681,6 +5706,13 @@ __metadata:
   version: 2.2.0
   resolution: "@noble/hashes@npm:2.2.0"
   checksum: 10c0/cad8630c504d6b9271984f685cd0af9101b40988fc2dfbe17ccdf068a9941f95cc5c9957d89e9ca4b7ca94c15cb35f93510c5d53a09fbcc83ee503b93d0a1034
+  languageName: node
+  linkType: hard
+
+"@noble/secp256k1@npm:^3.1.0":
+  version: 3.1.0
+  resolution: "@noble/secp256k1@npm:3.1.0"
+  checksum: 10c0/5f40f90d7b67c714f168f6f455e50e7702c5d1ca6a970e93c3e53fec150c93cfb39b1fff74ea12c6351afe589ea58ec65f721233a55ff43d8d9ce2fac3860342
   languageName: node
   linkType: hard
 
@@ -7268,6 +7300,23 @@ __metadata:
   version: 1.1.2
   resolution: "@tootallnate/once@npm:1.1.2"
   checksum: 10c0/8fe4d006e90422883a4fa9339dd05a83ff626806262e1710cee5758d493e8cbddf2db81c0e4690636dc840b02c9fda62877866ea774ebd07c1777ed5fafbdec6
+  languageName: node
+  linkType: hard
+
+"@trystero-p2p/core@npm:0.25.3":
+  version: 0.25.3
+  resolution: "@trystero-p2p/core@npm:0.25.3"
+  checksum: 10c0/ae87f471d7b488aecd53da3b1148fb0eb417b28669803c1e2bb90e04d504e4e1f20827299501f71260bd66ec645e9af651da897d0674e8f4c8f9dd2c08bdbeeb
+  languageName: node
+  linkType: hard
+
+"@trystero-p2p/nostr@npm:0.25.3":
+  version: 0.25.3
+  resolution: "@trystero-p2p/nostr@npm:0.25.3"
+  dependencies:
+    "@noble/secp256k1": "npm:^3.1.0"
+    "@trystero-p2p/core": "npm:0.25.3"
+  checksum: 10c0/469b5467b847ca3dea3ff59699adb10d046ad427f6efe1407a0e8706b4d9ddd6a6ff8bfd9e2c2405fee409914b88b6378237c68b3bf47c45761ed5508da080e2
   languageName: node
   linkType: hard
 
@@ -9047,6 +9096,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"abbrev@npm:^5.0.0":
+  version: 5.0.0
+  resolution: "abbrev@npm:5.0.0"
+  checksum: 10c0/8e88f5c798ea4562d28c5a3e9ad69e3879890bc5d695d8f2dffb8609be4c890aacc8f80ef4553fdd2c6a62d70c2ce8bc57b38074e383beb7487bdafa9ed42ea5
+  languageName: node
+  linkType: hard
+
 "abitype@npm:1.0.6":
   version: 1.0.6
   resolution: "abitype@npm:1.0.6"
@@ -10458,9 +10514,9 @@ __metadata:
   languageName: node
   linkType: soft
 
-"boardgame.io@portal:../boardgame.io::locator=%40cyotee%2Fboardgameio-p2p%40workspace%3Apackages%2FboardgameIO-p2p":
+"boardgame.io@portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle":
   version: 0.0.0-use.local
-  resolution: "boardgame.io@portal:../boardgame.io::locator=%40cyotee%2Fboardgameio-p2p%40workspace%3Apackages%2FboardgameIO-p2p"
+  resolution: "boardgame.io@portal:../boardgame.io::locator=%40manamesh%2Fgame-battleship-merkle%40workspace%3Apackages%2Fgame-battleship-merkle"
   dependencies:
     "@koa/cors": "npm:^3.1.0"
     "@koa/router": "npm:^10.1.1"
@@ -19265,6 +19321,7 @@ __metadata:
     "@cyotee/boardgame.io": "workspace:*"
     "@cyotee/boardgameio-p2p": "workspace:*"
     boardgame.io: "portal:./packages/boardgame.io"
+    node-gyp: "npm:^13.0.1"
   languageName: unknown
   linkType: soft
 
@@ -20018,6 +20075,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"node-gyp@npm:^13.0.1":
+  version: 13.0.1
+  resolution: "node-gyp@npm:13.0.1"
+  dependencies:
+    env-paths: "npm:^2.2.0"
+    exponential-backoff: "npm:^3.1.1"
+    graceful-fs: "npm:^4.2.6"
+    nopt: "npm:^10.0.0"
+    proc-log: "npm:^7.0.0"
+    semver: "npm:^7.3.5"
+    tar: "npm:^7.5.4"
+    tinyglobby: "npm:^0.2.12"
+    undici: "npm:^8.4.1"
+    which: "npm:^7.0.0"
+  bin:
+    node-gyp: bin/node-gyp.js
+  checksum: 10c0/424077bc9e9bbe953a8e86db473ba818cbc6a121714008c977fd589e21e5f0c811fbf22faac730dc7182450b5e52df301811d01ae3373898658d999b7710f4e6
+  languageName: node
+  linkType: hard
+
 "node-gyp@npm:latest":
   version: 12.3.0
   resolution: "node-gyp@npm:12.3.0"
@@ -20103,6 +20180,17 @@ __metadata:
   bin:
     nodemon: bin/nodemon.js
   checksum: 10c0/074f2056051a148ad11cda0d6c3f905bdef93a878792385f16e1dff0c63dcf07f23ebe1ab3763dca7314d0266e12129f066070545d817a205ee050a22eff50b0
+  languageName: node
+  linkType: hard
+
+"nopt@npm:^10.0.0":
+  version: 10.0.1
+  resolution: "nopt@npm:10.0.1"
+  dependencies:
+    abbrev: "npm:^5.0.0"
+  bin:
+    nopt: bin/nopt.js
+  checksum: 10c0/980d89257f9587f3e1f77877ddbf905d6aa3b738ec33e49a4fa1a059a0dd82eb28063982b150654a7ae9de386f2ead60e56172db7d37cf56de545f7392a2a26a
   languageName: node
   linkType: hard
 
@@ -21485,6 +21573,13 @@ __metadata:
   version: 6.1.0
   resolution: "proc-log@npm:6.1.0"
   checksum: 10c0/4f178d4062733ead9d71a9b1ab24ebcecdfe2250916a5b1555f04fe2eda972a0ec76fbaa8df1ad9c02707add6749219d118a4fc46dc56bdfe4dde4b47d80bb82
+  languageName: node
+  linkType: hard
+
+"proc-log@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "proc-log@npm:7.0.0"
+  checksum: 10c0/b89c2d862604f35fec795477b0c7e376feab3ba0d4f4d291c4e959567442697cf451ac557d0623c1cc38af45a78128b983410f397a10c5d3a67f76c33de4754b
   languageName: node
   linkType: hard
 
@@ -24806,6 +24901,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"trystero@npm:0.25.3":
+  version: 0.25.3
+  resolution: "trystero@npm:0.25.3"
+  dependencies:
+    "@trystero-p2p/nostr": "npm:0.25.3"
+  checksum: 10c0/fddfbb2475aaa8e8e213830d0b89a86e7d5961fd9745217bccf50df0c50644f251e8e9cae54d60aa98bcf8d61a57cb7190c176bdbb10eba517f3e7fa53964e0e
+  languageName: node
+  linkType: hard
+
 "ts-api-utils@npm:^2.5.0":
   version: 2.5.0
   resolution: "ts-api-utils@npm:2.5.0"
@@ -25455,6 +25559,13 @@ __metadata:
   version: 7.25.0
   resolution: "undici@npm:7.25.0"
   checksum: 10c0/02a0b45dc14eb91bc488948750232450fe52f27a6b08086d6ac6736bb47908d600fe3a96d346f12eab24729c782e5c2f693bc8e8eca6696d4e4c09b1ed4cb4ec
+  languageName: node
+  linkType: hard
+
+"undici@npm:^8.4.1":
+  version: 8.8.0
+  resolution: "undici@npm:8.8.0"
+  checksum: 10c0/6ee51e6b814b67e212b19349c38657be988d878ca669ccf2ad33f0ebbb0d83e851aa57554b6ce3c6668a9a4df3010fb6a6af7bd28692ade911083ef376a3a75d
   languageName: node
   linkType: hard
 
@@ -26522,6 +26633,17 @@ __metadata:
   bin:
     node-which: bin/which.js
   checksum: 10c0/7e710e54ea36d2d6183bee2f9caa27a3b47b9baf8dee55a199b736fcf85eab3b9df7556fca3d02b50af7f3dfba5ea3a45644189836df06267df457e354da66d5
+  languageName: node
+  linkType: hard
+
+"which@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "which@npm:7.0.0"
+  dependencies:
+    isexe: "npm:^4.0.0"
+  bin:
+    node-which: bin/which.js
+  checksum: 10c0/ca0b54f198f78bbc4b7c02e34bda8d335cb352e0adb4cbca1c37b1a957af3a879a82c4c27ca6525bc942f548d8b64f816ef6528360af9f3de55ffb9b979b620d
   languageName: node
   linkType: hard
 

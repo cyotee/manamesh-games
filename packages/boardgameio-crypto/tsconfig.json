@@ -1,10 +1,8 @@
 {
   "compilerOptions": {
-    // Mirror @cyotee/manamesh's compiler standard (the code was authored
-    // against it): strict, but not noUncheckedIndexedAccess, ES2020 lib.
     "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "strict": true,
     "esModuleInterop": true,
@@ -12,7 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "noEmit": true
   },
   "include": ["src/**/*"]
 }

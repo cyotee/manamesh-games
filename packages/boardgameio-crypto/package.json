@@ -1,97 +1,142 @@
 {
   "name": "@cyotee/boardgameio-crypto",
-  "version": "0.1.0",
-  "description": "Cryptographic primitives for boardgame.io games — mental poker (SRA), Merkle commitments, EC ElGamal, Feldman DKG, DLEQ, ECDSA, Paillier HE, Shamir SSS, snarkjs ZK helpers, the boardgame.io crypto plugin, and setup-flow helpers.",
+  "version": "0.2.0",
+  "description": "Cryptographic primitives for boardgame.io games — mental poker (SRA), Merkle commitments, EC ElGamal, Feldman DKG, DLEQ, ECDSA, Paillier HE (demo), Shamir SSS, snarkjs ZK helpers, the boardgame.io crypto plugin, and setup-flow helpers.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./mental-poker": {
       "types": "./dist/mental-poker/index.d.ts",
+      "import": "./dist/mental-poker/index.js",
       "default": "./dist/mental-poker/index.js"
     },
     "./mental-poker/*": {
       "types": "./dist/mental-poker/*.d.ts",
+      "import": "./dist/mental-poker/*.js",
       "default": "./dist/mental-poker/*.js"
     },
     "./keychain": {
       "types": "./dist/keychain/index.d.ts",
+      "import": "./dist/keychain/index.js",
       "default": "./dist/keychain/index.js"
     },
     "./plugin": {
       "types": "./dist/plugin/index.d.ts",
+      "import": "./dist/plugin/index.js",
       "default": "./dist/plugin/index.js"
     },
     "./plugin/crypto-plugin": {
       "types": "./dist/plugin/crypto-plugin.d.ts",
+      "import": "./dist/plugin/crypto-plugin.js",
       "default": "./dist/plugin/crypto-plugin.js"
     },
     "./shamirs": {
       "types": "./dist/shamirs/index.d.ts",
+      "import": "./dist/shamirs/index.js",
       "default": "./dist/shamirs/index.js"
     },
     "./zk": {
       "types": "./dist/zk/index.d.ts",
+      "import": "./dist/zk/index.js",
       "default": "./dist/zk/index.js"
     },
     "./sha256": {
       "types": "./dist/sha256.d.ts",
+      "import": "./dist/sha256.js",
       "default": "./dist/sha256.js"
     },
     "./merkle": {
       "types": "./dist/merkle.d.ts",
+      "import": "./dist/merkle.js",
       "default": "./dist/merkle.js"
     },
     "./stable-json": {
       "types": "./dist/stable-json.d.ts",
+      "import": "./dist/stable-json.js",
       "default": "./dist/stable-json.js"
     },
     "./secp256k1": {
       "types": "./dist/secp256k1.d.ts",
+      "import": "./dist/secp256k1.js",
       "default": "./dist/secp256k1.js"
     },
     "./ec-elgamal-exp": {
       "types": "./dist/ec-elgamal-exp.d.ts",
+      "import": "./dist/ec-elgamal-exp.js",
       "default": "./dist/ec-elgamal-exp.js"
     },
     "./feldman-dkg": {
       "types": "./dist/feldman-dkg.d.ts",
+      "import": "./dist/feldman-dkg.js",
       "default": "./dist/feldman-dkg.js"
     },
     "./dleq": {
       "types": "./dist/dleq.d.ts",
+      "import": "./dist/dleq.js",
       "default": "./dist/dleq.js"
     },
     "./ecdsa": {
       "types": "./dist/ecdsa.d.ts",
+      "import": "./dist/ecdsa.js",
       "default": "./dist/ecdsa.js"
     },
     "./paillier": {
       "types": "./dist/paillier.d.ts",
+      "import": "./dist/paillier.js",
       "default": "./dist/paillier.js"
     },
     "./snarkjs-range": {
       "types": "./dist/snarkjs-range.d.ts",
+      "import": "./dist/snarkjs-range.js",
       "default": "./dist/snarkjs-range.js"
     },
     "./range-proof-vkey": {
       "types": "./dist/range-proof-vkey.d.ts",
+      "import": "./dist/range-proof-vkey.js",
       "default": "./dist/range-proof-vkey.js"
     },
     "./integration/setup-utils": {
       "types": "./dist/integration/setup-utils.d.ts",
+      "import": "./dist/integration/setup-utils.js",
       "default": "./dist/integration/setup-utils.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md"
   ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "boardgame.io",
+    "mental-poker",
+    "sra",
+    "secp256k1",
+    "merkle",
+    "dkg",
+    "elgamal",
+    "shamir",
+    "crypto",
+    "p2p",
+    "fair-play"
+  ],
+  "author": "cyotee",
+  "homepage": "https://github.com/cyotee/boardgameio-crypto#readme",
+  "bugs": {
+    "url": "https://github.com/cyotee/boardgameio-crypto/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -101,16 +146,23 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json || test -f dist/index.js",
-    "prepublishOnly": "npm run build",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "pack:check": "npm pack --dry-run"
   },
   "peerDependencies": {
     "boardgame.io": "^0.50.2"
   },
+  "peerDependenciesMeta": {
+    "boardgame.io": {
+      "optional": true
+    }
+  },
   "dependencies": {
-    "elliptic": "^6.5.5",
+    "@noble/curves": "^1.9.7",
     "snarkjs": "^0.7.6"
   },
   "devDependencies": {

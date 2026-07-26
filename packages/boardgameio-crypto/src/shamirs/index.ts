@@ -7,7 +7,7 @@
  *
  * @example
  * ```typescript
- * import { splitSecret, reconstructSecret, createKeyShares } from './shamirs';
+ * import { splitSecret, reconstructSecret, createKeyShares } from './shamirs.js';
  *
  * // Split a private key into 4 shares where any 3 can reconstruct
  * const result = splitSecret(privateKey, { threshold: 3, totalShares: 4 });
@@ -22,9 +22,9 @@
  * ```
  */
 
-export type { SecretShare, KeyShare, SplitResult, ShamirConfig } from "./types";
+export type { SecretShare, KeyShare, SplitResult, ShamirConfig } from "./types.js";
 
-export { PRIME, ReconstructionError, ShareValidationError } from "./types";
+export { PRIME, ReconstructionError, ShareValidationError } from "./types.js";
 
 export {
   splitSecret,
@@ -32,10 +32,10 @@ export {
   createKeyShares,
   encryptShare,
   decryptShare,
-} from "./split";
+} from "./split.js";
 
 export {
   reconstructSecret,
   canReconstruct,
   reconstructKeyFromShares,
-} from "./reconstruct";
+} from "./reconstruct.js";

@@ -1,6 +1,17 @@
-// `snarkjs` and `elliptic` ship no TypeScript declarations. The frontend that
-// originally hosted this code never ran `tsc` (it transpiles via esbuild), so
-// both were effectively `any`. These ambient shims preserve that reality so the
-// package's `typecheck` script reflects the standard the code was written against.
-declare module 'snarkjs';
-declare module 'elliptic';
+// snarkjs ships incomplete TypeScript declarations in some versions.
+// We keep a minimal ambient module so consumers and tsc can typecheck.
+declare module "snarkjs" {
+  export const groth16: {
+    fullProve: (
+      input: unknown,
+      wasmFile: string | Uint8Array,
+      zkeyFileName: string | Uint8Array,
+    ) => Promise<{ proof: unknown; publicSignals: unknown }>;
+    verify: (
+      vkey: unknown,
+      publicSignals: unknown,
+      proof: unknown,
+    ) => Promise<boolean>;
+    exportSolidityCallData?: (proof: unknown, publicSignals: unknown) => Promise<string>;
+  };
+}

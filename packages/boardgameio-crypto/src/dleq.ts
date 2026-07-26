@@ -10,8 +10,8 @@ import {
   secpScalarToHex32,
   type SecpPointHex,
   type SecpScalarHex,
-} from "./secp256k1";
-import { sha256Hex, utf8Bytes } from "./sha256";
+} from "./secp256k1.js";
+import { sha256Hex, utf8Bytes } from "./sha256.js";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);

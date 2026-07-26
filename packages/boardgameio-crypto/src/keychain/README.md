@@ -25,7 +25,7 @@ import {
   keychainFromRecord,
   keychainAdd,
   MENTAL_POKER_KEYCHAIN_POLICY,
-} from "@manamesh/boardgameio-crypto/keychain";
+} from "@cyotee/boardgameio-crypto/keychain";
 
 const prior = keychainFromRecord(G.crypto.publicKeys, MENTAL_POKER_KEYCHAIN_POLICY);
 const result = keychainAdd(prior, playerId, publicKey, MENTAL_POKER_KEYCHAIN_POLICY);

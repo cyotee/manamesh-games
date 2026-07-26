@@ -10,8 +10,8 @@ import {
   hashToHex,
   hexToHash,
   batchVerifyCommitments,
-} from './commitment';
-import type { EncryptedCard, DeckCommitment } from './types';
+} from './commitment.js';
+import type { EncryptedCard, DeckCommitment } from './types.js';
 
 describe('Commitment', () => {
   // Test deck

@@ -1,4 +1,4 @@
-import { bytesToHex, concatBytes, hexToBytes, sha256 } from "./sha256";
+import { bytesToHex, concatBytes, hexToBytes, sha256 } from "./sha256.js";
 
 export type MerkleSide = "left" | "right";
 

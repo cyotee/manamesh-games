@@ -173,7 +173,7 @@ See [War Game README](../../game/modules/war/README.md) for VRF integration deta
 
 ## Dependencies
 
-- `elliptic` - Elliptic curve cryptography
+- `@noble/curves` - secp256k1 elliptic curve cryptography
 - Web Crypto API - Hashing and random number generation
 
 ## References

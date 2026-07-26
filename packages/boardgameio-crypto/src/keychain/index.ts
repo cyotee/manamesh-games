@@ -13,7 +13,7 @@ export type {
   KeychainAddSuccess,
   KeychainAddFailure,
   KeychainAddResult,
-} from "./types";
+} from "./types.js";
 
 export {
   STRICT_KEYCHAIN_POLICY,
@@ -36,4 +36,4 @@ export {
   keychainList,
   keychainAdd,
   keychainRemove,
-} from "./keychain";
+} from "./keychain.js";

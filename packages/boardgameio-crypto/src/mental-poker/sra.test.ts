@@ -10,8 +10,8 @@ import {
   buildCardPointLookup,
   verifyCommutative,
   decryptToCardId,
-} from "./sra";
-import type { CryptoKeyPair, EncryptedCard } from "./types";
+} from "./sra.js";
+import type { CryptoKeyPair, EncryptedCard } from "./types.js";
 
 describe("SRA Commutative Encryption", () => {
   let keyA: CryptoKeyPair;
@@ -324,7 +324,7 @@ describe("Security helpers (centralized validation)", () => {
   });
 
   it("validateEncryptedCard rejects bad inputs", async () => {
-    const { validateEncryptedCard } = await import("../secp256k1");
+    const { validateEncryptedCard } = await import("../secp256k1.js");
     expect(validateEncryptedCard(null)).toBe(false);
     expect(validateEncryptedCard({ ciphertext: "garbage", layers: 2 })).toBe(false);
     expect(validateEncryptedCard({ ciphertext: "00", layers: -1 })).toBe(false);

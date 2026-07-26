@@ -42,13 +42,13 @@ import {
   shuffleWithProof,
   verifyShuffleProof,
   type Permutation,
-} from "../mental-poker";
+} from "../mental-poker/index.js";
 import {
   keychainAdd,
   keychainFromRecord,
   MENTAL_POKER_KEYCHAIN_POLICY,
   type KeychainState,
-} from "../keychain";
+} from "../keychain/index.js";
 
 // =============================================================================
 // Types

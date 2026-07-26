@@ -19,7 +19,17 @@ jobs:
           node-version: "22"
           package-manager-cache: false
       - run: npm install
+      - run: npm run typecheck
       - run: npm test
+      - run: npm run build
+      - name: Verify Node ESM entry
+        run: |
+          node --input-type=module -e "
+            import { generateKeyPair, sha256Hex } from './dist/index.js';
+            const k = generateKeyPair();
+            if (!k.publicKey || !k.privateKey) throw new Error('bad keypair');
+            console.log('esm-ok', k.publicKey.slice(0, 8), sha256Hex(new TextEncoder().encode('x')).slice(0, 8));
+          "
 
   publish:
     needs: test
@@ -33,7 +43,9 @@ jobs:
           package-manager-cache: false
       - run: npm install -g npm@latest
       - run: npm install
-      - run: npm run build || test -f dist/index.js
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
       - name: Prepare package.json for publish
         run: |
           node -e "
@@ -46,7 +58,6 @@ jobs:
           "
       - name: Publish if new version
         env:
-          # Prefer OIDC trusted publishing; token fallback only if secret set and OIDC not configured
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
         run: |

@@ -7,7 +7,7 @@ import {
   secpRandomScalar,
   secpInvN,
   type SecpPointHex,
-} from "./secp256k1";
+} from "./secp256k1.js";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);

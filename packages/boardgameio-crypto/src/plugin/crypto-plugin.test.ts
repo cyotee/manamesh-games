@@ -5,8 +5,8 @@ import {
   generateStandard52CardIds,
   type CryptoPluginGameState,
   type CryptoPlayerContext,
-} from "./crypto-plugin";
-import { decrypt, encrypt } from "../mental-poker";
+} from "./crypto-plugin.js";
+import { decrypt, encrypt } from "../mental-poker/index.js";
 import type { Ctx } from "boardgame.io";
 
 describe("CryptoPlugin", () => {
@@ -72,7 +72,7 @@ describe("CryptoPlugin", () => {
       api.submitPublicKey("playerA", playerA.keyPair.publicKey);
 
       // Stored in canonical compressed form via keychain policy.
-      const { normalizeSecp256k1PublicKey } = await import("../keychain");
+      const { normalizeSecp256k1PublicKey } = await import("../keychain/index.js");
       expect(gameState.crypto.publicKeys["playerA"]).toBe(
         normalizeSecp256k1PublicKey(playerA.keyPair.publicKey),
       );

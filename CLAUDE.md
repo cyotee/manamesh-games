@@ -18,8 +18,14 @@ This repo (`manamesh-games`) is a **Yarn 4 monorepo** that hosts:
 # From monorepo root (Yarn 4 / PnP — do not use npm)
 yarn install
 
-yarn dev:frontend          # Vite → typically http://localhost:3000
-yarn build                 # Build @manamesh/frontend
+# Each game is a distinct product entry (no multi-game lobby)
+yarn dev:timestreams       # → http://localhost:3000/src/pages/timestreams/
+yarn dev:poker             # → …/poker/
+yarn dev:battleship        # → …/merkle-battleship/
+yarn dev:onepiece          # → …/onepiece/
+yarn dev:frontend          # alias → Timestreams
+
+yarn build                 # Build @cyotee/manamesh (SPA shell + pages)
 yarn test:frontend         # Vitest (frontend workspace)
 
 # Package-scoped tests
@@ -104,6 +110,8 @@ manamesh-games/
 | Poker game + board + EIP-712 + Forge contracts | `packages/poker/` |
 | Timestreams rules engine, crypto deck ops, board, e2e, scanned packs | `packages/timestreams/` (submodule `cyotee/timestreams`) |
 | One Piece / Mistborn modules | `packages/onepiece/`, `packages/mistborn-deckbuilder/` |
+| Merkle Battleship | **submodule** `packages/game-battleship-merkle` → GitHub `cyotee/game-battleship-merkle`, npm `@manamesh/game-battleship-merkle` |
+| Poker | **submodule** `packages/poker` → GitHub `cyotee/game-poker`, npm `@manamesh/poker`, **license BUSL-1.1** |
 | Optional signaling server | `packages/manamesh/packages/backend/` |
 
 **Extracted modules are consumed as workspace packages**, e.g.:

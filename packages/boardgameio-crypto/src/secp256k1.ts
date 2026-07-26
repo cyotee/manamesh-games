@@ -1,13 +1,24 @@
-import { ec as EC } from "elliptic";
+/**
+ * secp256k1 helpers built on @noble/curves (constant-time-friendly, audited).
+ *
+ * Wire format conventions (stable across releases):
+ * - Points: compressed hex (02/03 + 32-byte x), no 0x prefix
+ * - Infinity: the sentinel `"00"` (not a valid public key)
+ * - Scalars: 32-byte hex, no 0x prefix
+ */
+
+import { secp256k1 as noble } from "@noble/curves/secp256k1";
 
 type Bytes = Uint8Array;
+
+const { ProjectivePoint } = noble;
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);
 }
 
 function getCrypto(): Crypto {
-  const c = (globalThis as any).crypto as Crypto | undefined;
+  const c = (globalThis as { crypto?: Crypto }).crypto;
   assert(
     c && typeof c.getRandomValues === "function",
     "crypto.getRandomValues unavailable",
@@ -28,7 +39,6 @@ function bytesToBigInt(b: Bytes): bigint {
 }
 
 function modInv(a: bigint, mod: bigint): bigint {
-  // Extended Euclid
   let t = 0n;
   let newT = 1n;
   let r = mod;
@@ -44,7 +54,7 @@ function modInv(a: bigint, mod: bigint): bigint {
 }
 
 function hexToBigInt(hex: string): bigint {
-  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const clean = hex.startsWith("0x") || hex.startsWith("0X") ? hex.slice(2) : hex;
   assert(clean.length > 0 && /^[0-9a-fA-F]+$/.test(clean), "invalid hex");
   return BigInt("0x" + clean);
 }
@@ -54,14 +64,30 @@ function bigintToHexNo0x(x: bigint): string {
   return h.length % 2 === 0 ? h : "0" + h;
 }
 
-export const secp256k1 = new EC("secp256k1");
+function strip0x(hex: string): string {
+  return hex.startsWith("0x") || hex.startsWith("0X") ? hex.slice(2) : hex;
+}
 
-// Curve order (n) for secp256k1.
-export const SECP256K1_N = BigInt(
-  "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-);
+function hexToBytes(hex: string): Uint8Array {
+  const clean = strip0x(hex);
+  assert(clean.length % 2 === 0 && /^[0-9a-fA-F]*$/.test(clean), "invalid hex");
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
 
-export type SecpPointHex = string; // compressed point hex, no 0x
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Curve order n (re-exported for consumers that need the prime field of scalars). */
+export const SECP256K1_N = noble.CURVE.n;
+
+export type SecpPointHex = string; // compressed point hex, no 0x — or "00" for infinity
 export type SecpScalarHex = string; // 32-byte hex scalar, no 0x
 
 export function secpModN(x: bigint): bigint {
@@ -84,7 +110,6 @@ export function secpScalarToHex32(x: bigint): SecpScalarHex {
 }
 
 export function secpRandomScalar(): bigint {
-  // Rejection sampling in [1..n-1]
   for (;;) {
     const x = bytesToBigInt(randomBytes(32));
     const v = x % SECP256K1_N;
@@ -92,13 +117,40 @@ export function secpRandomScalar(): bigint {
   }
 }
 
+/**
+ * Parse a point hex (compressed, uncompressed, or infinity `"00"`).
+ * Throws if invalid.
+ */
+export function secpPointFromHex(hex: string): InstanceType<typeof ProjectivePoint> {
+  const clean = strip0x(hex);
+  if (clean.toLowerCase() === "00") {
+    return ProjectivePoint.ZERO;
+  }
+  return ProjectivePoint.fromHex(clean);
+}
+
+export function secpPointToCompressedHex(
+  p: InstanceType<typeof ProjectivePoint>,
+): SecpPointHex {
+  if (p.equals(ProjectivePoint.ZERO)) return "00";
+  return p.toHex(true);
+}
+
+export function secpPointToUncompressedHex(
+  p: InstanceType<typeof ProjectivePoint>,
+): string {
+  if (p.equals(ProjectivePoint.ZERO)) return "00";
+  return p.toHex(false);
+}
+
 export function secpIsValidPointHex(hex: string): boolean {
   try {
-    const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+    const clean = strip0x(hex);
     if (clean.toLowerCase() === "00") return true;
     if (!/^[0-9a-fA-F]+$/.test(clean) || clean.length < 2) return false;
-    const p = secp256k1.curve.decodePoint(clean, "hex");
-    return !!p && p.validate();
+    const p = ProjectivePoint.fromHex(clean);
+    p.assertValidity();
+    return true;
   } catch {
     return false;
   }
@@ -106,19 +158,15 @@ export function secpIsValidPointHex(hex: string): boolean {
 
 export function secpPointNormalizeHex(hex: string): SecpPointHex {
   assert(secpIsValidPointHex(hex), "invalid point");
-  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const clean = strip0x(hex);
   if (clean.toLowerCase() === "00") return "00";
-  const p = secp256k1.curve.decodePoint(clean, "hex");
-  return p.encode("hex", true);
+  return ProjectivePoint.fromHex(clean).toHex(true);
 }
 
 export function secpBaseMulHex(k: bigint): SecpPointHex {
   const kk = secpModN(k);
   assert(kk !== 0n, "scalar cannot be zero");
-  const p = secp256k1.g.mul(
-    secp256k1.keyFromPrivate(secpScalarToHex32(kk), "hex").getPrivate(),
-  );
-  return p.encode("hex", true);
+  return ProjectivePoint.BASE.multiply(kk).toHex(true);
 }
 
 export function secpPointAddHex(aHex: string, bHex: string): SecpPointHex {
@@ -126,18 +174,15 @@ export function secpPointAddHex(aHex: string, bHex: string): SecpPointHex {
   const bN = secpPointNormalizeHex(bHex);
   if (aN === "00") return bN;
   if (bN === "00") return aN;
-  const a = secp256k1.curve.decodePoint(aN, "hex");
-  const b = secp256k1.curve.decodePoint(bN, "hex");
-  const c = a.add(b);
-  return c.encode("hex", true);
+  const a = ProjectivePoint.fromHex(aN);
+  const b = ProjectivePoint.fromHex(bN);
+  return secpPointToCompressedHex(a.add(b));
 }
 
 export function secpPointNegHex(aHex: string): SecpPointHex {
   const aN = secpPointNormalizeHex(aHex);
   if (aN === "00") return "00";
-  const a = secp256k1.curve.decodePoint(aN, "hex");
-  const c = a.neg();
-  return c.encode("hex", true);
+  return secpPointToCompressedHex(ProjectivePoint.fromHex(aN).negate());
 }
 
 export function secpPointMulHex(pHex: string, k: bigint): SecpPointHex {
@@ -145,16 +190,46 @@ export function secpPointMulHex(pHex: string, k: bigint): SecpPointHex {
   if (pN === "00") return "00";
   const kk = secpModN(k);
   if (kk === 0n) return "00";
-  const p = secp256k1.curve.decodePoint(pN, "hex");
-  const bn = secp256k1
-    .keyFromPrivate(secpScalarToHex32(kk), "hex")
-    .getPrivate();
-  const c = p.mul(bn);
-  return c.encode("hex", true);
+  return ProjectivePoint.fromHex(pN).multiply(kk).toHex(true);
+}
+
+/**
+ * Derive compressed public key from a private scalar hex (any length; mod n).
+ */
+export function secpPublicKeyFromPrivateHex(privateKeyHex: string): SecpPointHex {
+  const sk = secpScalarFromHex(privateKeyHex);
+  assert(sk !== 0n, "private key cannot be zero");
+  return ProjectivePoint.BASE.multiply(sk).toHex(true);
+}
+
+/**
+ * Normalize a seed/private-key byte string to a 32-byte scalar (big-endian, mod n).
+ * Matches elliptic's `keyFromPrivate` behaviour for short seeds (left-pad).
+ */
+export function secpPrivateKeyBytesFromSeed(seed: Uint8Array): Uint8Array {
+  if (seed.length === 32) {
+    const v = bytesToBigInt(seed) % SECP256K1_N;
+    if (v === 0n) throw new Error("invalid private key seed (zero scalar)");
+    return hexToBytes(secpScalarToHex32(v));
+  }
+  if (seed.length < 32) {
+    const out = new Uint8Array(32);
+    out.set(seed, 32 - seed.length);
+    const v = bytesToBigInt(out) % SECP256K1_N;
+    if (v === 0n) throw new Error("invalid private key seed (zero scalar)");
+    return hexToBytes(secpScalarToHex32(v));
+  }
+  // Longer than 32: reduce mod n (BN-style)
+  const v = bytesToBigInt(seed) % SECP256K1_N;
+  if (v === 0n) throw new Error("invalid private key seed (zero scalar)");
+  return hexToBytes(secpScalarToHex32(v));
+}
+
+export function secpRandomPrivateKeyBytes(): Uint8Array {
+  return hexToBytes(secpScalarToHex32(secpRandomScalar()));
 }
 
 export function secpLagrangeCoeffAt0(xs: bigint[], i: number): bigint {
-  // lambda_i = Π_{j!=i} (-x_j) / (x_i - x_j) mod n
   assert(i >= 0 && i < xs.length, "bad index");
   const xi = secpModN(xs[i] as bigint);
   let num = 1n;
@@ -172,7 +247,9 @@ export function secpLagrangeCoeffAt0(xs: bigint[], i: number): bigint {
  * Validate an EncryptedCard received as a decryption share.
  * Ensures the ciphertext is a valid curve point and layers is a non-negative number.
  */
-export function validateEncryptedCard(card: { ciphertext: string; layers: number } | null | undefined): boolean {
+export function validateEncryptedCard(
+  card: { ciphertext: string; layers: number } | null | undefined,
+): boolean {
   if (!card || typeof card.layers !== "number" || card.layers < 0) return false;
   return secpIsValidPointHex(card.ciphertext);
 }
@@ -182,12 +259,19 @@ export function validateEncryptedCard(card: { ciphertext: string; layers: number
  * In pure P2P, we require exact match (ctx.playerID may be undefined in some host paths,
  * but game modules should pass the real sender).
  */
-export function validatePlayerIdentity(ctxPlayerId: string | undefined, claimedPlayerId: string): boolean {
+export function validatePlayerIdentity(
+  ctxPlayerId: string | undefined,
+  claimedPlayerId: string,
+): boolean {
   if (!claimedPlayerId || typeof claimedPlayerId !== "string") return false;
   if (ctxPlayerId === undefined) {
-    // Conservative: in fully trusted host scenarios this may be relaxed,
-    // but for adversarial P2P we prefer explicit binding at call sites.
     return true;
   }
   return claimedPlayerId === ctxPlayerId;
 }
+
+// Re-export noble curve for advanced consumers (no elliptic dependency).
+export { noble as nobleSecp256k1, ProjectivePoint as SecpProjectivePoint };
+
+// Internal helpers used by sibling modules
+export { hexToBytes as secpHexToBytes, bytesToHex as secpBytesToHex, strip0x as secpStrip0x };
