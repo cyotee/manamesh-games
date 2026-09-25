@@ -87,7 +87,7 @@ export function getMission(id: string): any {
 }
 
 // Board and other assets (relative to assets/)
-export const PLAYER_TRAINING_TRACK_PATH = 'board/Player Training Track.png';
+export { PLAYER_TRAINING_TRACK_PATH, getLocalAssetUrl } from '../assets';
 
 export function getCardImagePath(card: MistbornCard): string | undefined {
   return card.imagePath || card.imageCid;
@@ -112,8 +112,5 @@ export function getPackCardImage(set: string, filename: string): string {
 
 // For convenience in UI components (relative to package assets/)
 // In Vite/Manamesh frontend: use new URL or the asset system.
-export function getLocalAssetUrl(relativePath: string): string {
-  return `/assets/${relativePath}`;
-}
 
 export const ASSET_CARDS_BASE = 'cards/';

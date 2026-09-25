@@ -300,7 +300,11 @@ export function MistbornBoard({
   // These enable full real-G rendering without demo fallback for the board.
   const getPlayerData = (pid: string) => {
     if (isDemo) {
-      return demoState!.players[pid] || { trainingPosition: 0, burnLimit: 1, health: 36, character: 'vin' };
+      return {
+        metals: [],
+        character: undefined,
+        ...(demoState!.players[pid] || { trainingPosition: 0, burnLimit: 1, health: 36, character: 'vin' }),
+      };
     }
     const p = (G?.players && G.players[pid]) || {};
     return {

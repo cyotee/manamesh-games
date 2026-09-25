@@ -1,5 +1,19 @@
 # Security Policy
 
+## Current protocol caveat — 2026-09-05
+
+Primitive correctness does not establish mental-poker privacy. Ordered SRA
+encryption passes followed by permutations of unchanged ciphertexts allow
+keyless card tracking through the transcript. Completing a private peek in
+shared state also exposes its plaintext to the host. Use a reviewed verifiable
+rerandomized shuffle, private final decryption and independent rule/proof
+verification before claiming malicious-host protection. See the monorepo
+[production-readiness investigation](../../docs/production-readiness.md).
+
+The signing serializer now preserves own `__proto__` fields instead of silently
+omitting them. Ordinary JSON encodings are unchanged; do not accept old signatures
+over messages that relied on that omission.
+
 ## Threat model (summary)
 
 `@cyotee/boardgameio-crypto` provides **browser-oriented** cryptographic building blocks for peer-to-peer board/card games. It is **not** a general-purpose hardened cryptography product (e.g. TLS, wallet core, or HSM).
@@ -22,7 +36,9 @@
 2. Submit only **ciphertexts**, **peels**, **commitments**, and **public keys** on the wire.
 3. Admit public keys via **keychain** (`MENTAL_POKER_KEYCHAIN_POLICY` for multi-party SRA).
 4. Bind encrypt `sk` → published `pk` **on the client** before encrypting (`requirePrivateKeyMatchesPublished` / `prepareEncryptionLayer` patterns).
-5. Prefer HOST-authoritative crypto moves (`client: false`) so clients cannot invent shared crypto state unilaterally.
+5. `client: false` only selects host execution. Authenticate the sender in moves;
+   peers must independently verify rules and cryptographic evidence to protect
+   against a malicious host.
 
 ## Supported versions
 

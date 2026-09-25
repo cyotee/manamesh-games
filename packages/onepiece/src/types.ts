@@ -183,7 +183,7 @@ export interface PlayAreaSlot {
 /**
  * Per-player state in One Piece TCG.
  */
-export interface OnePiecePlayerState {
+export interface OnePiecePlayerState extends OnePieceCryptoPlayerState {
   mainDeck: OnePieceCard[];
   lifeDeck: OnePieceCard[];
   donDeck: OnePieceDonCard[];
@@ -198,7 +198,8 @@ export interface OnePiecePlayerState {
 /**
  * Full game state for One Piece TCG.
  */
-export interface OnePieceState {
+export interface OnePieceState extends OnePieceProtocolState {
+  mode: "deck-loading";
   players: Record<string, OnePiecePlayerState>;
   config: OnePieceModuleConfig;
   phase: OnePiecePhase;
@@ -223,9 +224,6 @@ export interface OnePieceState {
   /** Remaining life for each player's leader (for win condition) */
   leaderLife: Record<string, number>;
 
-  /** Optional: card id lists extracted from loaded decks for crypto games */
-  deckCardIds?: Record<string, string[]>;
-  lifeDeckIds?: Record<string, string[]>;
 }
 
 export type OnePiecePhase =
@@ -268,7 +266,7 @@ export const DEFAULT_CONFIG: OnePieceModuleConfig = {
 // Module Type
 // =============================================================================
 
-export type OnePieceGameModule = import("../types").GameModule<
+export type OnePieceGameModule = import("@cyotee/manamesh/game/modules").GameModule<
   OnePieceCard,
   OnePieceState
 >;
@@ -335,10 +333,15 @@ export interface DecryptRequest {
  * Extends the plaintext OnePieceState but replaces player states with crypto ones
  * and adds encrypted zones, plugin state, escrow shares, and shuffle RNG.
  */
-export interface OnePieceCryptoState extends Omit<OnePieceState, "players"> {
+export interface OnePieceCryptoState extends Omit<OnePieceState, "players" | "mode"> {
+  mode: "encrypted";
   // Override player state for crypto
   players: Record<string, OnePieceCryptoPlayerState>;
 
+}
+
+/** Public protocol state shared by the deck-loading and encrypted game variants. */
+export interface OnePieceProtocolState {
   // Encrypted zones — replaces plaintext card arrays
   encryptedZones: Record<string, EncryptedCard[]>;
 

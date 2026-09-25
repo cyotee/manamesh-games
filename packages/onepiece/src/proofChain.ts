@@ -141,7 +141,7 @@ export function verifyProofSignature(
  * Append a proof to the game state's proof chain.
  */
 export function appendProof(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "proofChain">,
   proof: CryptographicProof,
 ): void {
   state.proofChain.push(proof);
@@ -233,7 +233,7 @@ export function verifyProofSignatures(
  * Get the latest proof in the chain.
  */
 export function getLatestProof(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "proofChain">,
 ): CryptographicProof | null {
   if (state.proofChain.length === 0) return null;
   return state.proofChain[state.proofChain.length - 1];
@@ -242,7 +242,7 @@ export function getLatestProof(
 /**
  * Get the hash of the latest proof (for chaining).
  */
-export function getLatestProofHash(state: OnePieceState): string | null {
+export function getLatestProofHash(state: Pick<OnePieceState, "proofChain">): string | null {
   const latest = getLatestProof(state);
   return latest?.hash ?? null;
 }
@@ -251,7 +251,7 @@ export function getLatestProofHash(state: OnePieceState): string | null {
  * Find all proofs for a specific card.
  */
 export function getProofsForCard(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "proofChain">,
   cardId: string,
 ): CryptographicProof[] {
   return state.proofChain.filter((proof) => proof.data.cardId === cardId);

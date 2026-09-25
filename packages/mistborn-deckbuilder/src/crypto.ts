@@ -74,14 +74,11 @@ export function createCryptoInitialState(): Partial<MistbornState> {
  */
 export function submitPublicKey(
   G: MistbornState,
-  ctx: Ctx,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   publicKey: string,
 ): MistbornState | typeof INVALID_MOVE {
-  if (G.phase !== "keyExchange" && (ctx.phase as string) !== "keyExchange") {
-    // Prefer G.phase; boardgame.io phase may also be keyExchange
-    if (G.phase !== "keyExchange") return INVALID;
-  }
+  if (G.phase !== "keyExchange" && ctx.phase !== "keyExchange") return INVALID;
 
   if (ctx.playerID !== undefined && ctx.playerID !== playerId) {
     return INVALID;
@@ -134,7 +131,7 @@ export function submitPublicKey(
  */
 export function encryptDeck(
   G: MistbornState,
-  ctx: Ctx,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   privateKey: string,
   zoneId = "deck",
@@ -216,13 +213,13 @@ export function encryptDeck(
 export const cryptoMoves = {
   submitPublicKey: (
     G: MistbornState,
-    ctx: Ctx,
+    ctx: Ctx & { playerID?: string },
     playerId: string,
     publicKey: string,
   ) => submitPublicKey(G, ctx, playerId, publicKey),
   encryptDeck: (
     G: MistbornState,
-    ctx: Ctx,
+    ctx: Ctx & { playerID?: string },
     playerId: string,
     privateKey: string,
   ) => encryptDeck(G, ctx, playerId, privateKey),

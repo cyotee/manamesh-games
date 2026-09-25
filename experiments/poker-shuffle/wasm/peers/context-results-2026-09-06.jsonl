@@ -1,0 +1,6 @@
+{"date": "2026-09-06", "contextVersion": 2, "sha256": "168839ad95346d554112f15f6e349890746e1f40572277dad7d5cc70f3291f1a"}
+{"browser":"149.0.7827.55","wasmBytes":351271}
+{"seats":2,"privateCardsOpened":1,"isolatedWorkers":2,"foreignSessionWorkers":1,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":2281}
+{"seats":3,"privateCardsOpened":1,"isolatedWorkers":3,"foreignSessionWorkers":1,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":4442}
+{"seats":4,"privateCardsOpened":1,"isolatedWorkers":4,"foreignSessionWorkers":1,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":7265}
+{"seats":5,"privateCardsOpened":1,"isolatedWorkers":5,"foreignSessionWorkers":1,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":10843}

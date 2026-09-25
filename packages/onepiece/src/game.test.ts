@@ -365,7 +365,7 @@ describe("OnePieceGame", () => {
       numPlayers: 2,
       playOrder: ["0", "1"],
     } as Ctx;
-    const state = OnePieceGame.setup!(ctx, {} as never);
+    const state = OnePieceGame.setup!({ ctx } as Parameters<NonNullable<typeof OnePieceGame.setup>>[0], {} as never);
     expect(state.players["0"]).toBeDefined();
     expect(state.players["1"]).toBeDefined();
   });
@@ -481,13 +481,13 @@ describe("leaderLife", () => {
 describe("OnePieceGame phases", () => {
   it("should set phase to setup on setup", () => {
     const ctx = { numPlayers: 2, playOrder: ["0", "1"] } as Ctx;
-    const state = OnePieceGame.setup!(ctx, {} as never);
+    const state = OnePieceGame.setup!({ ctx } as Parameters<NonNullable<typeof OnePieceGame.setup>>[0], {} as never);
     expect(state.phase).toBe("setup");
   });
 
   it("should advance to keyExchange when both players load decks", async () => {
     const ctx = { numPlayers: 2, playOrder: ["0", "1"] } as Ctx;
-    const state = OnePieceGame.setup!(ctx, {} as never);
+    const state = OnePieceGame.setup!({ ctx } as Parameters<NonNullable<typeof OnePieceGame.setup>>[0], {} as never);
     state.phase = "setup";
 
     const deck0 = [

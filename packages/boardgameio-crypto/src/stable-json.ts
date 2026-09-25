@@ -22,7 +22,9 @@ function normalize(value: unknown): unknown {
   }
   if (Array.isArray(value)) return value.map(normalize);
   if (isPlainObject(value)) {
-    const out: Record<string, unknown> = {};
+    // A normal object invokes Object.prototype.__proto__'s setter here, silently
+    // dropping a wire field from the signing preimage. Preserve every own key.
+    const out: Record<string, unknown> = Object.create(null);
     const keys = Object.keys(value).sort();
     for (const k of keys) out[k] = normalize(value[k] as unknown);
     return out;

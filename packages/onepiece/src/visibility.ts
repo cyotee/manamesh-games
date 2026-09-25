@@ -85,7 +85,7 @@ export function getValidTransitions(from: CardVisibilityState): CardVisibilitySt
  * @returns The transition record, or null if the transition is invalid.
  */
 export function transitionCardVisibility(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "cardVisibility" | "proofChain">,
   cardId: string,
   to: CardVisibilityState,
   initiatedBy: string,
@@ -129,7 +129,7 @@ export function transitionCardVisibility(
  * All transitions share the same action context but produce individual proofs.
  */
 export function batchTransitionVisibility(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "cardVisibility" | "proofChain">,
   cardIds: string[],
   to: CardVisibilityState,
   initiatedBy: string,
@@ -160,7 +160,7 @@ export function batchTransitionVisibility(
  * Defaults to 'encrypted' if not tracked.
  */
 export function getCardVisibility(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "cardVisibility" | "proofChain">,
   cardId: string,
 ): CardVisibilityState {
   return state.cardVisibility[cardId] ?? 'encrypted';
@@ -170,7 +170,7 @@ export function getCardVisibility(
  * Initialize visibility tracking for a set of cards.
  */
 export function initializeCardVisibility(
-  state: OnePieceState,
+  state: Pick<OnePieceState, "cardVisibility" | "proofChain">,
   cardIds: string[],
   initialState: CardVisibilityState = 'encrypted',
 ): void {

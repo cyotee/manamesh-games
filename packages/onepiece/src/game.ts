@@ -3,7 +3,7 @@
  *
  * Rules-agnostic state manager with cooperative decryption.
  * This module does NOT enforce game rules — it manages game state
- * and ensures fair deck operations through cryptographic protocols.
+ * includes experimental cryptographic deck operations. See ../SECURITY.md.
  *
  * Phases:
  * - setup: Initial game setup
@@ -52,7 +52,6 @@ import {
   OnePieceCryptoGame,
   createCryptoInitialState,
   submitPublicKey,
-  encryptDeck,
   commitShuffleSeed,
   revealShuffleSeed,
   shuffleEncryptedDeck,
@@ -109,6 +108,7 @@ export function createInitialState(
   config: GameConfig,
   moduleConfig: OnePieceModuleConfig = DEFAULT_CONFIG,
 ): OnePieceState {
+  const protocol = createCryptoInitialState(config, moduleConfig);
   const players: Record<string, OnePiecePlayerState> = {};
   const zones: Record<string, Record<string, AnyOnePieceCard[]>> = {
     mainDeck: {},
@@ -124,6 +124,7 @@ export function createInitialState(
     const donCards = createDonCards(moduleConfig.startingDon, playerId);
 
     players[playerId] = {
+      ...protocol.players[playerId],
       mainDeck: [],
       lifeDeck: [],
       donDeck: donCards,
@@ -152,6 +153,8 @@ export function createInitialState(
   }
 
   return {
+    ...protocol,
+    mode: "deck-loading",
     players,
     config: moduleConfig,
     phase: "setup",
@@ -211,6 +214,7 @@ export function loadDeck(
   const leaderSlot = player.playArea.find((s) => s.slotType === "leader");
   if (!leaderSlot) return INVALID_MOVE;
   leaderSlot.cardId = leader.id;
+  player.leaderCardId = leader.id;
 
   player.mainDeck = shuffleDeck(mainDeckCards);
 
@@ -712,11 +716,7 @@ export function validateMove(
 export const OnePieceGame: Game<OnePieceState> = {
   name: "onepiece",
 
-  // Stub: wire to a real session-token validator when a relay server is deployed.
-  // In pure P2P mode, ctx.playerID is enforced by the libp2p transport instead.
-  authenticateCredentials: () => true,
-
-  setup: (ctx): OnePieceState => {
+  setup: ({ ctx }): OnePieceState => {
     const state = createInitialState({
       numPlayers: ctx.numPlayers ?? 2,
       playerIDs: ctx.playOrder ?? ["0", "1"],
@@ -737,17 +737,12 @@ export const OnePieceGame: Game<OnePieceState> = {
         return (parseInt(ctx.currentPlayer) + 1) % (ctx.numPlayers ?? 2);
       },
     },
-    activePlayers: {
-      setup: { all: "setup" },
-      keyExchange: { all: "keyExchange" },
-      encrypt: { all: "encrypt" },
-      shuffle: { all: "shuffle" },
-      play: { all: "play" },
-    },
+
   },
 
   phases: {
     setup: {
+      turn: { activePlayers: { all: "setup" } },
       start: true,
       next: "keyExchange",
       endIf: ({ G }) => {
@@ -756,13 +751,16 @@ export const OnePieceGame: Game<OnePieceState> = {
       },
       moves: {
         loadDeck: {
-          move: ({ G, ctx }, playerId: string, cards: OnePieceCard[]) =>
-            loadDeck(G, ctx, playerId, cards),
+          move: ({ G, ctx, playerID }, playerId: string, cards: OnePieceCard[]) => {
+            if (playerId !== playerID) return INVALID_MOVE;
+            return loadDeck(G, ctx, playerID, cards);
+          },
           client: false,
         },
       },
     },
     keyExchange: {
+      turn: { activePlayers: { all: "keyExchange" } },
       next: "encrypt",
       endIf: ({ G }) => {
         if (G.phase !== "keyExchange") return true;
@@ -770,27 +768,27 @@ export const OnePieceGame: Game<OnePieceState> = {
       },
       moves: {
         submitPublicKey: {
-          move: ({ G, ctx }, playerId: string, publicKey: string) =>
-            submitPublicKey(G, ctx, playerId, publicKey),
+          move: ({ G, ctx, playerID }, playerId: string, publicKey: string) => {
+            if (playerId !== playerID) return INVALID_MOVE;
+            return submitPublicKey(G, { ...ctx, playerID }, playerID, publicKey);
+          },
           client: false,
         },
       },
     },
     encrypt: {
+      turn: { activePlayers: { all: "encrypt" } },
       next: "shuffle",
       endIf: ({ G }) => {
         if (G.phase !== "encrypt") return true;
         return undefined;
       },
       moves: {
-        encryptDeck: {
-          move: ({ G, ctx }, playerId: string, privateKey: string) =>
-            encryptDeck(G, ctx, playerId, privateKey),
-          client: false,
-        },
+        // Private-key encryption is offline-only; no network move is registered.
       },
     },
     shuffle: {
+      turn: { activePlayers: { all: "shuffle" } },
       next: "play",
       endIf: ({ G }) => {
         if (G.phase !== "shuffle") return true;
@@ -800,20 +798,18 @@ export const OnePieceGame: Game<OnePieceState> = {
       moves: {
         commitShuffleSeed: {
           move: (
-            { G, ctx },
+            { G, ctx, playerID },
             playerId: string,
             commitHashHex: string,
-            callerId?: string,
-          ) => commitShuffleSeed(G, ctx, playerId, commitHashHex, callerId),
+          ) => commitShuffleSeed(G, ctx, playerId, commitHashHex, playerID),
           client: false,
         },
         revealShuffleSeed: {
           move: (
-            { G, ctx },
+            { G, ctx, playerID },
             playerId: string,
             seedHex: string,
-            callerId?: string,
-          ) => revealShuffleSeed(G, ctx, playerId, seedHex, callerId),
+          ) => revealShuffleSeed(G, ctx, playerId, seedHex, playerID),
           client: false,
         },
         shuffleEncryptedDeck: {
@@ -832,7 +828,7 @@ export const OnePieceGame: Game<OnePieceState> = {
             return (parseInt(ctx.currentPlayer) + 1) % playerOrder.length;
           },
         },
-        onTurnBegin: ({ G, ctx }) => {
+        onBegin: ({ G, ctx }) => {
           const pid = ctx.currentPlayer;
           const player = G.players[pid];
           if (!player) return;
@@ -868,9 +864,9 @@ export const OnePieceGame: Game<OnePieceState> = {
       },
       moves: {
         endTurn: {
-          move: ({ G, ctx }) => {
-            if (G.phase !== "play") return INVALID_MOVE;
-            return G;
+          move: ({ G, ctx, playerID, events }) => {
+            if (G.phase !== "play" || playerID !== ctx.currentPlayer) return INVALID_MOVE;
+            events.endTurn();
           },
           client: false,
         },
@@ -970,7 +966,7 @@ export const OnePieceGame: Game<OnePieceState> = {
             { G, ctx },
             playerId: string,
             requestId: string,
-            decryptionShare: string,
+            decryptionShare: import("@cyotee/boardgameio-crypto/mental-poker").EncryptedCard,
           ) =>
             submitDecryptionShare(G, ctx, playerId, requestId, decryptionShare),
           client: false,
@@ -989,8 +985,8 @@ export const OnePieceGame: Game<OnePieceState> = {
           client: false,
         },
         voteAbortReveal: {
-          move: ({ G, ctx }, playerId: string) =>
-            voteAbortReveal(G as any, ctx, playerId),
+          move: ({ G, ctx, playerID }, playerId: string) =>
+            voteAbortReveal(G, { ...ctx, playerID }, playerId),
           client: false,
         },
       },

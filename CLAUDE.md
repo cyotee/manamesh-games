@@ -40,7 +40,7 @@ yarn build:timestreams-vercel
 # yarn deploy:timestreams   # builds + vercel --prod (needs auth)
 ```
 
-**Node:** `>=20` (see `@manamesh/frontend` engines).
+**Node:** `>=20` (see `@cyotee/manamesh` engines).
 
 **Submodules** (required for a full checkout):
 
@@ -65,7 +65,7 @@ manamesh-games/
 ├── packages/
 │   ├── manamesh/                # Platform submodule (NOT a yarn workspace root itself)
 │   │   ├── packages/
-│   │   │   ├── frontend/        # @manamesh/frontend — React + Vite app shell
+│   │   │   ├── frontend/        # @cyotee/manamesh — React + Vite app shell
 │   │   │   └── backend/         # Optional Express/WS signaling (not required for play)
 │   │   ├── contracts/           # Foundry contracts (platform-level)
 │   │   ├── CLAUDE.md            # Platform-oriented agent notes (may lag structure)
@@ -131,7 +131,7 @@ When changing a game, prefer editing its package (`packages/poker`, etc.) over t
 - **P2P-first** — A full game should work with no backend; signaling is optional fallback.
 - **Modular games** — Rules live in game modules; shell owns transport, assets, and registry.
 - **Crypto fairness** — In-play secrets use commitments / mental poker / HE; do not put private keys in shared boardgame.io state for production modes.
-- **HOST-authoritative crypto moves** — Crypto moves typically use `client: false` so the host runs them (clients cannot unilaterally invent shared crypto state).
+- **Host execution is not proof verification** — Crypto moves typically use `client: false` so the host runs them. This does not authenticate callers or protect against a malicious host; enforce sender binding in moves and verify protocol evidence independently.
 
 ### Three crypto paradigms
 
@@ -163,7 +163,7 @@ Deep module-by-module notes: `packages/manamesh/AGENTS.md`.
 
 | Package | Test / build |
 |---------|----------------|
-| `@manamesh/frontend` | `yarn workspace @manamesh/frontend dev` / `test` / `build` |
+| `@cyotee/manamesh` | `yarn workspace @cyotee/manamesh dev` / `test` / `build` |
 | `@manamesh/backend` | `yarn workspace @manamesh/backend dev` |
 | `@manamesh/timestreams` | `yarn workspace @manamesh/timestreams test` · e2e: `test:e2e` (Playwright) |
 | `@manamesh/poker` | `yarn workspace @manamesh/poker test` · `forge:test` (Foundry in package dir) |
@@ -174,7 +174,7 @@ Deep module-by-module notes: `packages/manamesh/AGENTS.md`.
 Single frontend test file example:
 
 ```bash
-yarn workspace @manamesh/frontend test src/game/modules/war/game.test.ts
+yarn workspace @cyotee/manamesh test:run src/game/modules/war/game.test.ts
 ```
 
 ## Docs map (read when relevant)
@@ -184,7 +184,8 @@ yarn workspace @manamesh/frontend test src/game/modules/war/game.test.ts
 | `packages/manamesh/AGENTS.md` | Game modules, crypto flows, phases/moves |
 | `packages/manamesh/docs/ARCHITECTURE.md` | Platform architecture depth |
 | `packages/manamesh/PRD.md` | Product goals / non-goals |
-| `packages/manamesh/PROJECT_STATUS.md` | Health, security blockers, completeness |
+| `docs/production-readiness.md` | Current investigation, validation evidence and malicious-host release gates |
+| `packages/manamesh/PROJECT_STATUS.md` | Historical health, security blockers, completeness |
 | `packages/manamesh/SECURITY_REPORT.md` | Crypto/P2P security findings |
 | `packages/timestreams/PRD.md`, `RULES.md`, `RULES_ENGINE_*.md` | Timestreams rules engine work |
 | `packages/poker/docs/*` | Poker settlement / deployment |
@@ -206,7 +207,7 @@ yarn workspace @manamesh/frontend test src/game/modules/war/game.test.ts
 1. **Dual tree confusion** — Platform shell is under `packages/manamesh/packages/frontend`, not `packages/frontend`. Paths in older docs/skills that say `packages/frontend` mean the nested frontend.
 2. **Stale nested CLAUDE/AGENTS** — `packages/manamesh/CLAUDE.md` and parts of `AGENTS.md` still describe crypto under `src/crypto/` and poker under frontend modules. Crypto is **`@cyotee/boardgameio-crypto`** (npm `0.2.x+`); poker/timestreams/onepiece/mistborn are top-level packages. Prefer this root file + current imports.
 3. **`packages/manamesh` is a submodule** — Commits there may need a separate push/PR from the outer monorepo commit that only bumps the submodule pointer.
-4. **Workspace exclusion** — `!packages/manamesh` means you cannot `yarn workspace manamesh …`; use nested package names (`@manamesh/frontend`, etc.).
+4. **Workspace exclusion** — `!packages/manamesh` means you cannot `yarn workspace manamesh …`; use nested package names (`@cyotee/manamesh`, etc.).
 5. **Timestreams P2P** — Production path is **manual join codes**, not libp2p DHT matchmaking (DHT path retired for Timestreams).
 6. **Symmetric NAT** — Join-code + STUN-only WebRTC fails for some networks without TURN (inherent WebRTC limit).
 7. **Demo crypto** — HE Battleship, Go Fish ZK attest, and some HE/DKG paths are demos/scaffolding; do not treat as production-ready fairness.

@@ -15,7 +15,9 @@
     "dev:onepiece": "yarn workspace @cyotee/manamesh exec vite --open /src/pages/onepiece/",
     "test:frontend": "yarn workspace @cyotee/manamesh test",
     "build:timestreams-vercel": "node packages/timestreams/scripts/build-vercel.mjs",
-    "deploy:timestreams": "node packages/timestreams/scripts/build-vercel.mjs && cd deploy/timestreams && vercel deploy --prod --yes --name timestreams"
+    "deploy:timestreams": "node packages/timestreams/scripts/build-vercel.mjs && cd deploy/timestreams && vercel deploy --prod --yes --name timestreams",
+    "test:e2e:poker": "yarn workspace @cyotee/manamesh test:e2e",
+    "test:e2e:poker:install": "yarn workspace @cyotee/manamesh test:e2e:install"
   },
   "dependencies": {
     "@cyotee/boardgame.io": "workspace:*",
@@ -24,5 +26,8 @@
   },
   "devDependencies": {
     "node-gyp": "^13.0.1"
+  },
+  "resolutions": {
+    "@ipld/dag-pb": "4.1.5"
   }
 }

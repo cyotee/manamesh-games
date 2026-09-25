@@ -1,0 +1,5 @@
+{"browser":"149.0.7827.55","wasmBytes":335319}
+{"seats":2,"dealer":1,"privateCardsOpened":4,"isolatedWorkers":2,"crossDealerRejected":true,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":3069}
+{"seats":3,"dealer":2,"privateCardsOpened":6,"isolatedWorkers":3,"crossDealerRejected":true,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":5776}
+{"seats":4,"dealer":3,"privateCardsOpened":8,"isolatedWorkers":4,"crossDealerRejected":true,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":9286}
+{"seats":5,"dealer":4,"privateCardsOpened":10,"isolatedWorkers":5,"crossDealerRejected":true,"crossSessionRejected":true,"transcriptAgreement":true,"elapsedMs":13907}

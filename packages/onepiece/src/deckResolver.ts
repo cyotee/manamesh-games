@@ -179,10 +179,7 @@ async function collectPacks(packId: string): Promise<LoadedAssetPack[]> {
   }
 
   // Single-pack deck: try memory cache first, then IndexedDB
-  let pack = getLoadedPack(packId);
-  if (!pack) {
-    pack = await reloadLocalPack(packId);
-  }
+  const pack = getLoadedPack(packId) ?? await reloadLocalPack(packId);
   return pack ? [pack] : [];
 }
 

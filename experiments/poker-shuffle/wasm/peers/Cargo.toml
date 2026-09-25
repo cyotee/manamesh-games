@@ -1,0 +1,18 @@
+[package]
+name = "manamesh-shuffle-peer-check"
+version = "0.0.0"
+edition = "2024"
+publish = false
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+ziffle = { path = "../ziffle-f24f38e6049d43336517079d4abb36e465ea2512" }
+ark-serialize = "0.5.0"
+ark-secp256k1 = "0.5.0"
+rand_chacha = "0.3.1"
+rand_core = "0.6.4"
+sha2 = "0.10.9"
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"

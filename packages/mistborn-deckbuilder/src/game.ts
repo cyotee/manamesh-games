@@ -28,6 +28,7 @@ import {
 import type { GameModule, GameConfig, MoveValidation } from '@cyotee/manamesh/game/modules';
 import type { CardManifestEntry } from '@cyotee/manamesh/assets/manifest';
 import { cryptoMoves } from './crypto';
+import { mistbornCardSchema } from './cardSchema';
 
 // =============================================================================
 // Initial State
@@ -514,26 +515,50 @@ const moves = {
   },
 };
 
+function engineMove<Args extends unknown[]>(
+  move: (G: MistbornState, ctx: Ctx, ...args: Args) => MistbornState | typeof INVALID_MOVE,
+) {
+  return ({ G, ctx, playerID }: { G: MistbornState; ctx: Ctx; playerID: string }, ...args: Args) => {
+    if (playerID !== ctx.currentPlayer) return INVALID_MOVE;
+    return move(G, ctx, ...args);
+  };
+}
+
+const engineMoves = {
+  draw: engineMove(moves.draw),
+  playCard: engineMove(moves.playCard),
+  burnMetal: engineMove(moves.burnMetal),
+  refillMarket: engineMove(moves.refillMarket),
+  buyCard: engineMove(moves.buyCard),
+  cleanupAndDraw: engineMove(moves.cleanupAndDraw),
+  advanceTraining: engineMove(moves.advanceTraining),
+  eliminateCard: engineMove(moves.eliminateCard),
+  useAsMetal: engineMove(moves.useAsMetal),
+  passTarget: engineMove(moves.passTarget),
+  endTurn: engineMove(moves.endTurn),
+  endMainPhase: engineMove(moves.endMainPhase),
+};
+
 // =============================================================================
 // Game Definition
 // =============================================================================
 
 const MistbornGame: Game<MistbornState> = {
   name: 'mistborn-deckbuilder',
-  setup: (ctx: Ctx, setupData?: any) => {
+  setup: ({ ctx }, setupData?: { packCards?: CardManifestEntry[] }) => {
     const packCards = setupData?.packCards || PACK_CARDS_FROM_MANIFESTS;
     return createInitialState({ 
       numPlayers: ctx.numPlayers, 
       playerIDs: ctx.playOrder,
       packCards,
-    } as any);
+    });
   },
   // Note: onBegin etc. typed in the turn config below
 
-  moves,
+  moves: engineMoves,
   turn: {
     // Rules engine: auto advance training at start of turn (per RULES)
-    onBegin: (G: MistbornState, ctx: Ctx) => {
+    onBegin: ({ G, ctx }) => {
       const pid = ctx.currentPlayer!;
       const player = G.players[pid];
       if (player) {
@@ -561,52 +586,43 @@ const MistbornGame: Game<MistbornState> = {
       moves: {
         submitPublicKey: {
           client: false,
-          move: ({ G, ctx }: { G: MistbornState; ctx: Ctx }, playerId: string, publicKey: string) =>
-            cryptoMoves.submitPublicKey(G, ctx, playerId ?? ctx.playerID!, publicKey),
+          move: ({ G, ctx, playerID }, playerId: string, publicKey: string) => {
+            if (playerId !== playerID) return INVALID_MOVE;
+            return cryptoMoves.submitPublicKey(G, { ...ctx, playerID }, playerID, publicKey);
+          },
         },
       },
     },
-    encrypt: {
-      moves: {
-        encryptDeck: {
-          client: false,
-          move: ({ G, ctx }: { G: MistbornState; ctx: Ctx }, playerId: string, privateKey: string) =>
-            cryptoMoves.encryptDeck(G, ctx, playerId ?? ctx.playerID!, privateKey),
-        },
-      },
-    },
+    // No network encryption move until a validated public-payload protocol exists.
+    // cryptoMoves.encryptDeck takes a private key and is offline-only.
+    encrypt: { moves: {} },
     shuffle: {},
     play: {
-      moves,
+      moves: engineMoves,
       // Main freeform play for rules-free + early engine.
       // Later: onBegin of subphases, endIf conditions, explicit endMainPhase -> combat/cleanup.
     },
   },
-  endIf: (G) => G.winner,
+  endIf: ({ G }) => G.winner,
 };
 
 // =============================================================================
 // GameModule
 // =============================================================================
 
-export const MistbornModule: GameModule = {
+export const MistbornModule: GameModule<MistbornCard, MistbornState> & {
+  assetPacks: {
+    defaultSource: typeof DEFAULT_MISTBORN_PACK_SOURCE;
+    ipfsSource: typeof IPFS_MISTBORN_PACK_SOURCE;
+  };
+  assetSets: { all: typeof MISTBORN_SETS; mapping: typeof DECK_SET_MAPPING };
+} = {
   id: 'mistborn-deckbuilder',
   name: 'Mistborn: The Deck Building Game',
   version: '0.1.0',
   description: 'Deck-building game with metals, training tracks, and missions. Phase 1 = rules-free digital tabletop. Asset packs load from IPFS, local FS, or bundled (Vercel).',
 
-  cardSchema: {
-    validate: (card: any): card is MistbornCard => {
-      return typeof card === 'object' && card !== null && 'id' in card && 'name' in card;
-    },
-    create: (data) => ({
-      id: data.id,
-      name: data.name,
-      imageCid: data.imageCid,
-      ...(data as Partial<MistbornCard>),
-    }),
-    getAssetKey: (card) => card.id,
-  },
+  cardSchema: mistbornCardSchema,
 
   zones: MISTBORN_ZONES,
 

@@ -9,11 +9,13 @@
  * Cooperative decryption for life damage and face-up effects.
  */
 
+import type { CryptoPluginState } from "@cyotee/boardgameio-crypto/plugin/crypto-plugin";
 import type { Game, Ctx } from "boardgame.io";
 import { INVALID_MOVE } from "boardgame.io/core";
 import type { GameConfig } from "@cyotee/manamesh/game/modules";
 import type {
   OnePieceCard,
+  OnePieceState,
   OnePieceDonCard,
   OnePieceCryptoState,
   OnePieceCryptoPlayerState,
@@ -25,7 +27,6 @@ import {
   decrypt,
   encryptDeck as encryptDeckCrypto,
   reencryptDeck,
-  buildCardPointLookup,
   type EncryptedCard,
 } from "@cyotee/boardgameio-crypto/mental-poker";
 import { sha256Hex, stableStringify } from "@cyotee/boardgameio-crypto";
@@ -64,16 +65,12 @@ function isHex(s: string): boolean {
 /**
  * Ensure shuffle RNG state exists.
  */
-function ensureShuffleRng(G: OnePieceCryptoState): ShuffleRngState {
-  const existing = (G as any).shuffleRng as ShuffleRngState | undefined;
+function ensureShuffleRng(G: OnePieceState | OnePieceCryptoState): ShuffleRngState {
+  const existing = G.shuffleRng as ShuffleRngState | undefined;
   if (existing) return existing;
 
-  const commits: Record<string, string | null> = {};
-  const reveals: Record<string, string | null> = {};
-  for (const pid of G.playerOrder ?? []) {
-    commits[pid] = null;
-    reveals[pid] = null;
-  }
+  const commits: Record<string, string> = {};
+  const reveals: Record<string, string> = {};
 
   const created: ShuffleRngState = {
     phase: "commit",
@@ -82,14 +79,14 @@ function ensureShuffleRng(G: OnePieceCryptoState): ShuffleRngState {
     finalSeedHex: null,
     abortVotes: {},
   };
-  (G as any).shuffleRng = created;
+  G.shuffleRng = created;
   return created;
 }
 
 /**
  * Maybe finalize the shuffle seed once all players have revealed.
  */
-function maybeFinalizeShuffleSeed(G: OnePieceCryptoState): void {
+function maybeFinalizeShuffleSeed(G: OnePieceState | OnePieceCryptoState): void {
   const rng = ensureShuffleRng(G);
   if (rng.finalSeedHex) return;
 
@@ -148,7 +145,7 @@ export function createCryptoInitialState(
       hasEncrypted: false,
       hasShuffled: false,
       isConnected: true,
-      lastHeartbeat: Date.now(),
+      lastHeartbeat: 0, // No heartbeat has been received at deterministic setup.
     };
   }
 
@@ -162,11 +159,11 @@ export function createCryptoInitialState(
     encryptedZones[`hand:${playerId}`] = [];
   }
 
-  const cryptoState = {
+  const cryptoState: CryptoPluginState = {
     phase: "init" as const,
     publicKeys: {} as Record<string, string>,
-    commitments: {} as Record<string, string>,
-    shuffleProofs: {} as Record<string, string>,
+    commitments: {},
+    shuffleProofs: {},
     encryptedZones,
     cardPointLookup: {} as Record<string, string>,
     revealedCards: {} as Record<string, string>,
@@ -181,6 +178,7 @@ export function createCryptoInitialState(
   }
 
   const state: OnePieceCryptoState = {
+    mode: "encrypted",
     players,
     config: {
       startingLife: moduleConfig?.startingLife ?? 5,
@@ -237,12 +235,12 @@ export function createCryptoInitialState(
  * Admits under MENTAL_POKER_KEYCHAIN_POLICY (valid finite points, unique seats/keys).
  * Stores canonical compressed public keys only — never private keys.
  */
-export function submitPublicKey(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function submitPublicKey<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   publicKey: string,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   console.log(
     "[OnePieceCrypto] submitPublicKey called for player",
     playerId,
@@ -315,12 +313,13 @@ export function submitPublicKey(
  * Production multiplayer should prepare layers client-side and submit ciphertexts only.
  * Never stores privateKey on G or player state.
  */
-export function encryptDeck(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+// Offline-only: the private key must never be a multiplayer move argument.
+export function encryptDeck<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   privateKey: string,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   if (G.phase !== "encrypt") return INVALID_MOVE;
 
   if (!validatePlayerIdentity(ctx.playerID, playerId)) {
@@ -427,13 +426,13 @@ export function encryptDeck(
 /**
  * Commit shuffle seed hash during shuffle phase.
  */
-export function commitShuffleSeed(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function commitShuffleSeed<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   commitHashHex: string,
   callerId?: string,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   if (G.phase !== "shuffle") return INVALID_MOVE;
   if (callerId && callerId !== playerId) return INVALID_MOVE;
   if (!G.players[playerId]) return INVALID_MOVE;
@@ -466,13 +465,13 @@ export function commitShuffleSeed(
 /**
  * Reveal shuffle seed during shuffle phase.
  */
-export function revealShuffleSeed(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function revealShuffleSeed<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   seedHex: string,
   callerId?: string,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   if (G.phase !== "shuffle") return INVALID_MOVE;
   if (callerId && callerId !== playerId) return INVALID_MOVE;
 
@@ -513,12 +512,12 @@ export function revealShuffleSeed(
  * Shuffle the encrypted deck during shuffle phase.
  * Uses deterministic shuffle seeded by the combined reveal seed.
  */
-export function shuffleEncryptedDeck(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function shuffleEncryptedDeck<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   events?: { endPhase?: () => void },
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   if (G.phase !== "shuffle") return INVALID_MOVE;
 
   const currentPlayer = getCurrentSetupPlayer(G);
@@ -588,7 +587,7 @@ export function shuffleEncryptedDeck(
  * Deal starting hands to all players.
  * Deals 1 card at a time in rotation from the main deck.
  */
-export function dealStartingHands(G: OnePieceCryptoState): void {
+export function dealStartingHands(G: OnePieceState | OnePieceCryptoState): void {
   const deck = G.encryptedZones[MAIN_DECK_ZONE];
   if (!deck || deck.length === 0) {
     console.error("[OnePieceCrypto] No deck to deal from!");
@@ -636,13 +635,13 @@ export function dealStartingHands(G: OnePieceCryptoState): void {
  * Submit decryption share for a pending decrypt request.
  * Used for both life damage (move card to hand) and face-up (keep in life zone).
  */
-export function submitDecryptionShare(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function submitDecryptionShare<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
   requestId: string,
   decryptionShare: EncryptedCard,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   const request = G.pendingDecryptRequests.find((r) => r.id === requestId);
   if (!request) {
     console.error("[OnePieceCrypto] Decrypt request not found:", requestId);
@@ -736,11 +735,11 @@ export function submitDecryptionShare(
 /**
  * Release key after game end (no-op — abandonment voids hand, no key recovery).
  */
-export function releaseKey(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function releaseKey<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   const player = G.players[playerId];
   if (!player) return INVALID_MOVE;
 
@@ -761,11 +760,11 @@ export const ONEPIECE_REVEAL_STALL_WINDOW_MOVES = 8;
  * Either player may call this once ONEPIECE_REVEAL_STALL_WINDOW_MOVES moves have
  * elapsed since the last DecryptRequest was created without completion.
  */
-export function voteAbortReveal(
-  G: OnePieceCryptoState,
-  ctx: Ctx,
+export function voteAbortReveal<State extends OnePieceState | OnePieceCryptoState>(
+  G: State,
+  ctx: Ctx & { playerID?: string },
   playerId: string,
-): OnePieceCryptoState | typeof INVALID_MOVE {
+): State | typeof INVALID_MOVE {
   if (G.phase !== "play") return INVALID_MOVE;
   if (playerId !== ctx.playerID) {
     return INVALID_MOVE;
@@ -797,35 +796,12 @@ export function voteAbortReveal(
 export const OnePieceCryptoGame: Game<OnePieceCryptoState> = {
   name: "onepiece-crypto",
 
-  // Stub: wire to a real session-token validator when a relay server is deployed.
-  // In pure P2P mode, ctx.playerID is enforced by the libp2p transport instead.
-  authenticateCredentials: () => true,
-
-  setup: async (ctx): Promise<OnePieceCryptoState> => {
-    const numPlayers = (ctx.numPlayers as number) ?? 2;
-    const playerIDs =
-      (ctx.playOrder as string[]) ??
-      Array.from({ length: numPlayers }, (_, i) => String(i));
-
-    const state = createCryptoInitialState({ numPlayers, playerIDs });
-
-    // Build card point lookup for all card IDs that might be used
-    // Note: In a full implementation, card IDs would be populated during loadDeck
-    const allCardIds: string[] = [];
-    for (const pid of playerIDs) {
-      allCardIds.push(...(state.deckCardIds[pid] ?? []));
-      allCardIds.push(...(state.lifeDeckIds[pid] ?? []));
-    }
-
-    if (allCardIds.length > 0) {
-      const lookup = await buildCardPointLookup(allCardIds);
-      for (const [cardId, point] of lookup) {
-        state.crypto.cardPointLookup[cardId] = point;
-      }
-    }
-
-    return state;
-  },
+  // Engine setup must return state synchronously. Deck IDs start empty;
+  // deck loading must prepare any card-point lookup before it is consumed.
+  setup: ({ ctx }): OnePieceCryptoState => createCryptoInitialState({
+    numPlayers: ctx.numPlayers,
+    playerIDs: ctx.playOrder,
+  }),
 
   turn: {
     order: {
@@ -847,15 +823,13 @@ export const OnePieceCryptoGame: Game<OnePieceCryptoState> = {
       moves: {
         // All moves have client: false to prevent optimistic updates in P2P mode.
         submitPublicKey: {
-          move: ({ G, ctx }, playerId: string, publicKey: string) =>
-            submitPublicKey(G, ctx, playerId, publicKey),
+          move: ({ G, ctx, playerID }, playerId: string, publicKey: string) => {
+            if (playerId !== playerID) return INVALID_MOVE;
+            return submitPublicKey(G, { ...ctx, playerID }, playerID, publicKey);
+          },
           client: false,
         },
-        encryptDeck: {
-          move: ({ G, ctx }, playerId: string, privateKey: string) =>
-            encryptDeck(G, ctx, playerId, privateKey),
-          client: false,
-        },
+        // Private-key encryption is offline-only; no network move is registered.
         commitShuffleSeed: {
           move: (
             { G, ctx, playerID },
@@ -886,15 +860,13 @@ export const OnePieceCryptoGame: Game<OnePieceCryptoState> = {
       moves: {
         // Setup moves (resume / debug)
         submitPublicKey: {
-          move: ({ G, ctx }, playerId: string, publicKey: string) =>
-            submitPublicKey(G, ctx, playerId, publicKey),
+          move: ({ G, ctx, playerID }, playerId: string, publicKey: string) => {
+            if (playerId !== playerID) return INVALID_MOVE;
+            return submitPublicKey(G, { ...ctx, playerID }, playerID, publicKey);
+          },
           client: false,
         },
-        encryptDeck: {
-          move: ({ G, ctx }, playerId: string, privateKey: string) =>
-            encryptDeck(G, ctx, playerId, privateKey),
-          client: false,
-        },
+        // Private-key encryption is offline-only; no network move is registered.
         commitShuffleSeed: {
           move: (
             { G, ctx, playerID },

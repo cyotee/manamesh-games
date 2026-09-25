@@ -1,0 +1,17 @@
+{
+  "candidateCommit": "f24f38e6049d43336517079d4abb36e465ea2512",
+  "sourceSha256": "6725a9c26853c1c0de29b84cff73235e9a6ddc47cf776f4da1c152b5385ee7de",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "target": "wasm32-unknown-unknown",
+  "cargoLockSha256": "98fe7ca45c506f6de09768673d12e23d301f7e21d3bc45374cb019e4febe4ce3",
+  "moduleSha256": "178ba8e7535ac0acb0557fb57d98d8899ad282c2914420a72171cd7ca9e73931",
+  "moduleBytes": 335319,
+  "metadataPolicy": "package-name-and-version",
+  "strip": "symbols",
+  "compilerWrapperSha256": "7edf3f9c9495222aac36a34efbba293b8f10996e19b729dfb8af9e46b0e28bbf",
+  "inputs": {
+    "wasm/peer-check.rs": "f798359472cedfcaa6ad9e8ac22da636e56291208602d66e7ef4fbc89aafb6c0",
+    "wire-codec.rs": "62c25948344195edad43bc13a80384d7aa6e89da24f6672c6db0cb1156f22b18",
+    "wasm/peers/Cargo.toml": "24ee316d5e18b2c0ad2118cb91545b666537451ae7be43c34ebe199a6431c544"
+  }
+}

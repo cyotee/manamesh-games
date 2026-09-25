@@ -34,8 +34,8 @@ import { createProof, appendProof } from "./proofChain";
 
 let peekCounter = 0;
 
-function isCryptoState(state: any): state is OnePieceCryptoState {
-  return state && typeof state === "object" && "encryptedZones" in state;
+function isCryptoState(state: OnePieceState | OnePieceCryptoState): state is OnePieceCryptoState {
+  return state.mode === "encrypted";
 }
 
 /**
@@ -44,13 +44,12 @@ function isCryptoState(state: any): state is OnePieceCryptoState {
  * The requesting player asks to look at the top N cards of a deck zone.
  */
 export function createPeekRequest(
-  state: OnePieceState,
+  state: OnePieceState | OnePieceCryptoState,
   playerId: string,
   deckZone: "mainDeck" | "lifeDeck",
   count: number,
 ): DeckPeekProtocol | null {
-  const player = state.players[playerId];
-  if (!player) return null;
+  if (!state.players[playerId]) return null;
 
   // Support crypto variant where decks live in encryptedZones
   if (isCryptoState(state)) {
@@ -92,6 +91,7 @@ export function createPeekRequest(
   }
 
   // Plaintext (existing behavior)
+  const player = state.players[playerId];
   const deck = deckZone === "mainDeck" ? player.mainDeck : player.lifeDeck;
   if (deck.length === 0) return null;
 
@@ -139,7 +139,7 @@ export function createPeekRequest(
  * because each card has multiple encryption layers.
  */
 export function acknowledgePeekRequest(
-  state: OnePieceState,
+  state: OnePieceState | OnePieceCryptoState,
   requestId: string,
   decryptionShare: string,
   opponentSignature: string,
@@ -181,7 +181,7 @@ export function acknowledgePeekRequest(
  * operation was fair through the proof chain.
  */
 export function ownerDecryptPeek(
-  state: OnePieceState,
+  state: OnePieceState | OnePieceCryptoState,
   requestId: string,
 ): DeckPeekOwnerDecrypt | null {
   const protocol = findPeekProtocol(state, requestId);
@@ -203,7 +203,7 @@ export function ownerDecryptPeek(
 
   if (isCryptoState(state)) {
     // Crypto mode: work against encryptedZones
-    const cs = state as OnePieceCryptoState;
+    const cs = state;
     const zoneId =
       deckZone === "mainDeck" ? "mainDeck" : `lifeDeck:${playerId}`;
     const encDeck = cs.encryptedZones[zoneId];
@@ -296,7 +296,7 @@ export function ownerDecryptPeek(
  * - Card at position 2 moves to position 1
  */
 export function reorderPeekedCards(
-  state: OnePieceState,
+  state: OnePieceState | OnePieceCryptoState,
   requestId: string,
   newPositions: number[],
   ownerSignature: string,
@@ -314,7 +314,7 @@ export function reorderPeekedCards(
   }
 
   if (isCryptoState(state)) {
-    const cs = state as OnePieceCryptoState;
+    const cs = state;
     const zoneId =
       deckZone === "mainDeck" ? "mainDeck" : `lifeDeck:${playerId}`;
     const encDeck = cs.encryptedZones[zoneId];
@@ -378,7 +378,7 @@ export function reorderPeekedCards(
 /**
  * Complete a peek protocol (mark it as done).
  */
-export function completePeek(state: OnePieceState, requestId: string): boolean {
+export function completePeek(state: OnePieceState | OnePieceCryptoState, requestId: string): boolean {
   const protocol = findPeekProtocol(state, requestId);
   if (!protocol) return false;
   if (protocol.status !== "decrypted" && protocol.status !== "reordered") {
@@ -403,7 +403,7 @@ export function completePeek(state: OnePieceState, requestId: string): boolean {
  * Find a peek protocol by request ID.
  */
 export function findPeekProtocol(
-  state: OnePieceState,
+  state: OnePieceState | OnePieceCryptoState,
   requestId: string,
 ): DeckPeekProtocol | undefined {
   return state.activePeeks.find((p) => p.request.id === requestId);
@@ -413,7 +413,7 @@ export function findPeekProtocol(
  * Get all active peek protocols for a player.
  */
 export function getPlayerActivePeeks(
-  state: OnePieceState,
+  state: OnePieceState | OnePieceCryptoState,
   playerId: string,
 ): DeckPeekProtocol[] {
   return state.activePeeks.filter((p) => p.request.playerId === playerId);
