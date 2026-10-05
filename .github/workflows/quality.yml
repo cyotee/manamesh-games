@@ -1,0 +1,140 @@
+name: Workspace quality
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      SUBMODULES_READ_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # Private submodules need a read-only credential with access to them.
+          token: ${{ secrets.SUBMODULES_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Build shared runtime packages
+        run: |
+          yarn workspace @cyotee/boardgameio-crypto build
+          yarn workspace @cyotee/boardgameio-p2p build
+      - name: Typecheck
+        run: |
+          yarn workspace @cyotee/boardgameio-crypto typecheck
+          yarn workspace @manamesh/poker typecheck
+          yarn workspace @cyotee/manamesh typecheck
+      - name: Shared crypto
+        run: yarn workspace @cyotee/boardgameio-crypto test
+      - name: Channel transport
+        run: yarn workspace @cyotee/boardgameio-p2p exec jest test/channel-multi-peer.test.ts --runInBand
+      - name: Poker
+        run: yarn workspace @manamesh/poker test
+      - name: Timestreams
+        run: yarn workspace @manamesh/timestreams test
+      - name: Extracted game suites
+        run: |
+          yarn workspace @manamesh/mistborn-deckbuilder test
+          yarn workspace @manamesh/onepiece test
+          yarn workspace @manamesh/game-battleship-merkle test
+      - name: Frontend
+        run: yarn workspace @cyotee/manamesh test:run
+      - name: Packaged CLI HTTP boundaries
+        run: node --test packages/manamesh/packages/frontend/scripts/tests/cli.test.mjs
+      - name: Install Chromium for browser checks
+        run: yarn workspace @cyotee/manamesh exec playwright install --with-deps chromium
+      - name: Wallet, session signing and local pages in Chromium
+        env:
+          E2E_PORT: '3107'
+        run: yarn workspace @cyotee/manamesh test:e2e history-signing.spec.ts poker-join-history.spec.ts connected-wallet.spec.ts local-battleship.spec.ts local-pages.spec.ts battleship-channel.spec.ts
+      - name: Production build
+        run: yarn build
+      - name: Stage and pack registry artifacts
+        run: |
+          node scripts/stage-manamesh-release.mjs "$RUNNER_TEMP/manamesh-release"
+          mkdir "$RUNNER_TEMP/manamesh-artifacts"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/manamesh-artifacts" "$RUNNER_TEMP/manamesh-release"
+      - name: Validate isolated registry consumer
+        run: |
+          mkdir "$RUNNER_TEMP/manamesh-consumer"
+          cd "$RUNNER_TEMP/manamesh-consumer"
+          npm init --yes
+          npm install --ignore-scripts --no-audit --no-fund "$RUNNER_TEMP"/manamesh-artifacts/*.tgz
+          node "$GITHUB_WORKSPACE/scripts/check-manamesh-consumer.mjs" "$RUNNER_TEMP/manamesh-consumer"
+          cd "$GITHUB_WORKSPACE"
+          yarn workspace @cyotee/manamesh exec tsc --noEmit --strict --skipLibCheck --module NodeNext --target ES2022 "$RUNNER_TEMP/manamesh-consumer/consumer.ts"
+      - name: Retain validated package
+        uses: actions/upload-artifact@v4
+        with:
+          name: manamesh-registry-package
+          path: ${{ runner.temp }}/manamesh-artifacts/*.tgz
+          if-no-files-found: error
+
+  poker-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+          cache: false
+      - name: Poker settlement and table contracts
+        working-directory: packages/poker
+        run: forge test --threads 2 -vv
+
+  poker-shuffle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_HOME: ${{ runner.temp }}/poker-cargo
+      POKER_SHUFFLE_WASM: ${{ runner.temp }}/poker-shuffle/manamesh_shuffle_peer_check.wasm
+      E2E_PORT: '3107'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Install pinned WASM compiler
+        run: rustup toolchain install 1.96.0 --profile minimal --target wasm32-unknown-unknown
+      - name: Build and verify the pinned experimental shuffle artifact
+        run: python3 scripts/build-poker-shuffle.py --output "$RUNNER_TEMP/poker-shuffle" --expected-module-sha256 d1031ede4c2e4fe0f92b7aa1ca3a6e28b3c15778a215dab97b548f506ad2cf44
+      - name: Build shared runtime packages
+        run: |
+          yarn workspace @cyotee/boardgameio-crypto build
+          yarn workspace @cyotee/boardgameio-p2p build
+      - name: Install Chromium
+        run: yarn workspace @cyotee/manamesh exec playwright install --with-deps chromium
+      - name: Independent shuffle workers and hostile proof inputs
+        run: yarn node experiments/poker-shuffle/wasm/peer-browser-check.mjs "$POKER_SHUFFLE_WASM"
+      - name: Wallet-admitted worker authorization in Chromium
+        run: yarn workspace @cyotee/manamesh test:e2e shuffle-admission.spec.ts
+      - name: Retain experimental artifact and build provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: poker-shuffle-experimental
+          path: ${{ runner.temp }}/poker-shuffle/
+          if-no-files-found: error

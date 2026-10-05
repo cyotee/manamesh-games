@@ -1,0 +1,51 @@
+name: Release validated ManaMesh package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact stable version already committed in the frontend manifest
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-manamesh
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    uses: ./.github/workflows/quality.yml
+    secrets:
+      SUBMODULES_READ_TOKEN: ${{ secrets.SUBMODULES_READ_TOKEN }}
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: manamesh-registry-package
+          path: release-artifact
+      - name: Check requested package version
+        id: package
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/check-release-artifact.mjs release-artifact
+      - name: Publish the validated tarball through npm trusted publishing
+        env:
+          RELEASE_TARBALL: ${{ steps.package.outputs.tarball }}
+        run: npm publish "$RELEASE_TARBALL" --access public --ignore-scripts --registry=https://registry.npmjs.org
